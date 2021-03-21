@@ -1,3 +1,6 @@
 [submodule "nrf5-sdk"]
 	path = nrf5-sdk
 	url = https://github.com/RedlerTechnologies/nrf5-sdk.git
+[submodule "FreeRTOS-Kernel"]
+	path = FreeRTOS-Kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
