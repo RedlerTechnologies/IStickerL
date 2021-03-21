@@ -1,0 +1,31 @@
+﻿---
+BasedOnStyle: LLVM
+AlignConsecutiveAssignments: "true"
+AlignConsecutiveDeclarations: "true"
+AlignEscapedNewlines: Right
+AlignTrailingComments: "true"
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: true
+  AfterObjCDeclaration: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+BreakBeforeTernaryOperators: "false"
+ColumnLimit: "140"
+CommentPragmas: "^ IWYU pragma:"
+# EmptyLinesAtEndOfFile: 1
+IncludeBlocks: Regroup
+IndentWidth: 4
+Language: Cpp
+Standard: Cpp11

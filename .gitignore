@@ -1,0 +1,21 @@
+## SEGGER Embedded Studio and JLink ##
+*.emSession
+*.jlink
+Output
+
+## OSX
+.DS_Store
+
+## Work area
+ignored
+
+## Python
+.venv
+__pycache__
+
+## mklfs
+tools/mklfs/*.o
+tools/mkfs.lfs*
+
+*.swp
+.clang-format.bak
