@@ -1,0 +1,13 @@
+#!/bin/zsh
+
+dirs=(
+  'istickerl'
+  'config'
+  'cloud-wise-sdk'
+  'bootloader'
+)
+
+for dir in $dirs; do
+  echo Format $dir
+  find $dir -iname '*.c' -o -iname '*.h' | xargs clang-format -i -style=file
+done
