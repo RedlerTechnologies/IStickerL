@@ -4,6 +4,7 @@
 #include "ble.h"
 #include "ble/ble_services_manager.h"
 #include "logic/peripherals.h"
+#include "logic/serial_comm.h"
 #include "logic/state_machine.h"
 #include "nrf.h"
 #include "nrf_delay.h"
@@ -141,6 +142,8 @@ static void monitor_thread(void *arg)
         NRFX_LOG_INFO("%s Battery: %u%% VDD mV: %u", __func__, bat_level, peripherals_read_vdd());
 
         ble_services_update_battery_level(bat_level);
+
+        serial_comm_send_text();
 
         vTaskDelay(10000);
     }

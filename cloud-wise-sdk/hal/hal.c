@@ -227,7 +227,19 @@ void hal_interrupts_set(bool enable)
 
 static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_context)
 {
-    //
+    switch (p_event->type) {
+    case NRFX_UART_EVT_RX_DONE:
+        p_evt_handler(HAL_EVENT_UART0_RX);
+        break;
+
+    case NRFX_UART_EVT_TX_DONE:
+        NRFX_LOG_DEBUG("%s TX %u", __func__, p_event->data.rxtx.bytes);
+        break;
+
+    case NRFX_UART_EVT_ERROR:
+        NRFX_LOG_ERROR("%s Error", __func__);
+        break;
+    }
 }
 
 static void spim1_event_handler(nrfx_spim_evt_t const *p_event, void *p_context)

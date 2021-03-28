@@ -7,6 +7,8 @@ typedef enum {
 
     HAL_EVENT_LIS3DH_INT1,
     HAL_EVENT_LIS3DH_INT2,
+
+    HAL_EVENT_UART0_RX,
 } hal_event_type_t;
 
 typedef void (*hal_evt_handler_t)(const hal_event_type_t event);

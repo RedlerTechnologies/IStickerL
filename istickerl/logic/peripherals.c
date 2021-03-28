@@ -5,7 +5,7 @@
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "nrf_log_ctrl.h"
-#include "nrfx_saadc.h"
+#include "serial_comm.h"
 
 #define NRF_LOG_MODULE_NAME logic_peripherals
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -25,6 +25,8 @@ void peripherals_init(void)
 
     lis3dh_init();
 
+    serial_comm_init();
+
     NRF_LOG_FLUSH();
 }
 
@@ -41,6 +43,10 @@ static void hal_evt_handler(const hal_event_type_t event)
 
     case HAL_EVENT_LIS3DH_INT2:
         NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT2", __func__);
+        break;
+
+    case HAL_EVENT_UART0_RX:
+        serial_comm_process_rx();
         break;
 
     default:
