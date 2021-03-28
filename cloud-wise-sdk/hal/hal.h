@@ -18,3 +18,5 @@ uint32_t hal_read_device_serial_number(char *const p_serial, uint8_t max_len);
 void hal_interrupts_set(bool enable);
 
 uint8_t hal_scan_twim0(void);
+
+int16_t hal_read_vdd_raw(void);

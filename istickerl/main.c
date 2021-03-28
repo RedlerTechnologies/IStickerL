@@ -109,6 +109,43 @@ static void clock_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
+// Demo Threads
+static TaskHandle_t m_blinky_thread;
+static TaskHandle_t m_monitor_thread;
+
+static void blinky_thread(void *arg)
+{
+    UNUSED_PARAMETER(arg);
+
+    static uint32_t counter = 0;
+
+    while (1) {
+        ++counter;
+        peripherals_toggle_leds();
+        ble_services_update_data((uint8_t *)&counter, sizeof(counter));
+
+        vTaskDelay(500);
+    }
+}
+
+static void monitor_thread(void *arg)
+{
+    UNUSED_PARAMETER(arg);
+
+    while (1) {
+        state_machine_feed_watchdog();
+
+        NRFX_LOG_INFO("%s Temperature: %dC", __func__, peripherals_read_temperature());
+
+        uint8_t bat_level = peripherals_read_battery_level();
+        NRFX_LOG_INFO("%s Battery: %u%% VDD mV: %u", __func__, bat_level, peripherals_read_vdd());
+
+        ble_services_update_battery_level(bat_level);
+
+        vTaskDelay(10000);
+    }
+}
+
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -130,13 +167,22 @@ int main(void)
     NRF_LOG_FLUSH();
 
     peripherals_init();
+    state_machine_init();
 
     ble_services_init();
 
     NRF_LOG_FLUSH();
 
+    if (pdPASS != xTaskCreate(blinky_thread, "Blink", 64, NULL, 1, &m_blinky_thread)) {
+        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+    }
+    if (pdPASS != xTaskCreate(monitor_thread, "Monitor", 256, NULL, 1, &m_monitor_thread)) {
+        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+    }
+
     ble_services_advertising_start();
 
+    NRFX_LOG_INFO("%s Free Heap: %u", __func__, xPortGetFreeHeapSize());
     // Start FreeRTOS scheduler.
     vTaskStartScheduler();
 

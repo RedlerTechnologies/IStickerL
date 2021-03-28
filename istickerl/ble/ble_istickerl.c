@@ -76,7 +76,8 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     // Initialize the service structure.
     p_istickerl->event_handler = p_istickerl_init->event_handler;
 
-    p_istickerl->busy = false;
+    p_istickerl->busy        = false;
+    p_istickerl->conn_handle = BLE_CONN_HANDLE_INVALID;
 
     // Add a custom base UUID.
     err_code = sd_ble_uuid_vs_add(&istickerl_base_uuid, &p_istickerl->uuid_type);
@@ -95,8 +96,8 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.uuid_type        = p_istickerl->uuid_type;
     add_char_params.max_len          = BLE_ISTICKERL_MAX_DATA_LEN;
     add_char_params.is_var_len       = true;
-    add_char_params.p_init_value     = p_istickerl_init->p_config_init_value;
-    add_char_params.init_len         = p_istickerl_init->config_init_len;
+    add_char_params.p_init_value     = p_istickerl_init->p_data_init_value;
+    add_char_params.init_len         = p_istickerl_init->data_init_len;
     add_char_params.char_props.read  = 1;
     add_char_params.char_props.write = 1;
 
@@ -126,7 +127,11 @@ static ret_code_t value_update(ble_istickerl_t *p_istickerl, uint8_t *const data
     NRFX_LOG_HEXDUMP_DEBUG(data, length);
 #endif
 
-    err_code = sd_ble_gatts_value_set(p_istickerl->conn_handle, value_handle, &gatts_value);
+    if (p_istickerl->conn_handle == BLE_CONN_HANDLE_INVALID) {
+        err_code = sd_ble_gatts_value_set(BLE_CONN_HANDLE_INVALID, value_handle, &gatts_value);
+    } else {
+        err_code = sd_ble_gatts_value_set(p_istickerl->conn_handle, value_handle, &gatts_value);
+    }
     if (err_code != NRF_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
         return err_code;
@@ -222,4 +227,9 @@ static void on_write(ble_istickerl_t *p_istickerl, ble_evt_t const *p_ble_evt)
     } else {
         NRFX_LOG_WARNING("%s unkown CCCD (0x%x) Length: %u", __func__, p_evt_write->handle, p_evt_write->len);
     }
+}
+
+ret_code_t ble_istickerl_update_data(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    return value_update(p_istickerl, data, length, p_istickerl->data_handle.value_handle);
 }

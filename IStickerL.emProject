@@ -5,7 +5,7 @@
       Name="Common"
       arm_linker_heap_size="2048"
       arm_linker_process_stack_size="0"
-      arm_linker_stack_size="4096"
+      arm_linker_stack_size="2048"
       c_user_include_directories="istickerl;istickerl/config"
       linker_section_placement_file="config/flash_placement.xml"
       linker_section_placement_macros="FLASH_PH_START=0x0;FLASH_PH_SIZE=0x80000;RAM_PH_START=0x20000000;RAM_PH_SIZE=0x10000;FLASH_START=0x1C000;FLASH_SIZE=0x5B000;RAM_START=0x20003500;RAM_SIZE=0xCB00"
@@ -371,7 +371,7 @@
     inherited_configurations="PCA10040;S113;nRF52832;Cloud-Wise SDK;nRF5 BLE;Release;nRF5 Crypto;FreeRTOS" />
   <configuration
     Name="Debug IStickerL Rev1 S113"
-    inherited_configurations="Debug;S113;nRF52832;Cloud-Wise SDK;nRF5 BLE;nRF5 Crypto;IStickerLRev1;FreeRTOS" />
+    inherited_configurations="Debug;S113;nRF52832;Cloud-Wise SDK;nRF5 BLE;nRF5 Crypto;IStickerLRev1;FreeRTOS;NRF_LOG_DEFAULT_LEVEL=4" />
   <configuration
     Name="Release IStickerL Rev1 S113"
     inherited_configurations="S113;nRF52832;Release;Cloud-Wise SDK;nRF5 BLE;nRF5 Crypto;IStickerLRev1;FreeRTOS" />

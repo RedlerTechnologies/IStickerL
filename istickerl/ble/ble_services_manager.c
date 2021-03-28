@@ -458,9 +458,9 @@ static void init_istickerl_service(void)
 
     istickerl_init.event_handler = istickerl_evt_handler;
 
-    // TODO set initial config value
-    istickerl_init.p_config_init_value = NULL;
-    istickerl_init.config_init_len     = 0;
+    // TODO set initial data value
+    istickerl_init.p_data_init_value = NULL;
+    istickerl_init.data_init_len     = 0;
 
     err_code = ble_istickerl_init(&m_istickerl, &istickerl_init);
     APP_ERROR_CHECK(err_code);
@@ -492,10 +492,8 @@ static void init_battery_service(void)
     ret_code_t     err_code;
     ble_bas_init_t bas_init = {0};
 
-    bas_init.initial_batt_level = peripherals_read_battery_level();
-
+    bas_init.initial_batt_level   = peripherals_read_battery_level();
     bas_init.support_notification = true;
-    bas_init.initial_batt_level   = 100;
 
     bas_init.bl_rd_sec        = SEC_OPEN;
     bas_init.bl_cccd_wr_sec   = SEC_OPEN;
@@ -514,23 +512,22 @@ void ble_services_update_battery_level(uint8_t battery_level)
     }
 }
 
-bool ble_services_tx_data(uint8_t *const data, size_t length)
+bool ble_services_update_data(uint8_t *const data, size_t length)
 {
-    if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
-        NRF_LOG_INFO("data drop");
-        return false;
-    }
+    // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+    //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
+    //    return false;
+    //}
 
     ret_code_t err_code;
 
 #ifdef BLE_ISTICKERL_DATA_HEXDUMP
-    NRF_LOG_INFO("tx_data  size: %d, last: 0x%02x", length, data[length - 1]);
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
     if (length > 0)
-        NRFX_LOG_HEXDUMP_INFO(data, MIN(16, length));
+        NRFX_LOG_HEXDUMP_INFO(data, length);
     NRF_LOG_FLUSH();
 #endif
 
-    err_code = ble_istickerl_notify_data(&m_istickerl, data, length);
-
+    err_code = ble_istickerl_update_data(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
 }

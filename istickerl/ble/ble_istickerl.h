@@ -50,8 +50,8 @@ typedef void (*ble_istickerl_event_handler_t)(ble_istickerl_evt_t *p_evt, void *
 typedef struct ble_istickerl_init_s {
     ble_istickerl_event_handler_t event_handler;
 
-    uint8_t *p_config_init_value;
-    uint16_t config_init_len;
+    uint8_t *p_data_init_value;
+    uint16_t data_init_len;
 } ble_istickerl_init_t;
 
 struct ble_istickerl_s {
@@ -81,7 +81,4 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
  */
 void ble_istickerl_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context);
 
-ret_code_t ble_istickerl_notify_data(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
-
-uint32_t ble_istickerl_data_fifo_free(void);
-void     ble_istickerl_data_fifo_reset(void);
+ret_code_t ble_istickerl_update_data(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);

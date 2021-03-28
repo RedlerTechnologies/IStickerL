@@ -3,6 +3,7 @@
 #include "ble/ble_services_manager.h"
 #include "drivers/lis3dh.h"
 #include "hal/hal.h"
+#include "hal/hal_boards.h"
 #include "nrf_log_ctrl.h"
 #include "nrfx_saadc.h"
 
@@ -47,8 +48,30 @@ static void hal_evt_handler(const hal_event_type_t event)
     }
 }
 
+void peripherals_toggle_leds(void)
+{
+    nrf_gpio_pin_toggle(HAL_LED_GREEN);
+    nrf_gpio_pin_toggle(HAL_LED_RED);
+}
+
+uint8_t peripherals_read_temperature(void)
+{
+    uint32_t temperature;
+    sd_temp_get(&temperature);
+
+    return ROUNDED_DIV(temperature, 4);
+}
+
+inline uint16_t peripherals_read_vdd(void)
+{
+    uint32_t vdd_adc = hal_read_vdd_raw();
+
+    vdd_adc *= 100 * 6 * 6;            // Convert to mV, Gain 1/6, Ref 0.6V
+    return ROUNDED_DIV(vdd_adc, 4095); // Div by 4095 (12 bits)
+}
+
 uint8_t peripherals_read_battery_level(void)
 {
-    // TODO Implement
-    return 100;
+    //
+    return battery_level_in_percent(peripherals_read_vdd());
 }

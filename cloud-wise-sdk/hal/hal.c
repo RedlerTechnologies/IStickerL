@@ -29,6 +29,8 @@ static void init_uart(void);
 static void init_twim(void);
 static void init_spim(void);
 static void init_saadc(void);
+static void init_saadc_channels(void);
+static void calibrate_saadc(void);
 static void init_pwm(void);
 
 static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_context);
@@ -76,8 +78,6 @@ static void init_gpio(void)
 
     nrf_gpio_cfg_output(HAL_LED_GREEN);
     nrf_gpio_cfg_output(HAL_LED_RED);
-    nrf_gpio_pin_clear(HAL_LED_GREEN);
-    nrf_gpio_pin_clear(HAL_LED_RED);
 
     nrf_gpio_cfg_output(HAL_SPI_FLASH_RESETN);
 
@@ -155,6 +155,22 @@ static void init_saadc(void)
     err_code = nrfx_saadc_init(NRFX_SAADC_CONFIG_IRQ_PRIORITY);
     APP_ERROR_CHECK(err_code);
 
+    calibrate_saadc();
+    init_saadc_channels();
+}
+
+static void calibrate_saadc(void)
+{
+    nrfx_err_t err_code;
+
+    err_code = nrfx_saadc_offset_calibrate(NULL);
+    APP_ERROR_CHECK(err_code);
+}
+
+static void init_saadc_channels(void)
+{
+    nrfx_err_t err_code;
+
     nrfx_saadc_channel_t channels[] = {NRFX_SAADC_DEFAULT_CHANNEL_SE(HAL_ADC_VBATT, HAL_SAADC_VBAT_CHANNEL)};
 
     channels[0].channel_config.reference = NRF_SAADC_REFERENCE_INTERNAL;
@@ -224,13 +240,19 @@ static void saadc_event_handler(nrfx_saadc_evt_t const *p_event)
     //
 }
 
-int16_t hal_read_vdd_mvolts(void)
+int16_t hal_read_vdd_raw(void)
 {
     nrfx_err_t        err_code;
     nrf_saadc_value_t battery_voltage[1];
 
-    // TODO Configure for SAADC_V2
-    err_code = nrfx_saadc_sample_convert(HAL_SAADC_VBAT_CHANNEL, battery_voltage);
+    err_code = nrfx_saadc_simple_mode_set(BIT_0, NRFX_SAADC_CONFIG_RESOLUTION, NRFX_SAADC_CONFIG_OVERSAMPLE, NULL);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrfx_saadc_buffer_set(battery_voltage, 1);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrfx_saadc_mode_trigger();
+    APP_ERROR_CHECK(err_code);
 
     if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
