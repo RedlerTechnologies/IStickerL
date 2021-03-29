@@ -63,6 +63,7 @@ static void dfu_observer(nrf_dfu_evt_type_t evt_type)
     switch (evt_type) {
     case NRF_DFU_EVT_DFU_FAILED:
     case NRF_DFU_EVT_DFU_ABORTED:
+#if LEDS_NUMBER > 0
     case NRF_DFU_EVT_DFU_INITIALIZED:
         bsp_board_init(BSP_INIT_LEDS);
         bsp_board_led_on(BSP_BOARD_LED_0);
@@ -73,6 +74,7 @@ static void dfu_observer(nrf_dfu_evt_type_t evt_type)
         bsp_board_led_off(BSP_BOARD_LED_1);
         bsp_board_led_on(BSP_BOARD_LED_2);
         break;
+#endif
     case NRF_DFU_EVT_DFU_STARTED:
         break;
     default:
