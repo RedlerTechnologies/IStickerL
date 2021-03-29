@@ -1,6 +1,7 @@
 #include "peripherals.h"
 
 #include "ble/ble_services_manager.h"
+#include "drivers/buzzer.h"
 #include "drivers/lis3dh.h"
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
@@ -24,6 +25,7 @@ void peripherals_init(void)
     hal_init(hal_evt_handler);
 
     lis3dh_init();
+    buzzer_init();
 
     serial_comm_init();
 
@@ -72,6 +74,7 @@ inline uint16_t peripherals_read_vdd(void)
 {
     uint32_t vdd_adc = hal_read_vdd_raw();
 
+    // INFO https://devzone.nordicsemi.com/nordic/nordic-blog/b/blog/posts/measuring-lithium-battery-voltage-with-nrf52
     vdd_adc *= 100 * 6 * 6;            // Convert to mV, Gain 1/6, Ref 0.6V
     return ROUNDED_DIV(vdd_adc, 4095); // Div by 4095 (12 bits)
 }

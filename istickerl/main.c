@@ -6,6 +6,7 @@
 #include "logic/peripherals.h"
 #include "logic/serial_comm.h"
 #include "logic/state_machine.h"
+#include "drivers/buzzer.h"
 #include "nrf.h"
 #include "nrf_delay.h"
 #include "nrf_drv_clock.h"
@@ -123,6 +124,7 @@ static void blinky_thread(void *arg)
     while (1) {
         ++counter;
         peripherals_toggle_leds();
+        buzzer_start();
         ble_services_update_data((uint8_t *)&counter, sizeof(counter));
 
         vTaskDelay(500);

@@ -4,7 +4,7 @@
 
 // <<< Use Configuration Wizard in Context Menu >>>\n
 
-// <h> AM
+// <h> ISTICKERL
 
 // <o> BLE_ISTICKERL_BLE_OBSERVER_PRIOs
 // <i> Priority with which BLE events are dispatched to the AM Service.

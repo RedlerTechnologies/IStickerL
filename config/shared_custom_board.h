@@ -8,7 +8,6 @@
 #define LEDS_ACTIVE_STATE 0
 
 #define BUTTONS_NUMBER 0
-//#define BUTTONS_NUMBER 3  //Gal <<<< (causes build errors)
 #define BUTTONS_ACTIVE_STATE 0
 
 #else

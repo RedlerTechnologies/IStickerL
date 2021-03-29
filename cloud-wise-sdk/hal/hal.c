@@ -140,7 +140,7 @@ static void init_spim(void)
     spim_config.miso_pin = HAL_SPIM1_MISO;
     spim_config.mode     = NRF_SPIM_MODE_0;
 
-    spim_config.ss_pin = HAL_SPIM1_SS;
+    nrf_gpio_cfg_output(HAL_SPIM1_SS);
 
     err_code = nrfx_spim_init(&m_spim1, &spim_config, spim1_event_handler, NULL);
     if (NRFX_SUCCESS != err_code)
@@ -222,7 +222,8 @@ uint32_t hal_read_device_serial_number(char *const p_serial, uint8_t max_len)
 
 void hal_interrupts_set(bool enable)
 {
-    // nrfx_gpiote_in_event_enable(HAL_EXAMPLE_INT_IO, enable);
+    nrfx_gpiote_in_event_enable(HAL_LIS3DH_INT1, enable);
+    nrfx_gpiote_in_event_enable(HAL_LIS3DH_INT2, enable);
 }
 
 static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_context)
@@ -256,8 +257,9 @@ int16_t hal_read_vdd_raw(void)
 {
     nrfx_err_t        err_code;
     nrf_saadc_value_t battery_voltage[1];
+    uint32_t          channels = (1 << HAL_SAADC_VBAT_CHANNEL);
 
-    err_code = nrfx_saadc_simple_mode_set(BIT_0, NRFX_SAADC_CONFIG_RESOLUTION, NRFX_SAADC_CONFIG_OVERSAMPLE, NULL);
+    err_code = nrfx_saadc_simple_mode_set(channels, NRFX_SAADC_CONFIG_RESOLUTION, NRFX_SAADC_CONFIG_OVERSAMPLE, NULL);
     APP_ERROR_CHECK(err_code);
 
     err_code = nrfx_saadc_buffer_set(battery_voltage, 1);
@@ -271,7 +273,6 @@ int16_t hal_read_vdd_raw(void)
         return UINT8_MAX;
     }
 
-    // TODO Calculate mvolts
     return battery_voltage[0];
 }
 
