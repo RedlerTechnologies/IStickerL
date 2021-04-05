@@ -63,13 +63,13 @@ static void uart_thread(void *arg)
 
         if (data[0] == '\r') {
             memcpy(copy_rx_buffer, rx_buffer, rx_ptr);
-            //err_code = nrfx_uart_tx(hal_uart, copy_rx_buffer, strlen(copy_rx_buffer));
+            // err_code = nrfx_uart_tx(hal_uart, copy_rx_buffer, strlen(copy_rx_buffer));
 
-            copy_rx_buffer[rx_ptr] = '\r';
-            copy_rx_buffer[rx_ptr+1] = '\n';
+            copy_rx_buffer[rx_ptr]     = '\r';
+            copy_rx_buffer[rx_ptr + 1] = '\n';
 
-            DisplayMessage( "\r\n\r\n\r\n", 6 );
-            DisplayMessage( copy_rx_buffer, 0 );
+            DisplayMessage("\r\n\r\n\r\n", 6);
+            DisplayMessage(copy_rx_buffer, 0);
             command_decoder(copy_rx_buffer, rx_ptr, 0);
             vTaskDelay(10);
             err_code = nrfx_uart_tx(hal_uart, crlf_data, strlen(crlf_data));

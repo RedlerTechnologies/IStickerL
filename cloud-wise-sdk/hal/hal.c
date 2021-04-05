@@ -6,7 +6,6 @@
 #include "nrf_log_ctrl.h"
 #include "nrfx_gpiote.h"
 #include "nrfx_saadc.h"
-#include "nrf_drv_gpiote.h" // ???????????
 
 #include <string.h>
 
@@ -24,6 +23,11 @@ const nrfx_twim_t *hal_lis3dh_twi = &m_twim0;
 const nrfx_spim_t *hal_flash_spi  = &m_spim1;
 const nrfx_uart_t *hal_uart       = &m_uart0;
 const nrfx_pwm_t * hal_buzzer     = &m_pwm0;
+
+volatile struct {
+    bool lis3dh_int1;
+    bool lis3dh_int2;
+} m_int_enable = {0};
 
 static void init_gpio(void);
 static void init_uart(void);
@@ -58,17 +62,20 @@ static void gpiote_event_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t ac
 {
     switch (pin) {
     case HAL_LIS3DH_INT1:
-        p_evt_handler(HAL_EVENT_LIS3DH_INT1);
+        if (m_int_enable.lis3dh_int1)
+            p_evt_handler(HAL_EVENT_LIS3DH_INT1);
         break;
 
     case HAL_LIS3DH_INT2:
-        p_evt_handler(HAL_EVENT_LIS3DH_INT2);
+        if (m_int_enable.lis3dh_int2)
+            p_evt_handler(HAL_EVENT_LIS3DH_INT2);
         break;
 
     default:
         NRFX_LOG_WARNING("%s Unknown INT Pin %u", __func__, pin);
     }
 }
+
 static void init_gpio(void)
 {
     ret_code_t err_code;
@@ -97,8 +104,6 @@ static void init_gpio(void)
     if (NRFX_SUCCESS != err_code)
         NRFX_LOG_ERROR("%s nrfx_gpiote_in_init failed: %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     APP_ERROR_CHECK(err_code);
-
-    nrf_drv_gpiote_in_event_enable(HAL_LIS3DH_INT2, true);
 }
 
 static void init_uart(void)
@@ -223,10 +228,12 @@ uint32_t hal_read_device_serial_number(char *const p_serial, uint8_t max_len)
     return serial_number;
 }
 
-void hal_interrupts_set(bool enable)
+void hal_interrupts_set(bool enable_int1, bool enable_int2)
 {
-    nrfx_gpiote_in_event_enable(HAL_LIS3DH_INT1, enable);
-    nrfx_gpiote_in_event_enable(HAL_LIS3DH_INT2, enable);
+    m_int_enable.lis3dh_int1 = enable_int1;
+    m_int_enable.lis3dh_int2 = enable_int2;
+    nrfx_gpiote_in_event_enable(HAL_LIS3DH_INT1, enable_int1);
+    nrfx_gpiote_in_event_enable(HAL_LIS3DH_INT2, enable_int2);
 }
 
 static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_context)

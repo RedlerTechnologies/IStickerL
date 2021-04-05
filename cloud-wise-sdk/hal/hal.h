@@ -17,7 +17,7 @@ void hal_init(hal_evt_handler_t evt_handler);
 
 uint32_t hal_read_device_serial_number(char *const p_serial, uint8_t max_len);
 
-void hal_interrupts_set(bool enable);
+void hal_interrupts_set(bool enable_int1, bool enable_int2);
 
 uint8_t hal_scan_twim0(void);
 

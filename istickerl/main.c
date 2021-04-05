@@ -6,11 +6,11 @@
 #include "drivers/buzzer.h"
 #include "event_groups.h"
 #include "hal/hal_boards.h"
-#include "logic/TrackingAlgorithm.h"
+#include "logic/commands.h"
 #include "logic/peripherals.h"
 #include "logic/serial_comm.h"
 #include "logic/state_machine.h"
-#include "logic/commands.h"
+#include "logic/tracking_algorithm.h"
 #include "nrf.h"
 #include "nrf_delay.h"
 #include "nrf_drv_clock.h"
@@ -30,7 +30,7 @@ extern xSemaphoreHandle   sleep_semaphore;
 extern xSemaphoreHandle   command_semaphore;
 
 extern DriverBehaviourState driver_behaviour_state;
-extern IStickerErrorBits error_bits;
+extern IStickerErrorBits    error_bits;
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread; // Logger thread
@@ -187,18 +187,18 @@ static void monitor_thread(void *arg)
 
         // send measurements to BLE
         memset(ble_buffer, 0x00, 16);
-        memcpy( ble_buffer, (uint8_t*)(&vdd_float), 4 );
+        memcpy(ble_buffer, (uint8_t *)(&vdd_float), 4);
         ble_buffer[10] = temperature;
         ble_buffer[11] = bat_level;
 
-        ble_services_update_measurement( ble_buffer, 16);
+        ble_services_update_measurement(ble_buffer, 16);
 
         // send status and error bit to BLE
         memset(ble_buffer, 0x00, 16);
         ble_buffer[0] = 1; // record type
-        memcpy( ble_buffer+4, (uint8_t*)(&error_bits), 4 );
+        memcpy(ble_buffer + 4, (uint8_t *)(&error_bits), 4);
 
-        ble_services_update_status( ble_buffer, 16);
+        ble_services_update_status(ble_buffer, 16);
 
         // send status and error bit to BLE
         vTaskDelay(10000);

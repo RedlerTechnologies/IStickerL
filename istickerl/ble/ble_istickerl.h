@@ -25,10 +25,13 @@ typedef enum {
 
     BLE_ISTICKERL_EVENT_TX_COMPLETE,
 
-    BLE_ISTICKERL_EVENT_DATA_WRITE,
+    BLE_ISTICKERL_EVENT_COMMAND_WRITE,
+
+    BLE_ISTICKERL_COMMAND_NOTIFICATION_STARTED,
+    BLE_ISTICKERL_COMMAND_NOTIFICATION_STOPPED,
 } ble_istickerl_evt_type_t;
 
-#define BLE_UUID_ISTICKERL_SERVICE 0x0001 // The UUID of the IStickerL Service
+#define BLE_UUID_ISTICKERL_SERVICE 0xD124 // The UUID of the IStickerL Service
 
 typedef struct ble_istickerl_s ble_istickerl_t;
 
@@ -39,8 +42,8 @@ typedef struct {
 
     union {
         struct {
-            uint8_t *p_data;
-            uint8_t  data_len;
+            uint8_t *p_command;
+            uint8_t  command_len;
         };
     } params;
 } ble_istickerl_evt_t;
@@ -49,6 +52,9 @@ typedef void (*ble_istickerl_event_handler_t)(ble_istickerl_evt_t *p_evt, void *
 
 typedef struct ble_istickerl_init_s {
     ble_istickerl_event_handler_t event_handler;
+
+    uint8_t *p_command_init_value;
+    uint16_t command_init_len;
 
     uint8_t *p_data_init_value;
     uint16_t data_init_len;
@@ -85,7 +91,7 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
  */
 void ble_istickerl_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context);
 
-ret_code_t ble_istickerl_update_command(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_notify_command(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
 ret_code_t ble_istickerl_update_acc(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
 ret_code_t ble_istickerl_update_status(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
 ret_code_t ble_istickerl_update_measurement(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);

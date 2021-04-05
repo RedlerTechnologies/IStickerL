@@ -1,19 +1,19 @@
-#include "TrackingAlgorithm.h"
+#include "tracking_algorithm.h"
 
-#include "../drivers/buzzer.h"
-#include "../drivers/lis3dh.h"
-#include "../logic/serial_comm.h"
-#include "../ble/ble_services_manager.h"
 #include "FreeRTOS.h"
+#include "ble/ble_services_manager.h"
 #include "commands.h"
-#include "Configuration.h"
-#include "../hal/hal.h"
+#include "configuration.h"
+#include "drivers/buzzer.h"
+#include "drivers/lis3dh.h"
 #include "event_groups.h"
+#include "events.h"
+#include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
-#include "task.h"
+#include "logic/serial_comm.h"
 #include "nrf_power.h"
-#include "Events.h"
+#include "task.h"
 
 #include <math.h>
 #include <string.h>
@@ -23,12 +23,13 @@ static TimerHandle_t sample_timer_handle;
 
 AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
-extern uint8_t Acc_Table_Merged[];
+extern uint8_t             Acc_Table_Merged[];
 extern DeviceConfiguration device_config;
 
 static uint8_t sample_buffer[7];
 
 DriverBehaviourState driver_behaviour_state;
+Calendar             absolute_time;
 
 void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
@@ -68,7 +69,7 @@ unsigned char wait_for_sample(void)
 
 void driver_behaviour_task(void *pvParameter)
 {
-    static unsigned duration;
+    static unsigned  duration;
     static AccSample acc_sample;
     uint8_t          count = 0;
 
@@ -76,10 +77,10 @@ void driver_behaviour_task(void *pvParameter)
 
     /////////////////
     // run BLE now //
-    ///////////////// 
+    /////////////////
 
     ble_services_init_0();
-    
+
     LoadConfiguration();
 
     ble_services_init();
@@ -123,8 +124,8 @@ void driver_behaviour_task(void *pvParameter)
         duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
 
         if (duration > driver_behaviour_state.sleep_delay_time) {
-            
-            DisplayMessage( "\r\nSleep\r\n" , 0 );
+
+            DisplayMessage("\r\nSleep\r\n", 0);
             buzzer_long(1200);
             vTaskDelay(2000);
 
@@ -215,11 +216,10 @@ void ProcessAllSamples(void)
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&acc_samples[i];
 
-        if (i==0)
-        {
-          memset( ble_buffer, 0x00, 16);
-          memcpy( ble_buffer, sample, sizeof(AccConvertedSample) );
-          ble_services_update_acc( ble_buffer, 16);
+        if (i == 0) {
+            memset(ble_buffer, 0x00, 16);
+            memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
+            ble_services_update_acc(ble_buffer, 16);
         }
 
         Process_Accident(state, sample);
@@ -344,7 +344,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
         if (state->accident_state == ACCIDENT_STATE_STARTED) {
             state->accident_sample_count = 1;
-            state->max_g = GetGValue(sample);
+            state->max_g                 = GetGValue(sample);
 
             state->last_activity_time = xTaskGetTickCount();
         }
@@ -382,7 +382,6 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
             }
         }
 
-
         break;
 
     case ACCIDENT_STATE_IDENTIFIED:
@@ -407,4 +406,3 @@ unsigned short GetGValue(AccConvertedSample *sample)
     value = sqrt(value);
     return value;
 }
-

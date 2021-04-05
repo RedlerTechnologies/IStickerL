@@ -1,16 +1,16 @@
 #include "events.h"
 
-#include "../ble/ble_services_manager.h"
-#include "../drivers/buzzer.h"
-#include "../logic/serial_comm.h"
-#include "Configuration.h"
 #include "FreeRTOS.h"
-#include "TrackingAlgorithm.h"
+#include "ble/ble_services_manager.h"
 #include "commands.h"
+#include "configuration.h"
+#include "drivers/buzzer.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
+#include "logic/serial_comm.h"
 #include "semphr.h"
 #include "task.h"
+#include "tracking_algorithm.h"
 
 #include <stdlib.h>
 #include <string.h>

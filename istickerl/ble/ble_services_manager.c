@@ -1,6 +1,5 @@
 #include "ble_services_manager.h"
 
-#include "../cloud-wise-sdk/logic/Configuration.h"
 #include "app_error.h"
 #include "app_timer.h"
 #include "ble.h"
@@ -12,7 +11,10 @@
 #include "ble_conn_state.h"
 #include "ble_dfu.h"
 #include "ble_dis.h"
+#include "logic/commands.h"
+#include "logic/configuration.h"
 #include "logic/peripherals.h"
+#include "logic/serial_comm.h"
 #include "nrf_ble_gatt.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_sdh.h"
@@ -499,8 +501,20 @@ static void istickerl_evt_handler(ble_istickerl_evt_t *p_evt, void *p_context)
         // TODO
         break;
 
-    case BLE_ISTICKERL_EVENT_DATA_WRITE:
-        NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_DATA_WRITE (%u bytes)", __func__, p_evt->params.data_len);
+    case BLE_ISTICKERL_EVENT_COMMAND_WRITE:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_COMMAND_WRITE (%u bytes)", __func__, p_evt->params.command_len);
+        DisplayMessage(p_evt->params.p_command, p_evt->params.command_len);
+        DisplayMessage("\r\n", 2);
+        command_decoder(p_evt->params.p_command, p_evt->params.command_len, 1);
+        break;
+
+    case BLE_ISTICKERL_COMMAND_NOTIFICATION_STARTED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_COMMAND_NOTIFICATION_STARTED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_COMMAND_NOTIFICATION_STOPPED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_COMMAND_NOTIFICATION_STOPPED", __func__);
         // TODO
         break;
 
@@ -535,7 +549,7 @@ void ble_services_update_battery_level(uint8_t battery_level)
     }
 }
 
-bool ble_services_update_command(uint8_t *const data, size_t length)
+bool ble_services_notify_command(uint8_t *const data, size_t length)
 {
     // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
     //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
@@ -551,7 +565,7 @@ bool ble_services_update_command(uint8_t *const data, size_t length)
     NRF_LOG_FLUSH();
 #endif
 
-    err_code = ble_istickerl_update_command(&m_istickerl, data, length);
+    err_code = ble_istickerl_notify_command(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
 }
 
@@ -587,7 +601,6 @@ bool ble_services_update_event(uint8_t *const data, size_t length)
     return (err_code == NRF_SUCCESS);
 }
 
-
 void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address)
 {
     int8_t  i = 0, j = 0;
@@ -622,7 +635,7 @@ void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address)
 void SetBleID(uint8_t *dev_id)
 {
     uint8_t *dev_name = device_config.DeviceName;
-    uint8_t i,j;
+    uint8_t  i, j;
     uint16_t x;
 
     memset(dev_name, 0x00, 16);
@@ -630,23 +643,21 @@ void SetBleID(uint8_t *dev_id)
     dev_name[0] = 'S';
     dev_name[1] = '-';
     dev_name[2] = 'K'; // should be 'L' // ??????????????
-    
+
     j = 0;
 
-    for (i=3 ; i<6 ; i++ )
-    {
-      x = dev_id[2*j] + 256*dev_id[2*j+1];
-      x = x % 26;
-      dev_name[i] = (x+'A');
-      j++;
-    } 
+    for (i = 3; i < 6; i++) {
+        x           = dev_id[2 * j] + 256 * dev_id[2 * j + 1];
+        x           = x % 26;
+        dev_name[i] = (x + 'A');
+        j++;
+    }
 
     j = 6;
-    for (i=6 ; i<12 ; i++ )
-    {
-      x = dev_id[j];
-      x = x % 10;
-      dev_name[i] = (x+'0');
-      j++;
+    for (i = 6; i < 12; i++) {
+        x           = dev_id[j];
+        x           = x % 10;
+        dev_name[i] = (x + '0');
+        j++;
     }
 }

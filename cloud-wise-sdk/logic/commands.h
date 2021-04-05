@@ -2,11 +2,13 @@
 
 #include "hal/hal_data_types.h"
 
-#define NUM_OF_PARAMETERS 7
+#define NUM_OF_PARAMETERS 8
 
 #define PARAM_TYPE_STRING 0
 #define PARAM_TYPE_INTEGER 1
 #define PARAM_TYPE_REAL 3
+
+#define DD(s)	((int)((s)[0]-'0')*10+(int)((s)[1]-'0'));
 
 typedef struct {
     uint8_t   param_name[16];
@@ -27,6 +29,7 @@ typedef enum {
     COMMAND_BUILD,
     COMMAND_DEVICE_ID,
     COMMAND_BLE_ID,
+    COMMAND_TIME,
 } ECOMMANDS;
 
 typedef struct {

@@ -5,11 +5,11 @@
 #include "../logic/serial_comm.h"
 #include "Configuration.h"
 #include "FreeRTOS.h"
-#include "TrackingAlgorithm.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
 #include "semphr.h"
 #include "task.h"
+#include "tracking_algorithm.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +19,7 @@
 
 extern DriverBehaviourState driver_behaviour_state;
 extern DeviceConfiguration  device_config;
+extern Calendar             absolute_time;
 
 xSemaphoreHandle sleep_semaphore;
 xSemaphoreHandle command_semaphore;
@@ -26,6 +27,7 @@ xSemaphoreHandle command_semaphore;
 IStickerErrorBits error_bits;
 
 void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command);
+void SetTimeFromString(uint8_t *date_str, uint8_t *time_str);
 
 ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"BEEP", NULL, 85, 0, PARAM_TYPE_STRING, 0, 0},
@@ -35,6 +37,7 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"SW_BUILD", NULL, 46, 2, PARAM_TYPE_INTEGER, 0, 1},
     {"DEVID", (uint32_t *)device_config.DeviceID, 46, 26, PARAM_TYPE_STRING, 0, 1},
     {"BLEID", (uint32_t *)device_config.DeviceName, 46, 16, PARAM_TYPE_STRING, 0, 1},
+    {"TIME", NULL, 46, 2, PARAM_TYPE_STRING, 0, 1},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
@@ -44,11 +47,11 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
     static uint8_t command[MAX_COMMAND_SIZE];
     static uint8_t param[MAX_PARAM_SIZE];
 
-    static ConfigParameter *p            = NULL;
+    static ConfigParameter *p = NULL;
     uint8_t                 i, j;
-    int8_t                  index = -1;
+    int8_t                  index          = -1;
     uint8_t                 is_set_command = 1;
-    bool                    flag  = true;
+    bool                    flag           = true;
 
     xSemaphoreTake(command_semaphore, portMAX_DELAY);
 
@@ -107,8 +110,8 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
 
     vTaskDelay(10);
 
-    if (param[0] == '?' )
-      is_set_command = 0;
+    if (param[0] == '?')
+        is_set_command = 0;
 
     if (flag) {
         DisplayMessage("COMMAND OK\r\n", 0);
@@ -122,7 +125,7 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
         }
 
         if (index >= 0) {
-            run_command(index, param, result_buffer , is_set_command);
+            run_command(index, param, result_buffer, is_set_command);
         } else
             flag = false;
     } else {
@@ -134,7 +137,7 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
     DisplayMessage("\r\n", 0);
 
     if (source == 1) {
-        ble_services_update_command(result_buffer, strlen(result_buffer));
+        ble_services_notify_command(result_buffer, strlen(result_buffer));
     }
 
     xSemaphoreGive(command_semaphore);
@@ -147,7 +150,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     static ConfigParameter *p;
     int32_t                 param_num      = 0;
     int32_t                 result         = -1;
-    uint8_t                   numeric_result = 1;
+    uint8_t                 numeric_result = 1;
 
     param_num = atoi(param);
     p         = &parameter_list[command_index];
@@ -157,18 +160,16 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     switch (command_index) {
     case COMMAND_BEEP:
-        if (is_set_command)
-        {
-          buzzer_train(param_num);
-          result = param_num;
+        if (is_set_command) {
+            buzzer_train(param_num);
+            result = param_num;
         }
         break;
 
     case COMMAND_CALIBRATE:
-        if (is_set_command)
-        {
-          driver_behaviour_state.calibrated = false;
-          result = 0;
+        if (is_set_command) {
+            driver_behaviour_state.calibrated = false;
+            result                            = 0;
         }
         break;
 
@@ -179,28 +180,33 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_SW_VERSION:
         if (!is_set_command)
-          result = APP_MAJOR_VERSION * 256 + APP_MINOR_VERSION;
+            result = APP_MAJOR_VERSION * 256 + APP_MINOR_VERSION;
         break;
 
     case COMMAND_BUILD:
         if (!is_set_command)
-          result = APP_BUILD;
+            result = APP_BUILD;
         break;
 
     case COMMAND_DEVICE_ID:
     case COMMAND_BLE_ID:
-        if (!is_set_command)
-        {
-          strcpy( param_result, (uint8_t* )p->param_address );
-          numeric_result = 0;
+        if (!is_set_command) {
+            strcpy(param_result, (uint8_t *)p->param_address);
+            numeric_result = 0;
         }
 
         break;
+
+    case COMMAND_TIME:
+        if (is_set_command) {
+            SetTimeFromString(param, param + 7);
+            numeric_result = 0;
+        }
+        break;
     }
 
-    switch (numeric_result)
-    {
-      case 1:
+    switch (numeric_result) {
+    case 1:
         ltoa(result, param_result, 10);
         break;
     }
@@ -225,4 +231,23 @@ void delay_sleep(int32_t delay_in_seconds)
     }
 
     xSemaphoreGive(sleep_semaphore);
+}
+
+void SetTimeFromString(uint8_t *date_str, uint8_t *time_str)
+{
+    absolute_time.year  = DD(date_str + 4);
+    absolute_time.month = DD(date_str + 2);
+    absolute_time.day   = DD(date_str);
+    absolute_time.hour  = DD(time_str);
+
+    /*
+    if (gps_sample->gpsHour < old_hour) // midnight wrap//
+    {
+        gps_sample->gpsDay++;
+    }
+    */
+
+    absolute_time.minute  = DD(time_str + 2);
+    absolute_time.seconds = DD(time_str + 4);
+    // gps_sample->gpsMSec = atof(hhmmss + 4) - (double)gps_sample->gpsSec + 123;
 }

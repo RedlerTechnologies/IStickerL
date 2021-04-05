@@ -24,10 +24,13 @@ void peripherals_init(void)
 
     hal_init(hal_evt_handler);
 
-    lis3dh_init();
+    lis3dh_init();    
+
     buzzer_init();
 
     serial_comm_init();
+
+    hal_interrupts_set(false, true);
 
     NRF_LOG_FLUSH();
 }
