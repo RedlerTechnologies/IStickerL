@@ -6,6 +6,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrfx_gpiote.h"
 #include "nrfx_saadc.h"
+#include "nrf_drv_gpiote.h" // ???????????
 
 #include <string.h>
 
@@ -83,19 +84,21 @@ static void init_gpio(void)
 
     nrfx_gpiote_in_config_t in_config;
 
-    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(false);
-    in_config.pull = NRF_GPIO_PIN_NOPULL;
+    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(false);
+    in_config.pull = NRF_GPIO_PIN_PULLUP;
     err_code       = nrfx_gpiote_in_init(HAL_LIS3DH_INT1, &in_config, gpiote_event_handler);
     if (NRFX_SUCCESS != err_code)
         NRFX_LOG_ERROR("%s nrfx_gpiote_in_init failed: %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     APP_ERROR_CHECK(err_code);
 
-    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(false);
-    in_config.pull = NRF_GPIO_PIN_NOPULL;
+    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(false);
+    in_config.pull = NRF_GPIO_PIN_PULLUP;
     err_code       = nrfx_gpiote_in_init(HAL_LIS3DH_INT2, &in_config, gpiote_event_handler);
     if (NRFX_SUCCESS != err_code)
         NRFX_LOG_ERROR("%s nrfx_gpiote_in_init failed: %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     APP_ERROR_CHECK(err_code);
+
+    nrf_drv_gpiote_in_event_enable(HAL_LIS3DH_INT2, true);
 }
 
 static void init_uart(void)
@@ -300,4 +303,10 @@ uint8_t hal_scan_twim0(void)
     }
 
     return detected_devices;
+}
+
+void isticker_bsp_board_sleep(void)
+{
+    nrf_gpio_pin_set(HAL_LED_RED);
+    nrf_gpio_pin_set(HAL_LED_GREEN);
 }

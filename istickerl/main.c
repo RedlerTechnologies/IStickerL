@@ -3,25 +3,42 @@
 #include "app_timer.h"
 #include "ble.h"
 #include "ble/ble_services_manager.h"
+#include "drivers/buzzer.h"
+#include "event_groups.h"
+#include "hal/hal_boards.h"
+#include "logic/TrackingAlgorithm.h"
 #include "logic/peripherals.h"
 #include "logic/serial_comm.h"
 #include "logic/state_machine.h"
-#include "drivers/buzzer.h"
+#include "logic/commands.h"
 #include "nrf.h"
 #include "nrf_delay.h"
 #include "nrf_drv_clock.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 #include "nrfx_log.h"
+#include "semphr.h"
 #include "task.h"
 #include "version.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 
+extern xSemaphoreHandle   tx_uart_semaphore;
+extern EventGroupHandle_t event_acc_sample;
+extern xSemaphoreHandle   sleep_semaphore;
+extern xSemaphoreHandle   command_semaphore;
+
+extern DriverBehaviourState driver_behaviour_state;
+extern IStickerErrorBits error_bits;
+
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread; // Logger thread
 #endif
+
+TaskHandle_t driver_behaviour_task_handle;
+
+void init_tasks(void);
 
 /**@brief Callback function for asserts in the SoftDevice.
  *
@@ -124,29 +141,66 @@ static void blinky_thread(void *arg)
     while (1) {
         ++counter;
         peripherals_toggle_leds();
-        buzzer_start();
-        ble_services_update_data((uint8_t *)&counter, sizeof(counter));
 
-        vTaskDelay(500);
+        // ?????????????? ble_services_update_data((uint8_t *)&counter, sizeof(counter));
+
+        vTaskDelay(2500);
     }
 }
 
 static void monitor_thread(void *arg)
 {
+    static uint8_t status_buffer[128];
+    static uint8_t ble_buffer[16];
+
+    static uint8_t  temperature;
+    static uint8_t  bat_level;
+    static uint16_t vdd;
+    static float    vdd_float;
+
+    uint32_t duration;
+
     UNUSED_PARAMETER(arg);
 
     while (1) {
         state_machine_feed_watchdog();
 
-        NRFX_LOG_INFO("%s Temperature: %dC", __func__, peripherals_read_temperature());
+        temperature = peripherals_read_temperature();
+        bat_level   = peripherals_read_battery_level();
+        vdd         = peripherals_read_vdd();
+        vdd_float   = ((float)vdd) / 1000;
 
-        uint8_t bat_level = peripherals_read_battery_level();
-        NRFX_LOG_INFO("%s Battery: %u%% VDD mV: %u", __func__, bat_level, peripherals_read_vdd());
+        duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
+        duration = driver_behaviour_state.sleep_delay_time - duration;
 
+        sprintf(status_buffer, "\r\n\r\nStatus: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level, duration, vdd_float);
+        DisplayMessage(status_buffer, 0);
+
+        // NRFX_LOG_INFO("%s Temperature: %dC", __func__, peripherals_read_temperature());
+
+        // uint8_t bat_level = peripherals_read_battery_level();
+        // NRFX_LOG_INFO("%s Battery: %u%% VDD mV: %u", __func__, bat_level, peripherals_read_vdd());
+
+#ifdef BLE_ENABLE
         ble_services_update_battery_level(bat_level);
+#endif
 
-        serial_comm_send_text();
+        // send measurements to BLE
+        memset(ble_buffer, 0x00, 16);
+        memcpy( ble_buffer, (uint8_t*)(&vdd_float), 4 );
+        ble_buffer[10] = temperature;
+        ble_buffer[11] = bat_level;
 
+        ble_services_update_measurement( ble_buffer, 16);
+
+        // send status and error bit to BLE
+        memset(ble_buffer, 0x00, 16);
+        ble_buffer[0] = 1; // record type
+        memcpy( ble_buffer+4, (uint8_t*)(&error_bits), 4 );
+
+        ble_services_update_status( ble_buffer, 16);
+
+        // send status and error bit to BLE
         vTaskDelay(10000);
     }
 }
@@ -168,13 +222,13 @@ int main(void)
     SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
 
     modules_init();
-    NRFX_LOG_INFO("Starting: %s %s (%s)\n", DEVICE_NAME, FIRMWARE_REV, MODEL_NUM);
+    NRFX_LOG_INFO("Starting: %s %s (%s) FreeRTOS %s\n", DEVICE_NAME, FIRMWARE_REV, MODEL_NUM, tskKERNEL_VERSION_NUMBER);
     NRF_LOG_FLUSH();
 
     peripherals_init();
     state_machine_init();
 
-    ble_services_init();
+    // ble_services_init();
 
     NRF_LOG_FLUSH();
 
@@ -185,13 +239,32 @@ int main(void)
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    ble_services_advertising_start();
+    UNUSED_VARIABLE(xTaskCreate(driver_behaviour_task, "Tracking", configMINIMAL_STACK_SIZE + 200, NULL, 2, &driver_behaviour_task_handle));
+
+    init_tasks();
+
+    // ble_services_advertising_start();
 
     NRFX_LOG_INFO("%s Free Heap: %u", __func__, xPortGetFreeHeapSize());
+
     // Start FreeRTOS scheduler.
     vTaskStartScheduler();
 
     for (;;) {
         APP_ERROR_HANDLER(NRF_ERROR_FORBIDDEN);
     }
+}
+
+void init_tasks(void)
+{
+    tx_uart_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(tx_uart_semaphore);
+
+    sleep_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(sleep_semaphore);
+
+    command_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(command_semaphore);
+
+    event_acc_sample = xEventGroupCreate();
 }

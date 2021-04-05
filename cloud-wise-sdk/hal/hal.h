@@ -22,3 +22,5 @@ void hal_interrupts_set(bool enable);
 uint8_t hal_scan_twim0(void);
 
 int16_t hal_read_vdd_raw(void);
+
+void isticker_bsp_board_sleep(void);

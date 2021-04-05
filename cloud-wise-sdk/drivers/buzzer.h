@@ -4,5 +4,6 @@
 
 bool buzzer_init(void);
 
-bool buzzer_start(void);
+bool buzzer_train(uint8_t repeats);
+bool buzzer_long(uint16_t time_ms);
 bool buzzer_end(void);

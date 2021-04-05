@@ -1,5 +1,6 @@
 #pragma once
 
+
 #define NRFX_LOG_LEVEL_OFF 0
 #define NRFX_LOG_LEVEL_ERROR 1
 #define NRFX_LOG_LEVEL_WARNING 2

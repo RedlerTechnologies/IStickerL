@@ -1,5 +1,6 @@
 #include "ble_services_manager.h"
 
+#include "../cloud-wise-sdk/logic/Configuration.h"
 #include "app_error.h"
 #include "app_timer.h"
 #include "ble.h"
@@ -20,6 +21,13 @@
 #include "nrf_sdh_soc.h"
 #include "nrf_sdm.h"
 #include "version.h"
+
+#include <string.h>
+
+extern DeviceConfiguration device_config;
+
+void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address);
+void SetBleID(uint8_t *dev_id);
 
 #define NRF_LOG_MODULE_NAME ble_services_manager
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -112,10 +120,24 @@ static void sdh_task_hook(void *p_context)
     //
 }
 
-void ble_services_init(void)
+void ble_services_init_0(void)
 {
+    static ble_gap_addr_t mac_address;
+
+    uint32_t res;
 
     ble_stack_init();
+
+    res = sd_ble_gap_addr_get(&mac_address);
+
+    if (res == NRF_SUCCESS) {
+        SetDeviceIDFromMacAddress(&mac_address);
+        SetBleID(device_config.DeviceID);
+    }
+}
+
+void ble_services_init(void)
+{
     gap_params_init();
     gatt_init();
 
@@ -365,7 +387,8 @@ static void gap_params_init(void)
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
-    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)DEVICE_NAME, strlen(DEVICE_NAME));
+    // err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)DEVICE_NAME, strlen(DEVICE_NAME));
+    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)device_config.DeviceName, strlen(device_config.DeviceName));
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -512,7 +535,7 @@ void ble_services_update_battery_level(uint8_t battery_level)
     }
 }
 
-bool ble_services_update_data(uint8_t *const data, size_t length)
+bool ble_services_update_command(uint8_t *const data, size_t length)
 {
     // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
     //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
@@ -528,6 +551,102 @@ bool ble_services_update_data(uint8_t *const data, size_t length)
     NRF_LOG_FLUSH();
 #endif
 
-    err_code = ble_istickerl_update_data(&m_istickerl, data, length);
+    err_code = ble_istickerl_update_command(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_update_acc(uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = ble_istickerl_update_acc(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_update_status(uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = ble_istickerl_update_status(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_update_measurement(uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = ble_istickerl_update_measurement(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_update_event(uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = ble_istickerl_update_event(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+
+void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address)
+{
+    int8_t  i = 0, j = 0;
+    uint8_t ch, c1, c2;
+
+    memset(device_config.DeviceID, 0x00, 28);
+
+    for (i = 5; i >= 0; i--) {
+        ch = mac_address->addr[i];
+
+        c1 = ch & 0x0F;
+        c2 = (ch & 0xF0) >> 4;
+
+        if (c1 < 10)
+            c1 += 48;
+        else
+            c1 += 55;
+
+        if (c2 < 10)
+            c2 += 48;
+        else
+            c2 += 55;
+
+        device_config.DeviceID[j * 2]     = c2;
+        device_config.DeviceID[j * 2 + 1] = c1;
+        j++;
+    }
+
+    memcpy(device_config.DeviceID + 12, device_config.DeviceID, 12);
+}
+
+void SetBleID(uint8_t *dev_id)
+{
+    uint8_t *dev_name = device_config.DeviceName;
+    uint8_t i,j;
+    uint16_t x;
+
+    memset(dev_name, 0x00, 16);
+
+    dev_name[0] = 'S';
+    dev_name[1] = '-';
+    dev_name[2] = 'K'; // should be 'L' // ??????????????
+    
+    j = 0;
+
+    for (i=3 ; i<6 ; i++ )
+    {
+      x = dev_id[2*j] + 256*dev_id[2*j+1];
+      x = x % 26;
+      dev_name[i] = (x+'A');
+      j++;
+    } 
+
+    j = 6;
+    for (i=6 ; i<12 ; i++ )
+    {
+      x = dev_id[j];
+      x = x % 10;
+      dev_name[i] = (x+'0');
+      j++;
+    }
 }

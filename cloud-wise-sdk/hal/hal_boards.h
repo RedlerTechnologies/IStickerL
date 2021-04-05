@@ -2,6 +2,10 @@
 
 #include "boards.h"
 
+#define APP_MAJOR_VERSION   1
+#define APP_MINOR_VERSION   1
+#define APP_BUILD           0
+
 #define HAL_UICR_DEVICE_SERIAL_NUMBER 0
 
 #if defined(BOARD_PCA10040)
@@ -33,12 +37,14 @@
 #define HAL_SPI_FLASH_RESETN NRF_GPIO_PIN_MAP(0, 9)
 
 #define HAL_BUZZER_PWM NRF_GPIO_PIN_MAP(0, 6)
-#define HAL_BUZZER_PWM_CYCLE_COUNT 4000
+#define HAL_BUZZER_PWM_CYCLE_COUNT 2000
 
 #define HAL_PDM_CLK NRF_GPIO_PIN_MAP(0, 7)
 #define HAL_PDM_DIN NRF_GPIO_PIN_MAP(0, 8)
 
 #define HAL_ADC_VBATT NRF_SAADC_INPUT_VDD
+
+#define timeDiff(a,b)    ( (int32_t)(a) - (int32_t)(b) )
 
 #else
 

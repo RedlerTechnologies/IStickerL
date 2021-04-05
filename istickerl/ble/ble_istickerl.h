@@ -64,7 +64,11 @@ struct ble_istickerl_s {
     bool busy; // Busy flag. Indicates that the hvx function returned busy and that there is still data to be transfered
 
     // IStickerL service Characteristics
-    ble_gatts_char_handles_t data_handle;
+    ble_gatts_char_handles_t command_handle;
+    ble_gatts_char_handles_t acc_handle;
+    ble_gatts_char_handles_t status_handle;
+    ble_gatts_char_handles_t measurement_handle;
+    ble_gatts_char_handles_t event_handle;
 };
 
 uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *const p_istickerl_init);
@@ -81,4 +85,8 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
  */
 void ble_istickerl_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context);
 
-ret_code_t ble_istickerl_update_data(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_update_command(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_update_acc(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_update_status(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_update_measurement(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_update_event(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);

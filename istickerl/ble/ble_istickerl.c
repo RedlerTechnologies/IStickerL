@@ -4,6 +4,9 @@
 #include "nrf_ringbuf.h"
 #include "nrfx_atomic.h"
 
+#include "logic/serial_comm.h"
+#include "../cloud-wise-sdk/logic/commands.h"
+
 #define NRF_LOG_MODULE_NAME ble_istickerl
 #define NRF_LOG_LEVEL BLE_ISTICKERL_BLE_LOG_LEVEL
 #include "nrfx_log.h"
@@ -11,10 +14,16 @@ NRF_LOG_MODULE_REGISTER();
 
 #define BLE_UUID_DATA_CHARACTERISTIC 0x0010
 
+#define BLE_UUID_COMMAND_CHARACTERISTIC       0xD7F0
+#define BLE_UUID_ACC_CHARACTERISTIC           0xD4F8
+#define BLE_UUID_STATUS_CHARACTERISTIC        0xED63
+#define BLE_UUID_MEASUREMENT_CHARACTERISTIC   0xDE44
+#define BLE_UUID_EVENT_CHARACTERISTIC         0xDBCE
+
 // Cloud-Wise IStickerL 128-bit base UUID 02F80000-5562-4076-83D7-912C187A0912
 #define ISTICKERL_BASE_UUID                                                                                                                \
     {                                                                                                                                      \
-        0x12, 0x09, 0x7A, 0x18, 0x2C, 0x91, 0xD7, 0x83, 0x76, 0x40, 0x62, 0x55, 0x00, 0x00, 0xF8, 0x02,                                    \
+        0xAE, 0x93, 0xF0, 0x4C, 0x21, 0x9A, 0x3F, 0x8C, 0xE7, 0x11, 0x43, 0xF9, 0x00, 0x00, 0x4D, 0xB9,                                    \
     }
 
 static void on_write(ble_istickerl_t *p_istickerl, ble_evt_t const *p_ble_evt);
@@ -84,28 +93,90 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     VERIFY_SUCCESS(err_code);
 
     ble_uuid.type = p_istickerl->uuid_type;
-    ble_uuid.uuid = BLE_UUID_ISTICKERL_SERVICE;
+    ble_uuid.uuid = 0xD124; // BLE_UUID_ISTICKERL_SERVICE; // ?????????????
 
     // Add the service.
     err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &ble_uuid, &p_istickerl->service_handle);
     VERIFY_SUCCESS(err_code);
 
-    // Add the Data Characteristic
+    // Add the Command Characteristic //
     memset(&add_char_params, 0, sizeof(add_char_params));
-    add_char_params.uuid             = BLE_UUID_DATA_CHARACTERISTIC;
+    add_char_params.uuid             = BLE_UUID_COMMAND_CHARACTERISTIC;
     add_char_params.uuid_type        = p_istickerl->uuid_type;
     add_char_params.max_len          = BLE_ISTICKERL_MAX_DATA_LEN;
     add_char_params.is_var_len       = true;
-    add_char_params.p_init_value     = p_istickerl_init->p_data_init_value;
-    add_char_params.init_len         = p_istickerl_init->data_init_len;
+    add_char_params.p_init_value     = p_istickerl_init->p_data_init_value; // ????????
+    add_char_params.init_len         = p_istickerl_init->data_init_len; // ???????????
     add_char_params.char_props.read  = 1;
     add_char_params.char_props.write = 1;
+    //add_char_params.char_props.notify = 1; // ??????????
 
     add_char_params.read_access  = SEC_OPEN;
     add_char_params.write_access = SEC_OPEN;
-
-    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->data_handle);
+  
+    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->command_handle);
     VERIFY_SUCCESS(err_code);
+
+    // Add the Acc Characteristic //
+    memset(&add_char_params, 0, sizeof(add_char_params));
+    add_char_params.uuid             = BLE_UUID_ACC_CHARACTERISTIC;
+    add_char_params.uuid_type        = p_istickerl->uuid_type;
+    add_char_params.max_len          = 16;
+    add_char_params.is_var_len       = false;
+    add_char_params.p_init_value     = p_istickerl_init->p_data_init_value; // ?????????
+    add_char_params.init_len         = p_istickerl_init->data_init_len; // ????????????
+    add_char_params.char_props.read  = 1;
+
+    add_char_params.read_access  = SEC_OPEN;
+
+    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->acc_handle);
+    VERIFY_SUCCESS(err_code);
+
+   // Add the status Characteristic //
+    memset(&add_char_params, 0, sizeof(add_char_params));
+    add_char_params.uuid             = BLE_UUID_STATUS_CHARACTERISTIC;
+    add_char_params.uuid_type        = p_istickerl->uuid_type;
+    add_char_params.max_len          = 16;
+    add_char_params.is_var_len       = false;
+    add_char_params.p_init_value     = p_istickerl_init->p_data_init_value; // ?????????
+    add_char_params.init_len         = p_istickerl_init->data_init_len; // ????????????
+    add_char_params.char_props.read  = 1;
+
+    add_char_params.read_access  = SEC_OPEN;
+
+    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->status_handle);
+    VERIFY_SUCCESS(err_code);
+
+   // Add the measurement Characteristic //
+    memset(&add_char_params, 0, sizeof(add_char_params));
+    add_char_params.uuid             = BLE_UUID_MEASUREMENT_CHARACTERISTIC;
+    add_char_params.uuid_type        = p_istickerl->uuid_type;
+    add_char_params.max_len          = 16;
+    add_char_params.is_var_len       = false;
+    add_char_params.p_init_value     = p_istickerl_init->p_data_init_value; // ?????????
+    add_char_params.init_len         = p_istickerl_init->data_init_len; // ????????????
+    add_char_params.char_props.read  = 1;
+
+    add_char_params.read_access  = SEC_OPEN;
+
+    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->measurement_handle);
+    VERIFY_SUCCESS(err_code);
+
+    // Add the event Characteristic //
+    memset(&add_char_params, 0, sizeof(add_char_params));
+    add_char_params.uuid             = BLE_UUID_EVENT_CHARACTERISTIC;
+    add_char_params.uuid_type        = p_istickerl->uuid_type;
+    add_char_params.max_len          = 64;
+    add_char_params.is_var_len       = true;
+    add_char_params.p_init_value     = p_istickerl_init->p_data_init_value; // ?????????
+    add_char_params.init_len         = p_istickerl_init->data_init_len; // ????????????
+    add_char_params.char_props.read  = 1;
+
+    add_char_params.read_access  = SEC_OPEN;
+
+    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->event_handle);
+    VERIFY_SUCCESS(err_code);
+
 
     return NRF_SUCCESS;
 }
@@ -212,7 +283,7 @@ static void on_write(ble_istickerl_t *p_istickerl, ble_evt_t const *p_ble_evt)
     p_istickerl->conn_handle                 = p_ble_evt->evt.gap_evt.conn_handle;
 
     // INFO Handle write for data_handle
-    if ((p_evt_write->handle == p_istickerl->data_handle.value_handle) && (p_evt_write->len > 0)) {
+    if ((p_evt_write->handle == p_istickerl->command_handle.value_handle) && (p_evt_write->len > 0)) {
 
 #ifdef BLE_ISTICKERL_DATA_HEXDUMP
         NRFX_LOG_INFO("%s", __func__);
@@ -229,7 +300,48 @@ static void on_write(ble_istickerl_t *p_istickerl, ble_evt_t const *p_ble_evt)
     }
 }
 
-ret_code_t ble_istickerl_update_data(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+ret_code_t ble_istickerl_update_command(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
 {
-    return value_update(p_istickerl, data, length, p_istickerl->data_handle.value_handle);
+    return value_update(p_istickerl, data, length, p_istickerl->command_handle.value_handle);
+}
+
+ret_code_t ble_istickerl_update_acc(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    return value_update(p_istickerl, data, length, p_istickerl->acc_handle.value_handle);
+}
+
+ret_code_t ble_istickerl_update_status(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    return value_update(p_istickerl, data, length, p_istickerl->status_handle.value_handle);
+}
+
+ret_code_t ble_istickerl_update_measurement(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    return value_update(p_istickerl, data, length, p_istickerl->measurement_handle.value_handle);
+}
+
+ret_code_t ble_istickerl_update_event(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    return value_update(p_istickerl, data, length, p_istickerl->event_handle.value_handle);
+}
+
+
+void isticker_character_write_handler(ble_evt_t const *p_ble_evt)
+{
+    ble_gatts_evt_write_t const *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
+    uint8_t* buffer;
+    uint8_t len;
+
+    len = p_evt_write->len;
+    buffer = (uint8_t*)p_evt_write->data;
+  
+
+    switch (p_evt_write->uuid.uuid)
+    {
+      case BLE_UUID_COMMAND_CHARACTERISTIC:
+        DisplayMessage( buffer, len );
+        DisplayMessage( "\r\n", 2 );
+        command_decoder( buffer, len, 1 );
+        break;
+    }
 }
