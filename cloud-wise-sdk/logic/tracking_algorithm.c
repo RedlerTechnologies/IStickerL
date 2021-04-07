@@ -14,6 +14,7 @@
 #include "logic/serial_comm.h"
 #include "nrf_power.h"
 #include "task.h"
+#include "logic/clock.h"
 
 #include <math.h>
 #include <string.h>
@@ -29,7 +30,6 @@ extern DeviceConfiguration device_config;
 static uint8_t sample_buffer[7];
 
 DriverBehaviourState driver_behaviour_state;
-Calendar             absolute_time;
 
 void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
@@ -84,7 +84,10 @@ void driver_behaviour_task(void *pvParameter)
     LoadConfiguration();
 
     ble_services_init();
+
+    #ifdef BLE_ADVERTISING
     ble_services_advertising_start();
+    #endif
 
     sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, sample_timer_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
@@ -136,6 +139,7 @@ void driver_behaviour_task(void *pvParameter)
             nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
 
             nrf_power_system_off();
+            //sd_power_system_off();
         }
     }
 }

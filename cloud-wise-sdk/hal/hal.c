@@ -6,6 +6,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrfx_gpiote.h"
 #include "nrfx_saadc.h"
+#include "app_timer.h"
 
 #include <string.h>
 
@@ -46,6 +47,8 @@ static hal_evt_handler_t p_evt_handler;
 
 void hal_init(hal_evt_handler_t evt_handler)
 {
+    ret_code_t ret;
+    
     ASSERT(evt_handler);
 
     p_evt_handler = evt_handler;
@@ -56,6 +59,10 @@ void hal_init(hal_evt_handler_t evt_handler)
     init_pwm();
     init_uart();
     init_saadc();
+
+    // init timers module
+    ret = app_timer_init();
+    APP_ERROR_CHECK(ret);
 }
 
 static void gpiote_event_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)

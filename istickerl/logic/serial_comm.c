@@ -5,6 +5,7 @@
 #include "logic/commands.h"
 #include "semphr.h"
 #include "task.h"
+#include "logic/monitor.h"
 
 #define NRF_LOG_MODULE_NAME logic_serial_comm
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -71,9 +72,9 @@ static void uart_thread(void *arg)
             DisplayMessage("\r\n\r\n\r\n", 6);
             DisplayMessage(copy_rx_buffer, 0);
             command_decoder(copy_rx_buffer, rx_ptr, 0);
-            vTaskDelay(10);
+            // ??????????? vTaskDelay(10);
             err_code = nrfx_uart_tx(hal_uart, crlf_data, strlen(crlf_data));
-            vTaskDelay(10);
+            // ??????????? vTaskDelay(10);
             rx_ptr = 0;
 
             // run command handler
@@ -98,7 +99,6 @@ void serial_comm_send_text(void)
 
 void serial_comm_process_rx(void)
 {
-    //
     xTaskResumeFromISR(m_uart_thread);
 }
 
@@ -106,6 +106,28 @@ void DisplayMessage(uint8_t *message, uint8_t len)
 {
     xSemaphoreTake(tx_uart_semaphore, portMAX_DELAY);
     vTaskDelay(10);
+
+    if (len == 0)
+        len = strlen(message);
+
+    nrfx_uart_tx(hal_uart, message, len);
+
+    xSemaphoreGive(tx_uart_semaphore);
+}
+
+void DisplayMessageWithTime(uint8_t *message, uint8_t len)
+{
+    static uint8_t time_buffer[20];
+    uint8_t len1;
+
+    xSemaphoreTake(tx_uart_semaphore, portMAX_DELAY);
+    vTaskDelay(10);
+
+    SetClockString( time_buffer );
+    len1 = strlen( time_buffer );
+    nrfx_uart_tx(hal_uart, time_buffer, len1);
+
+    vTaskDelay(20);
 
     if (len == 0)
         len = strlen(message);

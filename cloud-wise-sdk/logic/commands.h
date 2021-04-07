@@ -8,7 +8,6 @@
 #define PARAM_TYPE_INTEGER 1
 #define PARAM_TYPE_REAL 3
 
-#define DD(s)	((int)((s)[0]-'0')*10+(int)((s)[1]-'0'));
 
 typedef struct {
     uint8_t   param_name[16];

@@ -44,14 +44,14 @@ NRF_LOG_MODULE_REGISTER();
 // Number of attempts before giving up the connection parameter negotiation
 #define MAX_CONN_PARAMS_UPDATE_COUNT 3
 
-#define APP_ADV_FAST_INTERVAL 400 // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms) to 250 ms)
-#define APP_ADV_FAST_TIMEOUT_IN_SECONDS 60 * 100 // The Fast advertising duration in units of 10 milliseconds
+#define APP_ADV_FAST_INTERVAL 400 // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
+#define APP_ADV_FAST_TIMEOUT_IN_SECONDS (60 * 100) // The Fast advertising duration in units of 10 milliseconds
+
+#define APP_ADV_SLOW_INTERVAL 1800 // The advertising interval (in units of 0.625 ms. This value corresponds to 562.5 ms)
+#define APP_ADV_SLOW_TIMEOUT_IN_SECONDS (60 * 100) // The Slow advertising duration in units of 10 milliseconds
 
 #define APP_BLE_CONN_CFG_TAG 1     // A tag identifying the SoftDevice BLE configuration
 #define APP_BLE_OBSERVER_PRIO 3    // Application's BLE observer priority. You shouldn't need to modify this value
-#define APP_ADV_SLOW_INTERVAL 1800 // The advertising interval (in units of 0.625 ms. This value corresponds to 562.5 ms)
-
-#define APP_ADV_SLOW_TIMEOUT_IN_SECONDS (0 * 100) // The Slow advertising duration in units of 10 milliseconds
 
 #define MIN_CONN_INTERVAL (uint16_t) MSEC_TO_UNITS(7.5, UNIT_1_25_MS) // Minimum acceptable connection interval (0.001 seconds)
 #define MAX_CONN_INTERVAL (uint16_t) MSEC_TO_UNITS(200, UNIT_1_25_MS) // Maximum acceptable connection interval (0.375 seconds)

@@ -7,6 +7,7 @@
 #include "FreeRTOS.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
+#include "monitor.h"
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
@@ -19,7 +20,9 @@
 
 extern DriverBehaviourState driver_behaviour_state;
 extern DeviceConfiguration  device_config;
-extern Calendar             absolute_time;
+extern xSemaphoreHandle     clock_semaphore;
+
+extern Calendar absolute_time;
 
 xSemaphoreHandle sleep_semaphore;
 xSemaphoreHandle command_semaphore;
@@ -27,7 +30,6 @@ xSemaphoreHandle command_semaphore;
 IStickerErrorBits error_bits;
 
 void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command);
-void SetTimeFromString(uint8_t *date_str, uint8_t *time_str);
 
 ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"BEEP", NULL, 85, 0, PARAM_TYPE_STRING, 0, 0},
@@ -199,8 +201,14 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_TIME:
         if (is_set_command) {
-            SetTimeFromString(param, param + 7);
-            numeric_result = 0;
+            // static Calendar calendar;
+
+            xSemaphoreTake(clock_semaphore, portMAX_DELAY);
+
+            SetTimeFromString(param, param + 7, &absolute_time);
+            result         = GetTimeStampFromDate(&absolute_time);
+
+            xSemaphoreGive(clock_semaphore);
         }
         break;
     }
@@ -231,23 +239,4 @@ void delay_sleep(int32_t delay_in_seconds)
     }
 
     xSemaphoreGive(sleep_semaphore);
-}
-
-void SetTimeFromString(uint8_t *date_str, uint8_t *time_str)
-{
-    absolute_time.year  = DD(date_str + 4);
-    absolute_time.month = DD(date_str + 2);
-    absolute_time.day   = DD(date_str);
-    absolute_time.hour  = DD(time_str);
-
-    /*
-    if (gps_sample->gpsHour < old_hour) // midnight wrap//
-    {
-        gps_sample->gpsDay++;
-    }
-    */
-
-    absolute_time.minute  = DD(time_str + 2);
-    absolute_time.seconds = DD(time_str + 4);
-    // gps_sample->gpsMSec = atof(hhmmss + 4) - (double)gps_sample->gpsSec + 123;
 }

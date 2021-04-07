@@ -75,18 +75,5 @@ typedef struct
 }
 DriverBehaviourState;
 
-typedef struct
-{
-  uint8_t year;
-  uint8_t month;
-  uint8_t day;
-
-  uint8_t hour;
-  uint8_t minute;
-  uint8_t seconds;
-}
-Calendar;
-
-
 
 void driver_behaviour_task(void * pvParameter);

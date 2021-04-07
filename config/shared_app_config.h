@@ -1,5 +1,7 @@
 #pragma once
 
+//#define BLE_ADVERTISING
+
 
 #define NRFX_LOG_LEVEL_OFF 0
 #define NRFX_LOG_LEVEL_ERROR 1

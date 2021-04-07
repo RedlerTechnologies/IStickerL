@@ -20,17 +20,18 @@
 #include "semphr.h"
 #include "task.h"
 #include "version.h"
+#include "logic/monitor.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 
 extern xSemaphoreHandle   tx_uart_semaphore;
-extern EventGroupHandle_t event_acc_sample;
+extern xSemaphoreHandle   clock_semaphore;
 extern xSemaphoreHandle   sleep_semaphore;
 extern xSemaphoreHandle   command_semaphore;
 
-extern DriverBehaviourState driver_behaviour_state;
-extern IStickerErrorBits    error_bits;
+extern EventGroupHandle_t event_acc_sample;
+
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread; // Logger thread
@@ -142,68 +143,10 @@ static void blinky_thread(void *arg)
         ++counter;
         peripherals_toggle_leds();
 
-        // ?????????????? ble_services_update_data((uint8_t *)&counter, sizeof(counter));
-
         vTaskDelay(2500);
     }
 }
 
-static void monitor_thread(void *arg)
-{
-    static uint8_t status_buffer[128];
-    static uint8_t ble_buffer[16];
-
-    static uint8_t  temperature;
-    static uint8_t  bat_level;
-    static uint16_t vdd;
-    static float    vdd_float;
-
-    uint32_t duration;
-
-    UNUSED_PARAMETER(arg);
-
-    while (1) {
-        state_machine_feed_watchdog();
-
-        temperature = peripherals_read_temperature();
-        bat_level   = peripherals_read_battery_level();
-        vdd         = peripherals_read_vdd();
-        vdd_float   = ((float)vdd) / 1000;
-
-        duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
-        duration = driver_behaviour_state.sleep_delay_time - duration;
-
-        sprintf(status_buffer, "\r\n\r\nStatus: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level, duration, vdd_float);
-        DisplayMessage(status_buffer, 0);
-
-        // NRFX_LOG_INFO("%s Temperature: %dC", __func__, peripherals_read_temperature());
-
-        // uint8_t bat_level = peripherals_read_battery_level();
-        // NRFX_LOG_INFO("%s Battery: %u%% VDD mV: %u", __func__, bat_level, peripherals_read_vdd());
-
-#ifdef BLE_ENABLE
-        ble_services_update_battery_level(bat_level);
-#endif
-
-        // send measurements to BLE
-        memset(ble_buffer, 0x00, 16);
-        memcpy(ble_buffer, (uint8_t *)(&vdd_float), 4);
-        ble_buffer[10] = temperature;
-        ble_buffer[11] = bat_level;
-
-        ble_services_update_measurement(ble_buffer, 16);
-
-        // send status and error bit to BLE
-        memset(ble_buffer, 0x00, 16);
-        ble_buffer[0] = 1; // record type
-        memcpy(ble_buffer + 4, (uint8_t *)(&error_bits), 4);
-
-        ble_services_update_status(ble_buffer, 16);
-
-        // send status and error bit to BLE
-        vTaskDelay(10000);
-    }
-}
 
 /**@brief Function for application main entry.
  */
@@ -255,6 +198,11 @@ int main(void)
     }
 }
 
+void SuspendAllTasks(void)
+{
+  //xTaskSuspend(monitor_thread);
+}
+
 void init_tasks(void)
 {
     tx_uart_semaphore = xSemaphoreCreateBinary();
@@ -265,6 +213,9 @@ void init_tasks(void)
 
     command_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(command_semaphore);
+
+    clock_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(clock_semaphore);
 
     event_acc_sample = xEventGroupCreate();
 }
