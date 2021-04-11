@@ -8,6 +8,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define COMMAND_CHAR_MAX_LEN    64
+#define ACC_CHAR_MAX_LEN        16
+#define EVENTS_CHAR_MAX_LEN     64
+#define MEASURE_CHAR_MAX_LEN    16
+#define STATUS_CHAR_MAX_LEN     32
+
 #define BLE_ISTICKERL_DEF(_name)                                                                                                           \
     static ble_istickerl_t _name;                                                                                                          \
     NRF_SDH_BLE_OBSERVER(_name##_obs, BLE_ISTICKERL_BLE_OBSERVER_PRIO, ble_istickerl_on_ble_evt, &_name)
@@ -29,6 +35,19 @@ typedef enum {
 
     BLE_ISTICKERL_COMMAND_NOTIFICATION_STARTED,
     BLE_ISTICKERL_COMMAND_NOTIFICATION_STOPPED,
+
+    BLE_ISTICKERL_MEASURE_NOTIFICATION_STARTED,
+    BLE_ISTICKERL_MEASURE_NOTIFICATION_STOPPED,
+
+    BLE_ISTICKERL_ACC_NOTIFICATION_STARTED,
+    BLE_ISTICKERL_ACC_NOTIFICATION_STOPPED,
+
+    BLE_ISTICKERL_STATUS_NOTIFICATION_STARTED,
+    BLE_ISTICKERL_STATUS_NOTIFICATION_STOPPED,
+
+    BLE_ISTICKERL_EVENT_NOTIFICATION_STARTED,
+    BLE_ISTICKERL_EVENT_NOTIFICATION_STOPPED,
+
 } ble_istickerl_evt_type_t;
 
 #define BLE_UUID_ISTICKERL_SERVICE 0xD124 // The UUID of the IStickerL Service
@@ -92,7 +111,12 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
 void ble_istickerl_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context);
 
 ret_code_t ble_istickerl_notify_command(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_notify_measurement(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_notify_acc(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_notify_status(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+ret_code_t ble_istickerl_notify_event(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
+
+ret_code_t ble_istickerl_update_measurement(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
 ret_code_t ble_istickerl_update_acc(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
 ret_code_t ble_istickerl_update_status(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
-ret_code_t ble_istickerl_update_measurement(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);
 ret_code_t ble_istickerl_update_event(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length);

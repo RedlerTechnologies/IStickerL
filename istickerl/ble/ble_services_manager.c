@@ -23,10 +23,15 @@
 #include "nrf_sdh_soc.h"
 #include "nrf_sdm.h"
 #include "version.h"
+#include "ble_task.h"
+#include "logic/tracking_algorithm.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 #include <string.h>
 
 extern DeviceConfiguration device_config;
+extern DriverBehaviourState driver_behaviour_state;
 
 void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address);
 void SetBleID(uint8_t *dev_id);
@@ -322,9 +327,11 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         break;
 
-    case BLE_GAP_EVT_CONNECTED:
+    case BLE_GAP_EVT_CONNECTED: 
         NRFX_LOG_INFO("Connected.");
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+        
+        driver_behaviour_state.last_ble_connected_time = xTaskGetTickCount();
         break;
 
     case BLE_GATTC_EVT_TIMEOUT:
@@ -355,6 +362,11 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         // No implementation needed.
         break;
     }
+}
+
+bool is_connected(void)
+{
+  return !(m_conn_handle == BLE_CONN_HANDLE_INVALID);
 }
 
 /**@brief Function for starting advertising.
@@ -503,9 +515,14 @@ static void istickerl_evt_handler(ble_istickerl_evt_t *p_evt, void *p_context)
 
     case BLE_ISTICKERL_EVENT_COMMAND_WRITE:
         NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_COMMAND_WRITE (%u bytes)", __func__, p_evt->params.command_len);
+
+        PostBleCommand( p_evt->params.p_command, p_evt->params.command_len );
+        /*
         DisplayMessage(p_evt->params.p_command, p_evt->params.command_len);
         DisplayMessage("\r\n", 2);
         command_decoder(p_evt->params.p_command, p_evt->params.command_len, 1);
+        */
+
         break;
 
     case BLE_ISTICKERL_COMMAND_NOTIFICATION_STARTED:
@@ -515,6 +532,46 @@ static void istickerl_evt_handler(ble_istickerl_evt_t *p_evt, void *p_context)
 
     case BLE_ISTICKERL_COMMAND_NOTIFICATION_STOPPED:
         NRFX_LOG_INFO("%s BLE_ISTICKERL_COMMAND_NOTIFICATION_STOPPED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_MEASURE_NOTIFICATION_STARTED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_MEASURE_NOTIFICATION_STARTED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_MEASURE_NOTIFICATION_STOPPED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_MEASURE_NOTIFICATION_STOPPED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_ACC_NOTIFICATION_STARTED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_ACC_NOTIFICATION_STARTED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_ACC_NOTIFICATION_STOPPED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_ACC_NOTIFICATION_STOPPED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_STATUS_NOTIFICATION_STARTED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_STATUS_NOTIFICATION_STARTED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_STATUS_NOTIFICATION_STOPPED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_STATUS_NOTIFICATION_STOPPED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_EVENT_NOTIFICATION_STARTED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_NOTIFICATION_STARTED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_EVENT_NOTIFICATION_STOPPED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_NOTIFICATION_STOPPED", __func__);
         // TODO
         break;
 
@@ -568,6 +625,87 @@ bool ble_services_notify_command(uint8_t *const data, size_t length)
     err_code = ble_istickerl_notify_command(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
 }
+
+bool ble_services_notify_measurement(uint8_t *const data, size_t length)
+{
+    // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+    //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
+    //    return false;
+    //}
+
+    ret_code_t err_code;
+
+#ifdef BLE_ISTICKERL_DATA_HEXDUMP
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+    if (length > 0)
+        NRFX_LOG_HEXDUMP_INFO(data, length);
+    NRF_LOG_FLUSH();
+#endif
+
+    err_code = ble_istickerl_notify_measurement(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_notify_acc(uint8_t *const data, size_t length)
+{
+    // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+    //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
+    //    return false;
+    //}
+
+    ret_code_t err_code;
+
+#ifdef BLE_ISTICKERL_DATA_HEXDUMP
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+    if (length > 0)
+        NRFX_LOG_HEXDUMP_INFO(data, length);
+    NRF_LOG_FLUSH();
+#endif
+
+    err_code = ble_istickerl_notify_acc(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_notify_status(uint8_t *const data, size_t length)
+{
+    // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+    //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
+    //    return false;
+    //}
+
+    ret_code_t err_code;
+
+#ifdef BLE_ISTICKERL_DATA_HEXDUMP
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+    if (length > 0)
+        NRFX_LOG_HEXDUMP_INFO(data, length);
+    NRF_LOG_FLUSH();
+#endif
+
+    err_code = ble_istickerl_notify_status(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_notify_event(uint8_t *const data, size_t length)
+{
+    // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+    //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
+    //    return false;
+    //}
+
+    ret_code_t err_code;
+
+#ifdef BLE_ISTICKERL_DATA_HEXDUMP
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+    if (length > 0)
+        NRFX_LOG_HEXDUMP_INFO(data, length);
+    NRF_LOG_FLUSH();
+#endif
+
+    err_code = ble_istickerl_notify_event(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
 
 bool ble_services_update_acc(uint8_t *const data, size_t length)
 {

@@ -40,12 +40,11 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"DEVID", (uint32_t *)device_config.DeviceID, 46, 26, PARAM_TYPE_STRING, 0, 1},
     {"BLEID", (uint32_t *)device_config.DeviceName, 46, 16, PARAM_TYPE_STRING, 0, 1},
     {"TIME", NULL, 46, 2, PARAM_TYPE_STRING, 0, 1},
+    {"RESET", NULL, 46, 2, PARAM_TYPE_INTEGER, 0, 1},
 };
 
-bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
+bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
 {
-    static uint8_t result_buffer[128];
-
     static uint8_t command[MAX_COMMAND_SIZE];
     static uint8_t param[MAX_PARAM_SIZE];
 
@@ -57,9 +56,18 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
 
     xSemaphoreTake(command_semaphore, portMAX_DELAY);
 
-    if (command_str[0] == 'P') {
+    i = 0;
+    while (i < max_size) {
+
+        if (command_str[i] == 'P')
+            break;
+
+        i++;
+    }
+
+    if (command_str[i] == 'P') {
         memset(command, 0x00, MAX_COMMAND_SIZE);
-        i = 2;
+        i += 2;
         j = 0;
 
         while (i < max_size) {
@@ -99,11 +107,13 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
                     break;
             }
 
+            /*
             if (strlen(param) > 0) {
 
             } else {
                 flag = false;
             }
+            */
 
         } else
             flag = false;
@@ -126,21 +136,16 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source)
             }
         }
 
-        if (index >= 0) {
-            run_command(index, param, result_buffer, is_set_command);
-        } else
-            flag = false;
+        run_command(index, param, result_buffer, is_set_command);
     } else {
         DisplayMessage("COMMAND ERROR\r\n", 0);
     }
 
     DisplayMessage("Response: \r\n", 0);
-    DisplayMessage(result_buffer, 0);
-    DisplayMessage("\r\n", 0);
 
-    if (source == 1) {
-        ble_services_notify_command(result_buffer, strlen(result_buffer));
-    }
+    if (strlen(result_buffer) > 0)
+        DisplayMessage(result_buffer, 0);
+    DisplayMessage("\r\n", 0);
 
     xSemaphoreGive(command_semaphore);
 
@@ -156,9 +161,6 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     param_num = atoi(param);
     p         = &parameter_list[command_index];
-
-    // empty result buffer
-    param_result[0] = 0x0;
 
     switch (command_index) {
     case COMMAND_BEEP:
@@ -192,6 +194,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_DEVICE_ID:
     case COMMAND_BLE_ID:
+
         if (!is_set_command) {
             strcpy(param_result, (uint8_t *)p->param_address);
             numeric_result = 0;
@@ -206,10 +209,20 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
             xSemaphoreTake(clock_semaphore, portMAX_DELAY);
 
             SetTimeFromString(param, param + 7, &absolute_time);
-            result         = GetTimeStampFromDate(&absolute_time);
+            result = GetTimeStampFromDate(&absolute_time);
+            driver_behaviour_state.time_synced = true;
 
             xSemaphoreGive(clock_semaphore);
         }
+        break;
+
+     case COMMAND_RESET:
+        if (is_set_command)
+            NVIC_SystemReset();;
+        break;
+
+    default:
+        result = -9;
         break;
     }
 

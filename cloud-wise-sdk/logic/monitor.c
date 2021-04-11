@@ -25,9 +25,9 @@ extern IStickerErrorBits    error_bits;
 
 APP_TIMER_DEF(m_clock_timer);
 
-Calendar        absolute_time;
-static uint32_t clock_counter = 0;
-xSemaphoreHandle   clock_semaphore;
+Calendar         absolute_time;
+static uint32_t  clock_counter = 0;
+xSemaphoreHandle clock_semaphore;
 
 static uint16_t days[4][12] = {
     {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335},
@@ -84,7 +84,7 @@ void SetClockString(uint8_t *buffer)
 {
     uint8_t *ptr = buffer;
 
-    xSemaphoreTake( clock_semaphore, portMAX_DELAY );
+    xSemaphoreTake(clock_semaphore, portMAX_DELAY);
 
     PV(&ptr, absolute_time.day);
     PC(&ptr, '-');
@@ -104,15 +104,17 @@ void SetClockString(uint8_t *buffer)
     PV(&ptr, absolute_time.seconds);
     PC(&ptr, ' ');
 
-    xSemaphoreGive( clock_semaphore );
+    xSemaphoreGive(clock_semaphore);
 }
 
 void monitor_thread(void *arg)
 {
+    static uint8_t alert_str[32];
+
     uint32_t prev_current_time = 0;
     uint32_t current_time      = 0;
     uint32_t dt                = 0;
-    bool first = true;
+    bool     first             = true;
 
     static uint8_t  status_buffer[128];
     static uint8_t  ble_buffer[16];
@@ -165,9 +167,8 @@ void monitor_thread(void *arg)
             duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
             duration = driver_behaviour_state.sleep_delay_time - duration;
 
-            sprintf(status_buffer, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level, duration,
-                    vdd_float);
-            //DisplayMessage(status_buffer, 0);
+            sprintf(status_buffer, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level, duration, vdd_float);
+            // DisplayMessage(status_buffer, 0);
             DisplayMessageWithTime(status_buffer, 0);
 
             // NRFX_LOG_INFO("%s Temperature: %dC", __func__, peripherals_read_temperature());
@@ -175,24 +176,33 @@ void monitor_thread(void *arg)
             // uint8_t bat_level = peripherals_read_battery_level();
             // NRFX_LOG_INFO("%s Battery: %u%% VDD mV: %u", __func__, bat_level, peripherals_read_vdd());
 
+            if (is_connected()) {
 #ifdef BLE_ADVERTISING
-            ble_services_update_battery_level(bat_level);
+                ble_services_update_battery_level(bat_level);
 
-            // send measurements to BLE
-            memset(ble_buffer, 0x00, 16);
-            memcpy(ble_buffer, (uint8_t *)(&vdd_float), 4);
-            ble_buffer[10] = temperature;
-            ble_buffer[11] = bat_level;
+                // send measurements to BLE
+                memset(ble_buffer, 0x00, 16);
+                memcpy(ble_buffer, (uint8_t *)(&vdd_float), 4);
+                ble_buffer[10] = temperature;
+                ble_buffer[11] = bat_level;
 
-            ble_services_update_measurement(ble_buffer, 16);
+                ble_services_notify_measurement(ble_buffer, 12);
 
-            // send status and error bit to BLE
-            memset(ble_buffer, 0x00, 16);
-            ble_buffer[0] = 1; // record type
-            memcpy(ble_buffer + 4, (uint8_t *)(&error_bits), 4);
-
-            ble_services_update_status(ble_buffer, 16);
+                // send status and error bit to BLE
+                memset(ble_buffer, 0x00, 16);
+                ble_buffer[0]               = 1; // record type
+                error_bits.GPSNotFixed      = 1;
+                error_bits.GPS_Disconnected = 1;
+                error_bits.NotCalibrated    = 1;
+                memcpy(ble_buffer + 4, (uint8_t *)(&error_bits), 4);
+                ble_services_notify_status(ble_buffer, 16);
 #endif
+
+                if (!driver_behaviour_state.time_synced) {
+                    sprintf(alert_str + 2, "@?TIME");
+                    PostBleAlert(alert_str);
+                }
+            }
         }
     }
 }

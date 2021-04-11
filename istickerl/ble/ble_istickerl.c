@@ -25,6 +25,10 @@ NRF_LOG_MODULE_REGISTER();
 
 typedef struct {
     bool command;
+    bool measurement;
+    bool acc;
+    bool status;
+    bool event;
 } ble_istickerl_notify_t;
 
 volatile static ble_istickerl_notify_t m_notify;
@@ -109,7 +113,7 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     memset(&add_char_params, 0, sizeof(add_char_params));
     add_char_params.uuid              = BLE_UUID_COMMAND_CHARACTERISTIC;
     add_char_params.uuid_type         = p_istickerl->uuid_type;
-    add_char_params.max_len           = BLE_ISTICKERL_MAX_DATA_LEN;
+    add_char_params.max_len           = COMMAND_CHAR_MAX_LEN; // BLE_ISTICKERL_MAX_DATA_LEN;
     add_char_params.is_var_len        = true;
     add_char_params.p_init_value      = p_istickerl_init->p_command_init_value;
     add_char_params.init_len          = p_istickerl_init->command_init_len;
@@ -124,6 +128,24 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->command_handle);
     VERIFY_SUCCESS(err_code);
 
+    // Add the measurement Characteristic //
+    memset(&add_char_params, 0, sizeof(add_char_params));
+    add_char_params.uuid            = BLE_UUID_MEASUREMENT_CHARACTERISTIC;
+    add_char_params.uuid_type       = p_istickerl->uuid_type;
+    add_char_params.max_len         = 16;
+    add_char_params.is_var_len      = false;
+    add_char_params.p_init_value    = p_istickerl_init->p_data_init_value; // ?????????
+    add_char_params.init_len        = p_istickerl_init->data_init_len;     // ????????????
+    add_char_params.char_props.read = 1;
+    add_char_params.char_props.notify = 1;
+    add_char_params.cccd_write_access = SEC_OPEN;
+
+    add_char_params.read_access = SEC_OPEN;
+
+    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->measurement_handle);
+    VERIFY_SUCCESS(err_code);
+
+
     // Add the Acc Characteristic //
     memset(&add_char_params, 0, sizeof(add_char_params));
     add_char_params.uuid            = BLE_UUID_ACC_CHARACTERISTIC;
@@ -133,8 +155,10 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.p_init_value    = p_istickerl_init->p_data_init_value; // ?????????
     add_char_params.init_len        = p_istickerl_init->data_init_len;     // ????????????
     add_char_params.char_props.read = 1;
+    add_char_params.char_props.notify = 1;
 
     add_char_params.read_access = SEC_OPEN;
+    add_char_params.cccd_write_access =  SEC_OPEN;
 
     err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->acc_handle);
     VERIFY_SUCCESS(err_code);
@@ -148,25 +172,12 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.p_init_value    = p_istickerl_init->p_data_init_value; // ?????????
     add_char_params.init_len        = p_istickerl_init->data_init_len;     // ????????????
     add_char_params.char_props.read = 1;
+    add_char_params.char_props.notify = 1;
 
     add_char_params.read_access = SEC_OPEN;
+    add_char_params.cccd_write_access = SEC_OPEN;
 
     err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->status_handle);
-    VERIFY_SUCCESS(err_code);
-
-    // Add the measurement Characteristic //
-    memset(&add_char_params, 0, sizeof(add_char_params));
-    add_char_params.uuid            = BLE_UUID_MEASUREMENT_CHARACTERISTIC;
-    add_char_params.uuid_type       = p_istickerl->uuid_type;
-    add_char_params.max_len         = 16;
-    add_char_params.is_var_len      = false;
-    add_char_params.p_init_value    = p_istickerl_init->p_data_init_value; // ?????????
-    add_char_params.init_len        = p_istickerl_init->data_init_len;     // ????????????
-    add_char_params.char_props.read = 1;
-
-    add_char_params.read_access = SEC_OPEN;
-
-    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->measurement_handle);
     VERIFY_SUCCESS(err_code);
 
     // Add the event Characteristic //
@@ -178,8 +189,10 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.p_init_value    = p_istickerl_init->p_data_init_value; // ?????????
     add_char_params.init_len        = p_istickerl_init->data_init_len;     // ????????????
     add_char_params.char_props.read = 1;
+    add_char_params.char_props.notify = 1;
 
     add_char_params.read_access = SEC_OPEN;
+    add_char_params.cccd_write_access = SEC_OPEN;
 
     err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->event_handle);
     VERIFY_SUCCESS(err_code);
@@ -297,6 +310,25 @@ static void on_write(ble_istickerl_t *p_istickerl, ble_evt_t const *p_ble_evt)
         on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_COMMAND_NOTIFICATION_STARTED,
                                        BLE_ISTICKERL_COMMAND_NOTIFICATION_STOPPED, &m_notify.command);
 
+        // INFO Handle CCCD write (subscribe) for measurement_handle
+    } else if ((p_evt_write->handle == p_istickerl->measurement_handle.cccd_handle) && (p_evt_write->len == 2)) {
+        on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_MEASURE_NOTIFICATION_STARTED,
+                                       BLE_ISTICKERL_MEASURE_NOTIFICATION_STOPPED, &m_notify.measurement);
+
+        // INFO Handle CCCD write (subscribe) for acc_handle
+    } else if ((p_evt_write->handle == p_istickerl->acc_handle.cccd_handle) && (p_evt_write->len == 2)) {
+        on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_ACC_NOTIFICATION_STARTED,
+                                       BLE_ISTICKERL_ACC_NOTIFICATION_STOPPED, &m_notify.acc);
+
+        // INFO Handle CCCD write (subscribe) for status_handle
+    } else if ((p_evt_write->handle == p_istickerl->status_handle.cccd_handle) && (p_evt_write->len == 2)) {
+        on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_STATUS_NOTIFICATION_STARTED,
+                                       BLE_ISTICKERL_STATUS_NOTIFICATION_STOPPED, &m_notify.status);
+
+        // INFO Handle CCCD write (subscribe) for event_handle
+    } else if ((p_evt_write->handle == p_istickerl->status_handle.cccd_handle) && (p_evt_write->len == 2)) {
+        on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_EVENT_NOTIFICATION_STARTED,
+                                       BLE_ISTICKERL_EVENT_NOTIFICATION_STOPPED, &m_notify.event);
     } else {
         NRFX_LOG_WARNING("%s unkown CCCD (0x%x) Length: %u", __func__, p_evt_write->handle, p_evt_write->len);
     }
@@ -310,6 +342,58 @@ ret_code_t ble_istickerl_notify_command(ble_istickerl_t *p_istickerl, uint8_t *c
 
     if (m_notify.command && p_istickerl->conn_handle != BLE_CONN_HANDLE_INVALID) {
         err_code = value_notify(p_istickerl, data, length, p_istickerl->command_handle.value_handle);
+    }
+
+    return err_code;
+}
+
+ret_code_t ble_istickerl_notify_measurement(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = value_update(data, length, p_istickerl->measurement_handle.value_handle);
+
+    if (m_notify.measurement && p_istickerl->conn_handle != BLE_CONN_HANDLE_INVALID) {
+        err_code = value_notify(p_istickerl, data, length, p_istickerl->measurement_handle.value_handle);
+    }
+
+    return err_code;
+}
+
+ret_code_t ble_istickerl_notify_acc(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = value_update(data, length, p_istickerl->acc_handle.value_handle);
+
+    if (m_notify.acc && p_istickerl->conn_handle != BLE_CONN_HANDLE_INVALID) {
+        err_code = value_notify(p_istickerl, data, length, p_istickerl->acc_handle.value_handle);
+    }
+
+    return err_code;
+}
+
+ret_code_t ble_istickerl_notify_status(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = value_update(data, length, p_istickerl->status_handle.value_handle);
+
+    if (m_notify.status && p_istickerl->conn_handle != BLE_CONN_HANDLE_INVALID) {
+        err_code = value_notify(p_istickerl, data, length, p_istickerl->status_handle.value_handle);
+    }
+
+    return err_code;
+}
+
+ret_code_t ble_istickerl_notify_event(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = value_update(data, length, p_istickerl->event_handle.value_handle);
+
+    if (m_notify.event && p_istickerl->conn_handle != BLE_CONN_HANDLE_INVALID) {
+        err_code = value_notify(p_istickerl, data, length, p_istickerl->event_handle.value_handle);
     }
 
     return err_code;
@@ -334,21 +418,3 @@ ret_code_t ble_istickerl_update_event(ble_istickerl_t *p_istickerl, uint8_t *con
 {
     return value_update(data, length, p_istickerl->event_handle.value_handle);
 }
-
-// void isticker_character_write_handler_(ble_evt_t const *p_ble_evt)
-//{
-//    ble_gatts_evt_write_t const *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
-//    uint8_t *                    buffer;
-//    uint8_t                      len;
-
-//    len    = p_evt_write->len;
-//    buffer = (uint8_t *)p_evt_write->data;
-
-//    switch (p_evt_write->uuid.uuid) {
-//    case BLE_UUID_COMMAND_CHARACTERISTIC:
-//        DisplayMessage(buffer, len);
-//        DisplayMessage("\r\n", 2);
-//        command_decoder(buffer, len, 1);
-//        break;
-//    }
-//}

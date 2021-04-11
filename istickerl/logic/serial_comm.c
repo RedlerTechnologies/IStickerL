@@ -1,18 +1,20 @@
 #include "serial_comm.h"
 
 #include "FreeRTOS.h"
+#include "event_groups.h"
 #include "hal/hal_drivers.h"
 #include "logic/commands.h"
+#include "logic/monitor.h"
 #include "semphr.h"
 #include "task.h"
-#include "logic/monitor.h"
 
 #define NRF_LOG_MODULE_NAME logic_serial_comm
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
 
 #define UART_RX_BUFFER_SIZE 64
 
-xSemaphoreHandle tx_uart_semaphore;
+xSemaphoreHandle   tx_uart_semaphore;
+EventGroupHandle_t event_uart_rx;
 
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
@@ -23,6 +25,9 @@ static void uart_thread(void *arg);
 
 static uint8_t rx_buffer[UART_RX_BUFFER_SIZE];
 static uint8_t copy_rx_buffer[UART_RX_BUFFER_SIZE + 4];
+
+static uint8_t rx_buffer_xxx[UART_RX_BUFFER_SIZE];
+static uint8_t rx_ptr_xxx;
 
 void serial_comm_init(void)
 {
@@ -35,13 +40,30 @@ static void uart_thread(void *arg)
 {
     UNUSED_PARAMETER(arg);
 
-    ret_code_t err_code;
+    static uint8_t result_buffer[64];
+
+    ret_code_t  err_code;
+    EventBits_t uxBits;
 
     static uint8_t data[1];
     static uint8_t rx_ptr      = 0;
     static char    crlf_data[] = "\r\n";
 
+    // ????????????????
+    err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
+
     while (1) {
+
+        uxBits = xEventGroupWaitBits(event_uart_rx, 0x01, pdTRUE, pdFALSE, 5);
+
+        if (uxBits) {
+            DisplayMessage(copy_rx_buffer, 0);
+            command_decoder(copy_rx_buffer, strlen(copy_rx_buffer) , result_buffer, 0);
+        }
+
+        // vTaskSuspend(NULL); // ????????????
+        continue;
+
         err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
         APP_ERROR_CHECK(err_code);
 
@@ -71,7 +93,7 @@ static void uart_thread(void *arg)
 
             DisplayMessage("\r\n\r\n\r\n", 6);
             DisplayMessage(copy_rx_buffer, 0);
-            command_decoder(copy_rx_buffer, rx_ptr, 0);
+            // ????????????????? command_decoder(copy_rx_buffer, rx_ptr, 0);
             // ??????????? vTaskDelay(10);
             err_code = nrfx_uart_tx(hal_uart, crlf_data, strlen(crlf_data));
             // ??????????? vTaskDelay(10);
@@ -87,19 +109,43 @@ static void uart_thread(void *arg)
     }
 }
 
-void serial_comm_send_text(void)
-{
-    static char tx_data[] = "Hello\r\n";
-    ret_code_t  err_code;
-
-    // err_code = nrfx_uart_tx(hal_uart, tx_data, strlen(tx_data));
-
-    // APP_ERROR_CHECK(err_code);
-}
-
 void serial_comm_process_rx(void)
 {
-    xTaskResumeFromISR(m_uart_thread);
+    BaseType_t xHigherPriorityTaskWoken, xResult;
+
+    uint8_t ch;
+    // ??????????
+    // xTaskResumeFromISR(m_uart_thread);
+    // return;
+
+    ret_code_t err_code;
+    uint8_t    data[1];
+
+    err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
+    APP_ERROR_CHECK(err_code);
+
+    ch = data[0];
+
+    if (rx_ptr_xxx == 0)
+        memset(rx_buffer_xxx, 0x00, UART_RX_BUFFER_SIZE);
+
+    rx_buffer_xxx[rx_ptr_xxx] = ch;
+    nrfx_uart_tx(hal_uart, &ch, 1);
+
+    if (ch == 0x0D) {
+        memcpy(copy_rx_buffer, rx_buffer_xxx, UART_RX_BUFFER_SIZE);
+        rx_ptr_xxx = 0;
+
+        xHigherPriorityTaskWoken = pdFALSE;
+        xResult                  = xEventGroupSetBitsFromISR(event_uart_rx, 0x01, &xHigherPriorityTaskWoken);
+
+        if (xResult != pdFAIL) {
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
+    } else {
+        if (rx_ptr_xxx + 1 < UART_RX_BUFFER_SIZE)
+            rx_ptr_xxx++;
+    }
 }
 
 void DisplayMessage(uint8_t *message, uint8_t len)
@@ -118,13 +164,13 @@ void DisplayMessage(uint8_t *message, uint8_t len)
 void DisplayMessageWithTime(uint8_t *message, uint8_t len)
 {
     static uint8_t time_buffer[20];
-    uint8_t len1;
+    uint8_t        len1;
 
     xSemaphoreTake(tx_uart_semaphore, portMAX_DELAY);
     vTaskDelay(10);
 
-    SetClockString( time_buffer );
-    len1 = strlen( time_buffer );
+    SetClockString(time_buffer);
+    len1 = strlen(time_buffer);
     nrfx_uart_tx(hal_uart, time_buffer, len1);
 
     vTaskDelay(20);

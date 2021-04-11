@@ -26,7 +26,7 @@ void CreateEvent(IStickerEvent *event)
 
     static uint8_t ble_buffer[64];
     uint16_t       len, crc;
-    uint8_t        ptr = 0;
+    uint8_t        ptr = 2;
 
     memset(ble_buffer, 0x00, 64);
 
@@ -66,7 +66,9 @@ void CreateEvent(IStickerEvent *event)
     // write to flash here
     // ..
 
-    ble_services_update_event(ble_buffer, ptr);
+    ble_buffer[0] = 0x80;
+    ble_buffer[1] = ptr;
+    ble_services_notify_event(ble_buffer, ptr);
 }
 
 void CreateAccidentEvent(void)

@@ -72,6 +72,12 @@ typedef struct
   // on_driving
   unsigned last_activity_time;
   unsigned short sleep_delay_time;
+
+  // flags
+  bool time_synced;
+  bool ble_connected;
+
+  unsigned last_ble_connected_time;
 }
 DriverBehaviourState;
 

@@ -3,10 +3,12 @@
 #include "app_timer.h"
 #include "ble.h"
 #include "ble/ble_services_manager.h"
+#include "ble/ble_task.h"
 #include "drivers/buzzer.h"
 #include "event_groups.h"
 #include "hal/hal_boards.h"
 #include "logic/commands.h"
+#include "logic/monitor.h"
 #include "logic/peripherals.h"
 #include "logic/serial_comm.h"
 #include "logic/state_machine.h"
@@ -20,18 +22,17 @@
 #include "semphr.h"
 #include "task.h"
 #include "version.h"
-#include "logic/monitor.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 
-extern xSemaphoreHandle   tx_uart_semaphore;
-extern xSemaphoreHandle   clock_semaphore;
-extern xSemaphoreHandle   sleep_semaphore;
-extern xSemaphoreHandle   command_semaphore;
+extern xSemaphoreHandle tx_uart_semaphore;
+extern xSemaphoreHandle clock_semaphore;
+extern xSemaphoreHandle sleep_semaphore;
+extern xSemaphoreHandle command_semaphore;
 
 extern EventGroupHandle_t event_acc_sample;
-
+extern EventGroupHandle_t event_uart_rx;
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread; // Logger thread
@@ -132,6 +133,7 @@ static void clock_init(void)
 // Demo Threads
 static TaskHandle_t m_blinky_thread;
 static TaskHandle_t m_monitor_thread;
+static TaskHandle_t m_ble_thread;
 
 static void blinky_thread(void *arg)
 {
@@ -146,7 +148,6 @@ static void blinky_thread(void *arg)
         vTaskDelay(2500);
     }
 }
-
 
 /**@brief Function for application main entry.
  */
@@ -181,12 +182,13 @@ int main(void)
     if (pdPASS != xTaskCreate(monitor_thread, "Monitor", 256, NULL, 1, &m_monitor_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
+    if (pdPASS != xTaskCreate(ble_thread, "BLE", 256, NULL, 1, &m_ble_thread)) {
+        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+    }
 
     UNUSED_VARIABLE(xTaskCreate(driver_behaviour_task, "Tracking", configMINIMAL_STACK_SIZE + 200, NULL, 2, &driver_behaviour_task_handle));
 
     init_tasks();
-
-    // ble_services_advertising_start();
 
     NRFX_LOG_INFO("%s Free Heap: %u", __func__, xPortGetFreeHeapSize());
 
@@ -200,7 +202,7 @@ int main(void)
 
 void SuspendAllTasks(void)
 {
-  //xTaskSuspend(monitor_thread);
+    // xTaskSuspend(monitor_thread);
 }
 
 void init_tasks(void)
@@ -218,4 +220,7 @@ void init_tasks(void)
     xSemaphoreGive(clock_semaphore);
 
     event_acc_sample = xEventGroupCreate();
+    event_uart_rx    = xEventGroupCreate();
+
+    init_ble_task();
 }

@@ -15,9 +15,12 @@
 #include "nrf_power.h"
 #include "task.h"
 #include "logic/clock.h"
+#include "ble/ble_services_manager.h"
+#include "ble/ble_task.h"
 
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
 
 EventGroupHandle_t   event_acc_sample;
 static TimerHandle_t sample_timer_handle;
@@ -28,6 +31,7 @@ extern uint8_t             Acc_Table_Merged[];
 extern DeviceConfiguration device_config;
 
 static uint8_t sample_buffer[7];
+static uint8_t alert_str[64];
 
 DriverBehaviourState driver_behaviour_state;
 
@@ -93,6 +97,9 @@ void driver_behaviour_task(void *pvParameter)
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
 
     configure_acc(Acc_Table_Merged, ACC_TABLE_DRIVER_SIZE);
+
+    driver_behaviour_state.time_synced = false;
+    driver_behaviour_state.ble_connected = false;
 
     while (1) {
 
@@ -223,7 +230,7 @@ void ProcessAllSamples(void)
         if (i == 0) {
             memset(ble_buffer, 0x00, 16);
             memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
-            ble_services_update_acc(ble_buffer, 16);
+            ble_services_notify_acc(ble_buffer, 16);
         }
 
         Process_Accident(state, sample);
@@ -330,6 +337,10 @@ void Process_Calibrate(void)
         state->block_count = 0;
         state->calibrated  = true;
         buzzer_train(5);
+
+        // sending calibrate alert
+        sprintf( alert_str+2, "@?C,%d,%d,%d", 1 , -2, 0 ); // ??????????? 
+        PostBleAlert( alert_str );
     }
 }
 

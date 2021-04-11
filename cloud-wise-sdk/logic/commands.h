@@ -2,7 +2,7 @@
 
 #include "hal/hal_data_types.h"
 
-#define NUM_OF_PARAMETERS 8
+#define NUM_OF_PARAMETERS 9
 
 #define PARAM_TYPE_STRING 0
 #define PARAM_TYPE_INTEGER 1
@@ -29,6 +29,7 @@ typedef enum {
     COMMAND_DEVICE_ID,
     COMMAND_BLE_ID,
     COMMAND_TIME,
+    COMMAND_RESET,
 } ECOMMANDS;
 
 typedef struct {
@@ -48,5 +49,5 @@ typedef struct {
     uint32_t Reserved : 20;
 } IStickerErrorBits;
 
-bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t source);
+bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t* result_buffer, uint8_t source);
 void delay_sleep(int32_t delay_in_seconds);
