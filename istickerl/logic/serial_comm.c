@@ -5,6 +5,7 @@
 #include "hal/hal_drivers.h"
 #include "logic/commands.h"
 #include "logic/monitor.h"
+#include "nrf_delay.h"
 #include "semphr.h"
 #include "task.h"
 
@@ -58,7 +59,7 @@ static void uart_thread(void *arg)
 
         if (uxBits) {
             DisplayMessage(copy_rx_buffer, 0);
-            command_decoder(copy_rx_buffer, strlen(copy_rx_buffer) , result_buffer, 0);
+            command_decoder(copy_rx_buffer, strlen(copy_rx_buffer), result_buffer, 0);
         }
 
         // vTaskSuspend(NULL); // ????????????
@@ -157,7 +158,7 @@ void DisplayMessage(uint8_t *message, uint8_t len)
         len = strlen(message);
 
     nrfx_uart_tx(hal_uart, message, len);
-
+ 
     xSemaphoreGive(tx_uart_semaphore);
 }
 

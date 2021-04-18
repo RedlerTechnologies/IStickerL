@@ -326,7 +326,7 @@ static void on_write(ble_istickerl_t *p_istickerl, ble_evt_t const *p_ble_evt)
                                        BLE_ISTICKERL_STATUS_NOTIFICATION_STOPPED, &m_notify.status);
 
         // INFO Handle CCCD write (subscribe) for event_handle
-    } else if ((p_evt_write->handle == p_istickerl->status_handle.cccd_handle) && (p_evt_write->len == 2)) {
+    } else if ((p_evt_write->handle == p_istickerl->event_handle.cccd_handle) && (p_evt_write->len == 2)) {
         on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_EVENT_NOTIFICATION_STARTED,
                                        BLE_ISTICKERL_EVENT_NOTIFICATION_STOPPED, &m_notify.event);
     } else {

@@ -7,6 +7,7 @@
 #include "nrfx_gpiote.h"
 #include "nrfx_saadc.h"
 #include "app_timer.h"
+#include "nrf_delay.h"
 
 #include <string.h>
 
@@ -54,6 +55,14 @@ void hal_init(hal_evt_handler_t evt_handler)
     p_evt_handler = evt_handler;
 
     init_gpio();
+
+    // ??????????????
+    nrf_gpio_pin_clear(HAL_LED_GREEN);
+    nrf_gpio_pin_clear(HAL_LED_RED);
+    nrf_delay_ms(100);
+    nrf_gpio_pin_set(HAL_LED_GREEN);
+    nrf_gpio_pin_set(HAL_LED_RED);
+
     init_twim();
     init_spim();
     init_pwm();

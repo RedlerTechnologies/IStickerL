@@ -2,6 +2,7 @@
 
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
+#include "ble/ble_task.h"
 #include "commands.h"
 #include "configuration.h"
 #include "drivers/buzzer.h"
@@ -11,16 +12,14 @@
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
+#include "logic/clock.h"
 #include "logic/serial_comm.h"
 #include "nrf_power.h"
 #include "task.h"
-#include "logic/clock.h"
-#include "ble/ble_services_manager.h"
-#include "ble/ble_task.h"
 
 #include <math.h>
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
 EventGroupHandle_t   event_acc_sample;
 static TimerHandle_t sample_timer_handle;
@@ -43,6 +42,7 @@ void           ProcessAllSamples(void);
 void           ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
 void           Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
 void           Process_Calibrate(void);
+signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -89,17 +89,20 @@ void driver_behaviour_task(void *pvParameter)
 
     ble_services_init();
 
-    #ifdef BLE_ADVERTISING
+#ifdef BLE_ADVERTISING
     ble_services_advertising_start();
-    #endif
+#endif
 
     sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, sample_timer_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
 
     configure_acc(Acc_Table_Merged, ACC_TABLE_DRIVER_SIZE);
 
-    driver_behaviour_state.time_synced = false;
+    driver_behaviour_state.time_synced   = false;
     driver_behaviour_state.ble_connected = false;
+
+    sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD); // ???????????
+    DisplayMessage(alert_str,0);
 
     while (1) {
 
@@ -146,7 +149,7 @@ void driver_behaviour_task(void *pvParameter)
             nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
 
             nrf_power_system_off();
-            //sd_power_system_off();
+            // sd_power_system_off();
         }
     }
 }
@@ -339,8 +342,8 @@ void Process_Calibrate(void)
         buzzer_train(5);
 
         // sending calibrate alert
-        sprintf( alert_str+2, "@?C,%d,%d,%d", 1 , -2, 0 ); // ??????????? 
-        PostBleAlert( alert_str );
+        sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", 1, -2, 0); // ???????????
+        PostBleAlert(alert_str);
     }
 }
 
@@ -375,6 +378,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
             state->max_g                     = value;
             state->sample_in_drive_direction = sample->drive_direction;
             state->sample_in_turn_direction  = sample->turn_direction;
+            state->hit_angle                 = calculate_accident_hit_angle(sample);
         }
 
         if (state->accident_sample_count >= 5) {
@@ -383,6 +387,9 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
                 // accident identified //
                 /////////////////////////
 
+                // sending calibrate alert
+                sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g , state->hit_angle);
+                PostBleAlert(alert_str);
                 CreateAccidentEvent();
 
                 // beep a buzzer
@@ -409,6 +416,26 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
         break;
     }
+}
+
+signed short calculate_accident_hit_angle(AccConvertedSample *sample)
+{
+    float value;
+
+    if (sample->drive_direction == 0)
+        sample->drive_direction = 1;
+
+    value = atan((float)sample->turn_direction / sample->drive_direction);
+    value = value * 180 / PI;
+
+    if (sample->drive_direction < 0) {
+        if (sample->turn_direction > 0)
+            value = 360 + value;
+    } else {
+        value = 180 + value;
+    }
+
+    return (short)value;
 }
 
 unsigned short GetGValue(AccConvertedSample *sample)

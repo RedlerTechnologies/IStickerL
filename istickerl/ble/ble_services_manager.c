@@ -49,7 +49,7 @@ NRF_LOG_MODULE_REGISTER();
 // Number of attempts before giving up the connection parameter negotiation
 #define MAX_CONN_PARAMS_UPDATE_COUNT 3
 
-#define APP_ADV_FAST_INTERVAL 400 // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
+#define APP_ADV_FAST_INTERVAL 100 // 400 // ????????? // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
 #define APP_ADV_FAST_TIMEOUT_IN_SECONDS (60 * 100) // The Fast advertising duration in units of 10 milliseconds
 
 #define APP_ADV_SLOW_INTERVAL 1800 // The advertising interval (in units of 0.625 ms. This value corresponds to 562.5 ms)
@@ -780,7 +780,7 @@ void SetBleID(uint8_t *dev_id)
 
     dev_name[0] = 'S';
     dev_name[1] = '-';
-    dev_name[2] = 'K'; // should be 'L' // ??????????????
+    dev_name[2] = 'L';
 
     j = 0;
 

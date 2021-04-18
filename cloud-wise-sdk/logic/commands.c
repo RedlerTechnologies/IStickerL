@@ -126,7 +126,7 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
         is_set_command = 0;
 
     if (flag) {
-        DisplayMessage("COMMAND OK\r\n", 0);
+        DisplayMessage("\r\nCOMMAND OK\r\n", 0);
 
         for (i = 0; i < NUM_OF_PARAMETERS; i++) {
             p = &parameter_list[i];
@@ -138,10 +138,10 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
 
         run_command(index, param, result_buffer, is_set_command);
     } else {
-        DisplayMessage("COMMAND ERROR\r\n", 0);
+        DisplayMessage("\r\nCOMMAND ERROR\r\n", 0);
     }
 
-    DisplayMessage("Response: \r\n", 0);
+    DisplayMessage("\r\nResponse: \r\n", 0);
 
     if (strlen(result_buffer) > 0)
         DisplayMessage(result_buffer, 0);

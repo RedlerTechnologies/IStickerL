@@ -8,12 +8,17 @@
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
 #include "logic/serial_comm.h"
+#include "monitor.h"
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
 
 #include <stdlib.h>
 #include <string.h>
+
+extern xSemaphoreHandle     clock_semaphore;
+extern Calendar             absolute_time;
+extern DriverBehaviourState driver_behaviour_state;
 
 static uint32_t event_id = 0;
 
@@ -22,7 +27,7 @@ void CreateEvent(IStickerEvent *event)
     // need semaphore on this fucktion ..
     // ..
 
-    event_id++;
+    // event_id++;
 
     static uint8_t ble_buffer[64];
     uint16_t       len, crc;
@@ -37,11 +42,18 @@ void CreateEvent(IStickerEvent *event)
     ptr += 2;
 
     // record length
-    len = event->data_len + 12;
+    len = event->data_len + 17;
     memcpy(ble_buffer + ptr, (uint8_t *)&len, 2);
     ptr += 2;
 
     // record time
+
+    if (event->time == 0) {
+        xSemaphoreTake(clock_semaphore, portMAX_DELAY);
+        event->time = GetTimeStampFromDate(&absolute_time);
+        xSemaphoreGive(clock_semaphore);
+    }
+
     memcpy(ble_buffer + ptr, (uint8_t *)&event->time, 4);
     ptr += 4;
 
@@ -57,30 +69,32 @@ void CreateEvent(IStickerEvent *event)
     ptr += 2;
 
     // event data
-    memcpy(ble_buffer + ptr, (uint8_t *)&event->data, event->data_len);
+    memcpy(ble_buffer + ptr, (uint8_t *)event->data, event->data_len);
     ptr += event->data_len;
 
     // crc16
-    crc = CRC16_Calc(ble_buffer, ptr - 2, 0);
+    crc = CRC16_Calc(ble_buffer + 2, ptr - 2, 0);
+    memcpy(ble_buffer + ptr, (uint8_t *)&crc, 2);
+    ptr += 2;
 
     // write to flash here
     // ..
 
     ble_buffer[0] = 0x80;
-    ble_buffer[1] = ptr;
+    ble_buffer[1] = ptr - 2;
     ble_services_notify_event(ble_buffer, ptr);
 }
 
 void CreateAccidentEvent(void)
 {
-    DriverBehaviourState *driver_behaviour_state;
-
     static IStickerEvent accident_event;
     static uint8_t       buffer[8];
 
-    memcpy(buffer, (uint8_t *)&driver_behaviour_state->max_g, 2);
+    memset(buffer, 0x00, 8);
+    buffer[0] = driver_behaviour_state.max_g / 10;
+    buffer[1] = driver_behaviour_state.hit_angle / 2;
 
-    accident_event.time       = 0; // ?????????????
+    accident_event.time       = 0;
     accident_event.data_len   = 8;
     accident_event.data       = buffer;
     accident_event.event_type = 16; // accident type

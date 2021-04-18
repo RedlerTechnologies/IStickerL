@@ -29,12 +29,6 @@ Calendar         absolute_time;
 static uint32_t  clock_counter = 0;
 xSemaphoreHandle clock_semaphore;
 
-static uint16_t days[4][12] = {
-    {0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335},
-    {366, 397, 425, 456, 486, 517, 547, 578, 609, 639, 670, 700},
-    {731, 762, 790, 821, 851, 882, 912, 943, 974, 1004, 1035, 1065},
-    {1096, 1127, 1155, 1186, 1216, 1247, 1277, 1308, 1339, 1369, 1400, 1430},
-};
 
 uint8_t GetDaysInMonth(uint8_t year, uint8_t month);
 void    InitClock(void);
@@ -131,7 +125,7 @@ void monitor_thread(void *arg)
 
     // setting default date/time
     SetTimeFromString("010120", "000000", &absolute_time);
-
+  
     InitClock();
 
     prev_current_time = getTick();
@@ -193,13 +187,13 @@ void monitor_thread(void *arg)
                 ble_buffer[0]               = 1; // record type
                 error_bits.GPSNotFixed      = 1;
                 error_bits.GPS_Disconnected = 1;
-                error_bits.NotCalibrated    = 1;
-                memcpy(ble_buffer + 4, (uint8_t *)(&error_bits), 4);
+                // error_bits.NotCalibrated    = 1;
+                memcpy(ble_buffer + 6, (uint8_t *)(&error_bits), 4);
                 ble_services_notify_status(ble_buffer, 16);
 #endif
 
                 if (!driver_behaviour_state.time_synced) {
-                    sprintf(alert_str + 2, "@?TIME");
+                    sprintf(alert_str + 2, "@?TIME\r\n");
                     PostBleAlert(alert_str);
                 }
             }
@@ -229,9 +223,23 @@ void InitClock(void)
 
 uint32_t GetTimeStampFromDate(Calendar *c)
 {
-    uint32_t timestamp = 0;
 
-    timestamp = (((c->year / 4 * (365 * 4 + 1) + days[c->year % 4][c->month] + c->day) * 24 + c->day) * 60 + c->minute) * 60 + c->seconds;
+    uint32_t timestamp;
+    uint32_t days;
+    uint8_t  i;
+
+    days = c->year * 365;
+    days += (c->year - 1) / 4 + 1;
+
+    for (i = 1; i < c->month; i++)
+        days += GetDaysInMonth(c->year, i);
+
+    days += c->day - 1;
+
+    timestamp = days * 24 * 3600;
+    timestamp += c->hour * 3600;
+    timestamp += c->minute * 60;
+    timestamp += c->seconds;
 
     return timestamp;
 }
