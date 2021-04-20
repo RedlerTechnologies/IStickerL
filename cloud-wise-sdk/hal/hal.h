@@ -13,7 +13,7 @@ typedef enum {
 
 typedef void (*hal_evt_handler_t)(const hal_event_type_t event);
 
-void hal_init(hal_evt_handler_t evt_handler);
+void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler);
 
 uint32_t hal_read_device_serial_number(char *const p_serial, uint8_t max_len);
 

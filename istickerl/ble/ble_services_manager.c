@@ -1,5 +1,6 @@
 #include "ble_services_manager.h"
 
+#include "FreeRTOS.h"
 #include "app_error.h"
 #include "app_timer.h"
 #include "ble.h"
@@ -11,10 +12,12 @@
 #include "ble_conn_state.h"
 #include "ble_dfu.h"
 #include "ble_dis.h"
+#include "ble_task.h"
 #include "logic/commands.h"
 #include "logic/configuration.h"
 #include "logic/peripherals.h"
 #include "logic/serial_comm.h"
+#include "logic/tracking_algorithm.h"
 #include "nrf_ble_gatt.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_sdh.h"
@@ -22,16 +25,16 @@
 #include "nrf_sdh_freertos.h"
 #include "nrf_sdh_soc.h"
 #include "nrf_sdm.h"
-#include "version.h"
-#include "ble_task.h"
-#include "logic/tracking_algorithm.h"
-#include "FreeRTOS.h"
 #include "task.h"
+#include "version.h"
+#include "semphr.h"
 
 #include <string.h>
 
-extern DeviceConfiguration device_config;
+extern DeviceConfiguration  device_config;
 extern DriverBehaviourState driver_behaviour_state;
+
+xSemaphoreHandle ble_command__notify_semaphore;
 
 void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address);
 void SetBleID(uint8_t *dev_id);
@@ -52,11 +55,11 @@ NRF_LOG_MODULE_REGISTER();
 #define APP_ADV_FAST_INTERVAL 100 // 400 // ????????? // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
 #define APP_ADV_FAST_TIMEOUT_IN_SECONDS (60 * 100) // The Fast advertising duration in units of 10 milliseconds
 
-#define APP_ADV_SLOW_INTERVAL 1800 // The advertising interval (in units of 0.625 ms. This value corresponds to 562.5 ms)
+#define APP_ADV_SLOW_INTERVAL 1800                 // The advertising interval (in units of 0.625 ms. This value corresponds to 562.5 ms)
 #define APP_ADV_SLOW_TIMEOUT_IN_SECONDS (60 * 100) // The Slow advertising duration in units of 10 milliseconds
 
-#define APP_BLE_CONN_CFG_TAG 1     // A tag identifying the SoftDevice BLE configuration
-#define APP_BLE_OBSERVER_PRIO 3    // Application's BLE observer priority. You shouldn't need to modify this value
+#define APP_BLE_CONN_CFG_TAG 1  // A tag identifying the SoftDevice BLE configuration
+#define APP_BLE_OBSERVER_PRIO 3 // Application's BLE observer priority. You shouldn't need to modify this value
 
 #define MIN_CONN_INTERVAL (uint16_t) MSEC_TO_UNITS(7.5, UNIT_1_25_MS) // Minimum acceptable connection interval (0.001 seconds)
 #define MAX_CONN_INTERVAL (uint16_t) MSEC_TO_UNITS(200, UNIT_1_25_MS) // Maximum acceptable connection interval (0.375 seconds)
@@ -327,10 +330,10 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         break;
 
-    case BLE_GAP_EVT_CONNECTED: 
+    case BLE_GAP_EVT_CONNECTED:
         NRFX_LOG_INFO("Connected.");
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-        
+
         driver_behaviour_state.last_ble_connected_time = xTaskGetTickCount();
         break;
 
@@ -364,10 +367,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
     }
 }
 
-bool is_connected(void)
-{
-  return !(m_conn_handle == BLE_CONN_HANDLE_INVALID);
-}
+bool is_connected(void) { return !(m_conn_handle == BLE_CONN_HANDLE_INVALID); }
 
 /**@brief Function for starting advertising.
  */
@@ -516,7 +516,7 @@ static void istickerl_evt_handler(ble_istickerl_evt_t *p_evt, void *p_context)
     case BLE_ISTICKERL_EVENT_COMMAND_WRITE:
         NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_COMMAND_WRITE (%u bytes)", __func__, p_evt->params.command_len);
 
-        PostBleCommand( p_evt->params.p_command, p_evt->params.command_len );
+        PostBleCommand(p_evt->params.p_command, p_evt->params.command_len);
         /*
         DisplayMessage(p_evt->params.p_command, p_evt->params.command_len);
         DisplayMessage("\r\n", 2);
@@ -608,21 +608,27 @@ void ble_services_update_battery_level(uint8_t battery_level)
 
 bool ble_services_notify_command(uint8_t *const data, size_t length)
 {
+    ret_code_t err_code;
+
+    xSemaphoreTake(ble_command__notify_semaphore,portMAX_DELAY);
+    
+
     // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
     //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
     //    return false;
     //}
 
-    ret_code_t err_code;
-
 #ifdef BLE_ISTICKERL_DATA_HEXDUMP
-    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+        NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
     if (length > 0)
         NRFX_LOG_HEXDUMP_INFO(data, length);
     NRF_LOG_FLUSH();
 #endif
 
     err_code = ble_istickerl_notify_command(&m_istickerl, data, length);
+
+    xSemaphoreGive(ble_command__notify_semaphore);
+
     return (err_code == NRF_SUCCESS);
 }
 
@@ -705,7 +711,6 @@ bool ble_services_notify_event(uint8_t *const data, size_t length)
     err_code = ble_istickerl_notify_event(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
 }
-
 
 bool ble_services_update_acc(uint8_t *const data, size_t length)
 {

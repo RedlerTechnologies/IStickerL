@@ -10,7 +10,15 @@
 
 #define ACC_NORMALIZATION_VALUE 1024
 
+#define ACC_MIN_DRIVE_VALUE 25
+
 #define PI 3.1415
+
+typedef enum {
+    TRACKING_STATE_WAKEUP = 0,
+    TRACKING_STATE_ROUTE = 1,
+    TRACKING_STATE_SLEEP = 2,
+} TrackingState;
 
 typedef struct {
     short drive_direction;
@@ -32,6 +40,15 @@ typedef enum {
 } AccidentState;
 
 typedef struct {
+    TrackingState track_state;
+
+    /////////////////////
+    // start algorithm //
+    /////////////////////
+
+    uint16_t movement_count;
+    uint16_t movement_test_count;
+
     ///////////////////////////
     // calibration algorithm //
     ///////////////////////////

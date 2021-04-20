@@ -19,6 +19,7 @@ Calendar;
 void monitor_thread(void *arg);
 
 void InitClock(void);
-void SetTimeFromString(uint8_t *date_str, uint8_t *time_str, Calendar* calendar);
-uint32_t GetTimeStampFromDate(Calendar* c);
+void SetTimeFromString(uint8_t *date_str, uint8_t *time_str);
+uint32_t GetTimeStampFromDate(void);
 void SetClockString(uint8_t *buffer);
+void PostBleAlert(uint8_t *command_str);

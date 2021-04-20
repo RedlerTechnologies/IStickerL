@@ -7,6 +7,7 @@
 #include "hal/hal_boards.h"
 #include "nrf_log_ctrl.h"
 #include "serial_comm.h"
+#include "flash.h"
 
 #define NRF_LOG_MODULE_NAME logic_peripherals
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -22,7 +23,7 @@ void peripherals_init(void)
     uint32_t serial = hal_read_device_serial_number(device_serial_number, SERIAL_NUMBER_WIDTH);
     NRFX_LOG_INFO("%s Device Serial %u [%s]\n", __func__, serial, device_serial_number);
 
-    hal_init(hal_evt_handler);
+    hal_init(hal_evt_handler, flash_spi_event_handler);
 
     lis3dh_init();    
 

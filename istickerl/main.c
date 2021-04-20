@@ -30,9 +30,16 @@ extern xSemaphoreHandle tx_uart_semaphore;
 extern xSemaphoreHandle clock_semaphore;
 extern xSemaphoreHandle sleep_semaphore;
 extern xSemaphoreHandle command_semaphore;
+extern xSemaphoreHandle ble_command__notify_semaphore;
+extern xSemaphoreHandle event_semaphore;
 
 extern EventGroupHandle_t event_acc_sample;
 extern EventGroupHandle_t event_uart_rx;
+
+static uint32_t reset_count __attribute__((section(".non_init")));
+static uint32_t test_value __attribute__((section(".non_init")));
+
+uint32_t reset_count_x;
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread; // Logger thread
@@ -157,6 +164,17 @@ int main(void)
     log_init();
     clock_init();
 
+    if (test_value != 0x5A5A5A5A) {
+        test_value  = 0x5A5A5A5A;
+        reset_count = 0;
+
+        SetTimeFromString("010120", "000000");
+    } else {
+        reset_count++;
+    }
+
+    reset_count_x = reset_count;
+
     // Start execution.
     if (pdPASS != xTaskCreate(logger_thread, "NRF_LOG", 256, NULL, 1, &m_logger_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
@@ -215,6 +233,12 @@ void init_tasks(void)
 
     command_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(command_semaphore);
+
+    ble_command__notify_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(ble_command__notify_semaphore);
+
+    event_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(event_semaphore);
 
     clock_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(clock_semaphore);

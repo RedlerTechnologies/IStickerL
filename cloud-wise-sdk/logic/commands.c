@@ -5,6 +5,7 @@
 #include "../logic/serial_comm.h"
 #include "Configuration.h"
 #include "FreeRTOS.h"
+#include "events.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
 #include "monitor.h"
@@ -208,17 +209,20 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             xSemaphoreTake(clock_semaphore, portMAX_DELAY);
 
-            SetTimeFromString(param, param + 7, &absolute_time);
-            result = GetTimeStampFromDate(&absolute_time);
+            SetTimeFromString(param, param + 7);
+            result                             = GetTimeStampFromDate();
             driver_behaviour_state.time_synced = true;
 
             xSemaphoreGive(clock_semaphore);
+
+            CreateGeneralEvent(result, EVENT_TYPE_TIME_SET, 4);
         }
         break;
 
-     case COMMAND_RESET:
+    case COMMAND_RESET:
         if (is_set_command)
-            NVIC_SystemReset();;
+            NVIC_SystemReset();
+        ;
         break;
 
     default:

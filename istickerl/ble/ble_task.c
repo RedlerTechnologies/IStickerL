@@ -73,21 +73,6 @@ void ble_thread(void *pvParameters)
     }
 }
 
-/*
-void PostBleAlert(uint8_t *command_str)
-{
-    DisplayMessage(command_str + 2, 0);
-
-    command_str[0] = 0x80;
-    command_str[1] = strlen(command_str + 2);
-
-#ifdef BLE_ADVERTISING
-    // this command need semaphore
-    ble_services_notify_command(command_str, strlen(command_str));
-
-#endif
-}
-*/
 
 void PostBleAlert(uint8_t *command_str)
 {

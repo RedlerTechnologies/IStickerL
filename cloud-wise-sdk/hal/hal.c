@@ -1,13 +1,14 @@
 #include "hal.h"
 
+#include "app_timer.h"
 #include "hal_boards.h"
 #include "hal_drivers.h"
+#include "logic/flash.h"
+#include "nrf_delay.h"
 #include "nrf_gpio.h"
 #include "nrf_log_ctrl.h"
 #include "nrfx_gpiote.h"
 #include "nrfx_saadc.h"
-#include "app_timer.h"
-#include "nrf_delay.h"
 
 #include <string.h>
 
@@ -18,13 +19,13 @@ NRF_LOG_MODULE_REGISTER();
 
 static const nrfx_uart_t m_uart0 = NRFX_UART_INSTANCE(0);
 static const nrfx_twim_t m_twim0 = NRFX_TWIM_INSTANCE(0);
-static const nrfx_spim_t m_spim1 = NRFX_SPIM_INSTANCE(1);
 static const nrfx_pwm_t  m_pwm0  = NRFX_PWM_INSTANCE(0);
+static const nrfx_spi_t  m_spi1  = NRFX_SPI_INSTANCE(1);
 
 const nrfx_twim_t *hal_lis3dh_twi = &m_twim0;
-const nrfx_spim_t *hal_flash_spi  = &m_spim1;
 const nrfx_uart_t *hal_uart       = &m_uart0;
 const nrfx_pwm_t * hal_buzzer     = &m_pwm0;
+const nrfx_spi_t * hal_flash_spi  = &m_spi1;
 
 volatile struct {
     bool lis3dh_int1;
@@ -34,29 +35,28 @@ volatile struct {
 static void init_gpio(void);
 static void init_uart(void);
 static void init_twim(void);
-static void init_spim(void);
+static void init_spi(nrfx_spi_evt_handler_t handler);
 static void init_saadc(void);
 static void init_saadc_channels(void);
 static void calibrate_saadc(void);
 static void init_pwm(void);
 
 static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_context);
-static void spim1_event_handler(nrfx_spim_evt_t const *p_event, void *p_context);
 static void saadc_event_handler(nrfx_saadc_evt_t const *p_event);
 
 static hal_evt_handler_t p_evt_handler;
 
-void hal_init(hal_evt_handler_t evt_handler)
+void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler)
 {
     ret_code_t ret;
-    
+
     ASSERT(evt_handler);
 
     p_evt_handler = evt_handler;
 
     init_gpio();
 
-    // ??????????????
+    // blinks led to indicate a reset for the user
     nrf_gpio_pin_clear(HAL_LED_GREEN);
     nrf_gpio_pin_clear(HAL_LED_RED);
     nrf_delay_ms(100);
@@ -64,7 +64,7 @@ void hal_init(hal_evt_handler_t evt_handler)
     nrf_gpio_pin_set(HAL_LED_RED);
 
     init_twim();
-    init_spim();
+    init_spi(spi_handler);
     init_pwm();
     init_uart();
     init_saadc();
@@ -104,6 +104,7 @@ static void init_gpio(void)
     nrf_gpio_cfg_output(HAL_LED_RED);
 
     nrf_gpio_cfg_output(HAL_SPI_FLASH_RESETN);
+    nrf_gpio_pin_set(HAL_SPI_FLASH_RESETN);
 
     nrfx_gpiote_in_config_t in_config;
 
@@ -153,22 +154,21 @@ static void init_twim(void)
     nrfx_twim_enable(&m_twim0);
 }
 
-static void init_spim(void)
+static void init_spi(nrfx_spi_evt_handler_t handler)
 {
     nrfx_err_t err_code;
 
-    nrfx_spim_config_t spim_config = NRFX_SPIM_DEFAULT_CONFIG;
+    nrfx_spi_config_t spi_config = NRFX_SPI_DEFAULT_CONFIG;
 
-    spim_config.sck_pin  = HAL_SPIM1_CLK;
-    spim_config.mosi_pin = HAL_SPIM1_MOSI;
-    spim_config.miso_pin = HAL_SPIM1_MISO;
-    spim_config.mode     = NRF_SPIM_MODE_0;
+    spi_config.sck_pin  = HAL_SPI1_CLK;
+    spi_config.ss_pin   = HAL_SPI1_SS;
+    spi_config.mosi_pin = HAL_SPI1_MOSI;
+    spi_config.miso_pin = HAL_SPI1_MISO;
+    spi_config.mode     = NRF_SPI_MODE_0;
 
-    nrf_gpio_cfg_output(HAL_SPIM1_SS);
-
-    err_code = nrfx_spim_init(&m_spim1, &spim_config, spim1_event_handler, NULL);
+    err_code = nrfx_spi_init(&m_spi1, &spi_config, handler, NULL);
     if (NRFX_SUCCESS != err_code)
-        NRFX_LOG_ERROR("%s nrfx_spim_init failed: %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
+        NRFX_LOG_ERROR("%s nrfx_spi_init failed: %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     APP_ERROR_CHECK(err_code);
 }
 
@@ -267,11 +267,6 @@ static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_contex
         NRFX_LOG_ERROR("%s Error", __func__);
         break;
     }
-}
-
-static void spim1_event_handler(nrfx_spim_evt_t const *p_event, void *p_context)
-{
-    //
 }
 
 static void saadc_event_handler(nrfx_saadc_evt_t const *p_event)

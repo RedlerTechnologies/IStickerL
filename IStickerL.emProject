@@ -38,13 +38,12 @@
         <file file_name="nrf5-sdk/modules/nrfx/hal/nrf_nvmc.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_clock.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_gpiote.c" />
-        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/prs/nrfx_prs.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_ppi.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_twim.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_pwm.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_pdm.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_uart.c" />
-        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_spim.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_spi.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_rtc.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_wdt.c" />
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_saadc.c" />
@@ -52,6 +51,7 @@
         <folder Name="Legacy">
           <file file_name="nrf5-sdk/integration/nrfx/legacy/nrf_drv_clock.c" />
         </folder>
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/prs/nrfx_prs.c" />
       </folder>
       <folder Name="SoftDevice">
         <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh.c" />

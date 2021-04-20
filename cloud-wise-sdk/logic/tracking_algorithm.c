@@ -15,6 +15,7 @@
 #include "logic/clock.h"
 #include "logic/serial_comm.h"
 #include "nrf_power.h"
+#include "nrfx_log.h"
 #include "task.h"
 
 #include <math.h>
@@ -28,6 +29,7 @@ AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
 extern uint8_t             Acc_Table_Merged[];
 extern DeviceConfiguration device_config;
+extern uint32_t reset_count_x;
 
 static uint8_t sample_buffer[7];
 static uint8_t alert_str[64];
@@ -37,12 +39,15 @@ DriverBehaviourState driver_behaviour_state;
 void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
 void           CalibrateAllSamples(void);
-void           Process_DriverBehaviourAlgorithm(void);
-void           ProcessAllSamples(void);
-void           ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
-void           Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
-void           Process_Calibrate(void);
-signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
+// void           Process_DriverBehaviourAlgorithm(void);
+void         ProcessDrivingState(void);
+void         ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
+void         Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
+void         Process_Calibrate(void);
+void         InitWakeupAlgorithm(void);
+signed short calculate_accident_hit_angle(AccConvertedSample *sample);
+bool         ProcessWakeupState(void);
+bool         CheckNoActivity(uint16_t timeout_in_sec);
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -76,6 +81,7 @@ void driver_behaviour_task(void *pvParameter)
     static unsigned  duration;
     static AccSample acc_sample;
     uint8_t          count = 0;
+    bool             need_sleep;
 
     buzzer_train(1);
 
@@ -100,9 +106,11 @@ void driver_behaviour_task(void *pvParameter)
 
     driver_behaviour_state.time_synced   = false;
     driver_behaviour_state.ble_connected = false;
+    driver_behaviour_state.track_state   = TRACKING_STATE_WAKEUP;
+    InitWakeupAlgorithm();
 
-    sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD); // ???????????
-    DisplayMessage(alert_str,0);
+    sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD, reset_count_x);
+    DisplayMessage(alert_str, 0);
 
     while (1) {
 
@@ -128,16 +136,60 @@ void driver_behaviour_task(void *pvParameter)
         ///////////////////////////
 
         // handle last 32 samples
-        Process_DriverBehaviourAlgorithm();
+        // ?????????????? Process_DriverBehaviourAlgorithm();
 
-        ///////////////////////
-        // check no activity //
-        ///////////////////////
+        // ???????????????????????
 
-        duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
+        need_sleep = false;
 
-        if (duration > driver_behaviour_state.sleep_delay_time) {
+        if (!driver_behaviour_state.calibrated) {
+            Process_Calibrate();
+        } else {
+            CalibrateAllSamples();
 
+            switch (driver_behaviour_state.track_state) {
+            case TRACKING_STATE_WAKEUP:
+                if (ProcessWakeupState()) {
+                    driver_behaviour_state.track_state        = TRACKING_STATE_ROUTE;
+                    driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+
+                    DisplayMessage("\r\nStart route\r\n", 0);
+                    CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
+                    continue;
+                } else {
+                    need_sleep = CheckNoActivity(30);
+
+                    if (need_sleep) {
+                        CreateGeneralEvent(LOG_FALSE_WAKEUP, EVENT_TYPE_LOG, 2);
+                        // need delay after creating end of route immediate events
+                        vTaskDelay(10000);
+                    }
+                }
+
+                break;
+
+            case TRACKING_STATE_ROUTE:
+                ProcessDrivingState();
+
+                need_sleep = CheckNoActivity(driver_behaviour_state.sleep_delay_time);
+
+                if (need_sleep) {
+                    CreateEndRouteEvent();
+                    CreateGeneralEvent(LOG_SLEEP_BY_NO_MOVEMENT, EVENT_TYPE_LOG, 2);
+
+                    // need delay after creating end of route immediate events
+                    vTaskDelay(10000);
+                }
+                break;
+
+            case TRACKING_STATE_SLEEP:
+
+                break;
+            }
+        }
+
+        if (need_sleep) {
+            vTaskDelay(500);
             DisplayMessage("\r\nSleep\r\n", 0);
             buzzer_long(1200);
             vTaskDelay(2000);
@@ -150,8 +202,53 @@ void driver_behaviour_task(void *pvParameter)
 
             nrf_power_system_off();
             // sd_power_system_off();
+
+            // sleep loop here
+            // ..
+
+            // wakeup from sleep here
+            // ..
         }
+
+        ///////////////////////
+        // check no activity //
+        ///////////////////////
+
+        /*
+                duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
+
+                if (duration > driver_behaviour_state.sleep_delay_time) {
+
+                    DisplayMessage("\r\nSleep\r\n", 0);
+                    buzzer_long(1200);
+                    vTaskDelay(2000);
+
+                    isticker_bsp_board_sleep();
+
+                    nrf_gpio_pin_sense_t sense = NRF_GPIO_PIN_SENSE_LOW;
+
+                    nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
+
+                    nrf_power_system_off();
+                    // sd_power_system_off();
+                }
+                */
     }
+}
+
+bool CheckNoActivity(uint16_t timeout_in_sec)
+{
+    uint32_t duration;
+    bool     need_sleep = false;
+
+    duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
+
+    if (duration > timeout_in_sec) {
+
+        need_sleep = true;
+    }
+
+    return need_sleep;
 }
 
 void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
@@ -197,6 +294,7 @@ void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
     acc_sample->Z = z1 * 12;
 }
 
+/*
 void Process_DriverBehaviourAlgorithm(void)
 {
     if (driver_behaviour_state.calibrated) {
@@ -206,6 +304,7 @@ void Process_DriverBehaviourAlgorithm(void)
         Process_Calibrate();
     }
 }
+*/
 
 void CalibrateAllSamples(void)
 {
@@ -220,7 +319,7 @@ void CalibrateAllSamples(void)
     }
 }
 
-void ProcessAllSamples(void)
+void ProcessDrivingState(void)
 {
     static uint8_t ble_buffer[16];
 
@@ -238,6 +337,59 @@ void ProcessAllSamples(void)
 
         Process_Accident(state, sample);
     }
+}
+
+void InitWakeupAlgorithm(void)
+{
+    driver_behaviour_state.movement_count      = 0;
+    driver_behaviour_state.movement_test_count = 0;
+}
+
+bool ProcessWakeupState(void)
+{
+    DriverBehaviourState *state = &driver_behaviour_state;
+    AccConvertedSample *  sample;
+    bool                  sense;
+    bool                  sense1 = false;
+    bool                  found  = false;
+
+    for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        sample = (AccConvertedSample *)&acc_samples[i];
+        sense  = false;
+
+        if (sample->turn_direction >= ACC_MIN_DRIVE_VALUE)
+            sense = true;
+
+        if (sample->drive_direction >= ACC_MIN_DRIVE_VALUE)
+            sense = true;
+
+        if (sense) {
+            sense1 = true;
+
+            if (state->movement_count == 0)
+                InitWakeupAlgorithm();
+            state->movement_count++;
+        }
+    }
+
+    state->movement_test_count++;
+
+    if (state->movement_test_count >= 15) // about 5 seconds
+    {
+        sprintf(alert_str, "\r\n\r\nmovements# %d\r\n\r\n", state->movement_count);
+        DisplayMessage(alert_str, 0);
+
+        if (state->movement_count >= 5) {
+            vTaskDelay(25);
+            found = true;
+        }
+        InitWakeupAlgorithm();
+    } else if (sense1) {
+        sprintf(alert_str, "\r\n\r\nm# %d\r\n\r\n", state->movement_count);
+        DisplayMessage(alert_str, 0);
+    }
+
+    return found;
 }
 
 void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out)
@@ -388,7 +540,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
                 /////////////////////////
 
                 // sending calibrate alert
-                sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g , state->hit_angle);
+                sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
                 PostBleAlert(alert_str);
                 CreateAccidentEvent();
 

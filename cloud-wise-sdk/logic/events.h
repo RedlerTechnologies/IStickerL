@@ -2,17 +2,107 @@
 
 #include "hal/hal_data_types.h"
 
-typedef struct
-{
-  uint32_t time;
-  uint16_t data_len;
-  uint16_t event_type;
-  uint8_t* data;
-}
-IStickerEvent; 
+typedef struct {
+    uint32_t time;
+    uint16_t data_len;
+    uint16_t event_type;
+    uint8_t *data;
 
+    bool immediate_event;
+} IStickerEvent;
+
+typedef enum {
+    EVENT_TYPE_TIME_SET    = 3,
+    EVENT_TYPE_START_ROUTE = 11,
+    EVENT_TYPE_END_ROUTE   = 12,
+    EVENT_TYPE_ACCIDENT    = 16,
+    EVENT_TYPE_LOG         = 22,
+} EventType;
+
+/////////////////////
+// Log Event codes //
+/////////////////////
+
+#define LOG_APPLICATION_START 0
+#define LOG_WAKEUP_BY_ACC 1
+#define LOG_WAKEUP_BY_KEEP_ALIVE 2
+#define LOG_FALSE_WAKEUP 3
+#define LOG_WAKEUP_BY_EXT_POWER_CONNECTED 4
+#define LOG_MISSED_GPS_SAMPLE_BY_SMALL_MOVEMENT 5
+#define LOG_SLEEP_BY_END_OF_TRACKING 6
+#define LOG_SLEEP_BY_LOW_VOLTAGE 7
+#define LOG_ENTER_GPS_ECONOMIC_MODE 8 // unused
+#define LOG_EXIT_GPS_ECONOMIC_MODE 9  // unused
+#define LOG_ENTER_CUT_OFF 10
+#define LOG_SLEEP_BY_NO_MOVEMENT 11 // unused
+#define LOG_WAKEUP_BY_POWER_CONNECTED 12
+#define LOG_CLOSED_ROUTE_BY_COMMAND 13      // unused
+#define LOG_ENTER_MODEM_LOW_VOLTAGE_MODE 14 // unused
+#define LOG_EXIT_MODEM_LOW_VOLTAGE_MODE 15  // unused
+#define LOG_EXERNAL_POWER_CONNECTED 16
+#define LOG_EXERNAL_POWER_DISCONNECTED 17
+#define LOG_DISCONNECT_FROM_ONLINE 18        // unused
+#define LOG_DISCONNECT_FROM_ONLINE_NO_ACK 19 // unused
+#define LOG_NO_MATCHED_WIFI_NETWORK_FOUND 20 // unused
+#define LOG_DNS_QUERY_FAILED 21              // unused
+#define LOG_TCP_CONNECTION_FAILED 22
+#define LOG_UDP_CONNECTION_FAILED 23         // unused
+#define LOG_TCP_WELLCOME_MESSAGE_FAILED 24   // unused
+#define LOG_TCP_CONNECTION_MESSAGE_FAILED 25 // unused
+//#define LOG_TCP_ROLL_BACK							26
+#define LOG_START_DOWNLOADING_FIRMWARE 27 // unused
+#define LOG_DOWNLOAD_FIRMWARE_SUCCESS 28
+#define LOG_DOWNLOAD_FIRMWARE_ERROR_NO_CONFIRM 29 // unused
+#define LOG_DOWNLOAD_FIRMWARE_ERROR_NEG_CONFIRM 30
+#define LOG_DATA_SENT_BY_BLE 31
+#define LOG_DATA_NOT_SENT_NOT_ENOUGH 32
+#define LOG_CALIBRATION_FAILED_INSIDE_MOVEMENT 33 // unused
+#define LOG_TAMPER 34
+#define LOG_REMOTE_DOWNLOAD_CANCELED 35 // unused
+#define LOG_PARAMETER_UPDATED_FROM_REMOTE 36
+#define LOG_ROUTE_CONTINUE_BY_GPS 37 // unused
+#define LOG_FALSE_GETTING_OUTSIDE_GEOGENCE 38
+#define LOG_START_ROUTE_AFTER_RESET 39
+#define LOG_MODEM_CLOSE 40 // unused
+#define LOG_MODEM_OPEN 41  // unused
+#define LOG_BLE_CONNECTED 42
+//#define LOG_BLE_INIT_FAILURE						43
+#define LOG_FLASH_ERROR_DEVICE_FORMATTED 44
+#define LOG_GPS_CONFIGURATION_SUCCEED 45
+#define LOG_GPS_CONFIGURATION_FAILS 46
+#define LOG_BLE_DISCONNECT_WITH_NO_ACTIVITY 47
+//#define LOG_BLE_RESET								48	// unused
+#define LOG_BLE_READ_FILE_STARTED 49
+#define LOG_BLE_READ_FILE_COMPLETED 50
+#define LOG_BLE_READ_FILE_ABORTED 51
+#define LOG_GYRO_CONFIG_FAILED 52
+#define LOG_ACC_CONFIG_FAILED 53
+#define LOG_CHARGER_DISABLE 54
+#define LOG_CHARGER_ENABLE 55
+#define LOG_ACC_DEEP_SLEEP_CONFIG_FAILED 56
+#define LOG_TEST_MODE_ON 57
+#define LOG_FLASH_PTR_ERROR_SLOW_SCAN 58
+#define LOG_SEND_EVENTS_BY_BLE 59
+#define LOG_SEND_EVENTS_BY_GSM 60
+#define LOG_BLE_SENDING_MSG_TIMEOUT 61
+#define LOG_UNLOCKED_DEVICE 62
+#define LOG_LOCKED_DEVICE 63
+#define LOG_WAKEUP_BY_ACC_BEFORE_SLEEP 64
+#define LOG_NO_GPS_FIRST_FIX 65 // unused
+//#define LOG_FALSE_WAKEUP							66
+#define LOG_MODEM_HOME_NETWORK 67
+#define LOG_MODEM_ROAMING 68
+#define LOG_MODEM_FAILED_ON_REGISTRATION 69
+#define LOG_MODEM_FAILED_ON_SIM_CARD 70
+#define LOG_MODEM_FAILED_ON_CREATING_PDP 71
+#define LOG_MODEM_FAILED_NO_RESPONSE 72
+#define LOG_MODEM_FAILED_ACCESS_DENIED 73
+#define LOG_MODEM_FAILED_NO_SEARCH 74
+#define LOG_MODEM_FAILED_SETTING_SECURITY_PARAMS 75
 
 void CreateEvent(IStickerEvent *event);
 void CreateAccidentEvent(void);
+void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size);
+void CreateEndRouteEvent(void);
 
-uint16_t CRC16_Calc(uint8_t * ptrPct, uint16_t pctLen, uint16_t  crc16);
+uint16_t CRC16_Calc(uint8_t *ptrPct, uint16_t pctLen, uint16_t crc16);

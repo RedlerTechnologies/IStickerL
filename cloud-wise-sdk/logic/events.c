@@ -20,14 +20,17 @@ extern xSemaphoreHandle     clock_semaphore;
 extern Calendar             absolute_time;
 extern DriverBehaviourState driver_behaviour_state;
 
+xSemaphoreHandle event_semaphore;
+
 static uint32_t event_id = 0;
 
 void CreateEvent(IStickerEvent *event)
 {
-    // need semaphore on this fucktion ..
-    // ..
+    xSemaphoreTake(event_semaphore, portMAX_DELAY);
 
-    // event_id++;
+    // ????????? if (!event->immediate_event)
+    if (false)
+        event_id++;
 
     static uint8_t ble_buffer[64];
     uint16_t       len, crc;
@@ -50,7 +53,7 @@ void CreateEvent(IStickerEvent *event)
 
     if (event->time == 0) {
         xSemaphoreTake(clock_semaphore, portMAX_DELAY);
-        event->time = GetTimeStampFromDate(&absolute_time);
+        event->time = GetTimeStampFromDate();
         xSemaphoreGive(clock_semaphore);
     }
 
@@ -83,12 +86,14 @@ void CreateEvent(IStickerEvent *event)
     ble_buffer[0] = 0x80;
     ble_buffer[1] = ptr - 2;
     ble_services_notify_event(ble_buffer, ptr);
+
+    xSemaphoreGive(event_semaphore);
 }
 
 void CreateAccidentEvent(void)
 {
-    static IStickerEvent accident_event;
-    static uint8_t       buffer[8];
+    IStickerEvent accident_event;
+    uint8_t       buffer[8];
 
     memset(buffer, 0x00, 8);
     buffer[0] = driver_behaviour_state.max_g / 10;
@@ -97,7 +102,45 @@ void CreateAccidentEvent(void)
     accident_event.time       = 0;
     accident_event.data_len   = 8;
     accident_event.data       = buffer;
-    accident_event.event_type = 16; // accident type
+    accident_event.event_type = EVENT_TYPE_ACCIDENT;
+
+    CreateEvent(&accident_event);
+}
+
+void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size)
+{
+    IStickerEvent accident_event;
+    uint8_t       buffer[4];
+
+    //return; // ??????????
+
+    memset(buffer, 0x00, 4);
+    memcpy(buffer, (uint8_t *)(&value), value_size);
+
+    accident_event.time       = 0;
+    accident_event.data_len   = value_size;
+    accident_event.data       = buffer;
+    accident_event.event_type = event_type;
+
+    CreateEvent(&accident_event);
+}
+
+void CreateEndRouteEvent(void)
+{
+    IStickerEvent accident_event;
+    uint8_t       buffer[13];
+
+    // 0 - stop bits
+    // 1-4 - distance
+    // 5-8 - duration
+    // 9-12 - odometer
+
+    memset(buffer, 0x00, 13);
+  
+    accident_event.time       = 0;
+    accident_event.data_len   = 13;
+    accident_event.data       = buffer;
+    accident_event.event_type = EVENT_TYPE_END_ROUTE;
 
     CreateEvent(&accident_event);
 }

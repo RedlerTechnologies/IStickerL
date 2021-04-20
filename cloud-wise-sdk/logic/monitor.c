@@ -25,10 +25,9 @@ extern IStickerErrorBits    error_bits;
 
 APP_TIMER_DEF(m_clock_timer);
 
-Calendar         absolute_time;
+static Calendar  absolute_time __attribute__((section(".non_init")));
 static uint32_t  clock_counter = 0;
 xSemaphoreHandle clock_semaphore;
-
 
 uint8_t GetDaysInMonth(uint8_t year, uint8_t month);
 void    InitClock(void);
@@ -124,8 +123,8 @@ void monitor_thread(void *arg)
     UNUSED_PARAMETER(arg);
 
     // setting default date/time
-    SetTimeFromString("010120", "000000", &absolute_time);
-  
+    //SetTimeFromString("010120", "000000");
+
     InitClock();
 
     prev_current_time = getTick();
@@ -201,8 +200,10 @@ void monitor_thread(void *arg)
     }
 }
 
-void SetTimeFromString(uint8_t *date_str, uint8_t *time_str, Calendar *calendar)
+void SetTimeFromString(uint8_t *date_str, uint8_t *time_str)
 {
+    Calendar *calendar = &absolute_time;
+
     calendar->year  = DD(date_str + 4);
     calendar->month = DD(date_str + 2);
     calendar->day   = DD(date_str);
@@ -221,8 +222,9 @@ void InitClock(void)
     app_timer_start(m_clock_timer, APP_TIMER_TICKS(1000), NULL);
 }
 
-uint32_t GetTimeStampFromDate(Calendar *c)
+uint32_t GetTimeStampFromDate(void)
 {
+    Calendar *c = &absolute_time;
 
     uint32_t timestamp;
     uint32_t days;
