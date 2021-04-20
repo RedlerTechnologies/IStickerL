@@ -8,6 +8,7 @@
 #include "event_groups.h"
 #include "hal/hal_boards.h"
 #include "logic/commands.h"
+#include "logic/flash_data.h"
 #include "logic/monitor.h"
 #include "logic/peripherals.h"
 #include "logic/serial_comm.h"
@@ -188,6 +189,10 @@ int main(void)
     NRF_LOG_FLUSH();
 
     peripherals_init();
+    bool result = flash_data_test_sector(0x0);
+    NRFX_LOG_INFO("Flash test: %s", result ? "OK" : "Error");
+    NRF_LOG_FLUSH();
+
     state_machine_init();
 
     // ble_services_init();

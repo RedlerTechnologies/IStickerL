@@ -2,12 +2,12 @@
 
 #include "ble/ble_services_manager.h"
 #include "drivers/buzzer.h"
+#include "drivers/flash.h"
 #include "drivers/lis3dh.h"
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "nrf_log_ctrl.h"
 #include "serial_comm.h"
-#include "flash.h"
 
 #define NRF_LOG_MODULE_NAME logic_peripherals
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -25,7 +25,10 @@ void peripherals_init(void)
 
     hal_init(hal_evt_handler, flash_spi_event_handler);
 
-    lis3dh_init();    
+    uint16_t flash_id = flash_read_manufacture_id();
+    NRFX_LOG_INFO("%s Flash ID 0x%04X", __func__, flash_id);
+
+    lis3dh_init();
 
     buzzer_init();
 

@@ -1,8 +1,8 @@
 #include "commands.h"
 
-#include "../ble/ble_services_manager.h"
-#include "../drivers/buzzer.h"
-#include "../logic/serial_comm.h"
+#include "ble/ble_services_manager.h"
+#include "drivers/buzzer.h"
+#include "logic/serial_comm.h"
 #include "Configuration.h"
 #include "FreeRTOS.h"
 #include "events.h"

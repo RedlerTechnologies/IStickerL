@@ -1,9 +1,9 @@
 #include "hal.h"
 
 #include "app_timer.h"
+#include "drivers/flash.h"
 #include "hal_boards.h"
 #include "hal_drivers.h"
-#include "logic/flash.h"
 #include "nrf_delay.h"
 #include "nrf_gpio.h"
 #include "nrf_log_ctrl.h"
