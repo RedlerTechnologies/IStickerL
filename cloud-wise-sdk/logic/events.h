@@ -100,7 +100,7 @@ typedef enum {
 #define LOG_MODEM_FAILED_NO_SEARCH 74
 #define LOG_MODEM_FAILED_SETTING_SECURITY_PARAMS 75
 
-void CreateEvent(IStickerEvent *event);
+bool CreateEvent(IStickerEvent *event);
 void CreateAccidentEvent(void);
 void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size);
 void CreateEndRouteEvent(void);

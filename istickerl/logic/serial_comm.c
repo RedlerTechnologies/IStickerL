@@ -151,15 +151,30 @@ void serial_comm_process_rx(void)
 
 void DisplayMessage(uint8_t *message, uint8_t len)
 {
-    xSemaphoreTake(tx_uart_semaphore, portMAX_DELAY);
-    vTaskDelay(10);
+    if (!xSemaphoreTake(tx_uart_semaphore, 50))
+        return;
+
+    // vTaskDelay(10);
+    while (nrfx_uart_tx_in_progress(hal_uart)) {
+    }
 
     if (len == 0)
         len = strlen(message);
 
     nrfx_uart_tx(hal_uart, message, len);
- 
+
     xSemaphoreGive(tx_uart_semaphore);
+}
+
+void DisplayMessageWithNoLock(uint8_t *message, uint8_t len)
+{
+    while (nrfx_uart_tx_in_progress(hal_uart)) {
+    }
+
+    if (len == 0)
+        len = strlen(message);
+
+    nrfx_uart_tx(hal_uart, message, len);
 }
 
 void DisplayMessageWithTime(uint8_t *message, uint8_t len)
@@ -167,14 +182,21 @@ void DisplayMessageWithTime(uint8_t *message, uint8_t len)
     static uint8_t time_buffer[20];
     uint8_t        len1;
 
-    xSemaphoreTake(tx_uart_semaphore, portMAX_DELAY);
-    vTaskDelay(10);
+    if (!xSemaphoreTake(tx_uart_semaphore, 50))
+        return;
+
+    while (nrfx_uart_tx_in_progress(hal_uart)) {
+    }
 
     SetClockString(time_buffer);
     len1 = strlen(time_buffer);
     nrfx_uart_tx(hal_uart, time_buffer, len1);
 
-    vTaskDelay(20);
+    while (nrfx_uart_tx_in_progress(hal_uart)) {
+    }
+
+    while (nrfx_uart_tx_in_progress(hal_uart)) {
+    }
 
     if (len == 0)
         len = strlen(message);

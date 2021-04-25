@@ -15,4 +15,4 @@ bool flash_write_buffer(uint8_t *buffer, uint32_t address, uint16_t size);
 
 bool flash_erase_sector(uint32_t address);
 
-void flash_wait_blocking(void);
+//void flash_wait_blocking(void);

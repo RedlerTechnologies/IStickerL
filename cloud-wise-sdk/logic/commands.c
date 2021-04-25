@@ -1,14 +1,16 @@
 #include "commands.h"
 
-#include "ble/ble_services_manager.h"
-#include "drivers/buzzer.h"
-#include "logic/serial_comm.h"
 #include "Configuration.h"
 #include "FreeRTOS.h"
+#include "ble/ble_services_manager.h"
+#include "drivers/buzzer.h"
 #include "events.h"
+#include "flash_data.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
+#include "logic/serial_comm.h"
 #include "monitor.h"
+#include "recording.h"
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
@@ -30,7 +32,7 @@ xSemaphoreHandle command_semaphore;
 
 IStickerErrorBits error_bits;
 
-void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command);
+void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command, uint8_t source);
 
 ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"BEEP", NULL, 85, 0, PARAM_TYPE_STRING, 0, 0},
@@ -40,8 +42,10 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"SW_BUILD", NULL, 46, 2, PARAM_TYPE_INTEGER, 0, 1},
     {"DEVID", (uint32_t *)device_config.DeviceID, 46, 26, PARAM_TYPE_STRING, 0, 1},
     {"BLEID", (uint32_t *)device_config.DeviceName, 46, 16, PARAM_TYPE_STRING, 0, 1},
-    {"TIME", NULL, 46, 2, PARAM_TYPE_STRING, 0, 1},
-    {"RESET", NULL, 46, 2, PARAM_TYPE_INTEGER, 0, 1},
+    {"TIME", NULL, 46, 0, PARAM_TYPE_STRING, 0, 1},
+    {"RESET", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
+    {"MEM_CLEAR", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
+    {"RECORD", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -137,7 +141,7 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
             }
         }
 
-        run_command(index, param, result_buffer, is_set_command);
+        run_command(index, param, result_buffer, is_set_command, source);
     } else {
         DisplayMessage("\r\nCOMMAND ERROR\r\n", 0);
     }
@@ -153,12 +157,13 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
     return flag;
 }
 
-void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command)
+void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command, uint8_t source)
 {
     static ConfigParameter *p;
     int32_t                 param_num      = 0;
     int32_t                 result         = -1;
     uint8_t                 numeric_result = 1;
+    bool                    is_remote      = (source == 1); // ble
 
     param_num = atoi(param);
     p         = &parameter_list[command_index];
@@ -222,7 +227,38 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_RESET:
         if (is_set_command)
             NVIC_SystemReset();
-        ;
+        break;
+
+    case COMMAND_CLEAR_MEMORY:
+        if (is_set_command) {
+
+            switch (param_num) {
+
+            case 1:
+                flash_erase_sectors_in_range(FLASH_RECORDS_START_ADDRESS, END_OF_FLASH);
+                result = param_num;
+            }
+        }
+        break;
+
+    case COMMAND_RECORD:
+
+        if (is_set_command) {
+            if (param_num) {
+                param_num = record_search(param_num);
+                param_num = -param_num;
+            }
+
+            if (param_num <= 0) {
+                if (!is_remote)
+                    record_print(-param_num);
+            }
+
+            if (is_remote) {
+                // send record file here
+                // ..
+            }
+        }
         break;
 
     default:

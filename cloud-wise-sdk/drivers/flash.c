@@ -1,8 +1,10 @@
 #include "flash.h"
 
+#include "FreeRTOS.h"
 #include "hal/hal.h"
 #include "hal/hal_drivers.h"
 #include "nrf_log_ctrl.h"
+#include "semphr.h"
 
 #define NRF_LOG_MODULE_NAME cloud_wise_sdk_drivers_flash
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -20,6 +22,9 @@ NRF_LOG_MODULE_REGISTER();
 static volatile bool m_spi_xfer_done;
 
 static void set_write_lock(bool is_enabled);
+static void flash_wait_blocking(void);
+
+xSemaphoreHandle flash_semaphore;
 
 void flash_spi_event_handler(nrfx_spi_evt_t const *p_event, void *p_context)
 {
@@ -44,6 +49,8 @@ uint16_t flash_read_manufacture_id(void)
 
     uint16_t ret;
 
+    xSemaphoreTake(flash_semaphore, portMAX_DELAY);
+
     memset(tx_buf, 0x00, 5);
     memset(rx_buf, 0x00, 6);
 
@@ -61,11 +68,16 @@ uint16_t flash_read_manufacture_id(void)
 
     ret = rx_buf[4] << 8;
     ret |= rx_buf[5];
+
+    xSemaphoreGive(flash_semaphore);
+
+    return ret;
 }
 
 // NOTICE The read data will be started in buffer+4
 bool flash_read_buffer(uint8_t *buffer, uint32_t address, uint16_t size)
 {
+    xSemaphoreTake(flash_semaphore, portMAX_DELAY);
 
     memset(buffer, 0x00, (size + 4));
 
@@ -84,14 +96,17 @@ bool flash_read_buffer(uint8_t *buffer, uint32_t address, uint16_t size)
         __WFE();
     }
 
+    xSemaphoreGive(flash_semaphore);
+
     return true;
 }
 
 // the write data will be started in buffer+4
-bool flash_write_buffer(uint8_t *buffer, uint32_t address, uint16_t size)
+static bool flash_write_buffer_internal(uint8_t *buffer, uint32_t address, uint16_t size)
 {
-
     ret_code_t ret;
+
+    // xSemaphoreTake(flash_semaphore, portMAX_DELAY);
 
     set_write_lock(true);
 
@@ -110,18 +125,107 @@ bool flash_write_buffer(uint8_t *buffer, uint32_t address, uint16_t size)
         __WFE();
     }
 
+    flash_wait_blocking();
+
     set_write_lock(false);
 
-    flash_wait_blocking();
+    // xSemaphoreGive(flash_semaphore);
 
     return true;
 }
+
+bool flash_write_buffer(uint8_t *buffer, uint32_t address, uint16_t size)
+{
+    int16_t    byte_left;
+    ret_code_t ret;
+
+    xSemaphoreTake(flash_semaphore, portMAX_DELAY);
+
+    byte_left = size;
+
+    while (byte_left > 0) {
+
+        if (((address % 256) + byte_left) > 256) {
+            size = 256 - (address % 256);
+        } else {
+            size = byte_left;
+        }
+
+        flash_write_buffer_internal(buffer, address, size);
+
+        byte_left -= size;
+        address += size;
+        buffer += size;
+    }
+
+    xSemaphoreGive(flash_semaphore);
+
+    return true;
+}
+
+/*
+// the write data will be started in buffer+4
+bool flash_write_buffer(uint8_t *buffer, uint32_t start_address, uint16_t size)
+{
+    uint32_t   address;
+    int16_t   byte_left;
+    ret_code_t ret;
+
+    xSemaphoreTake(flash_semaphore, portMAX_DELAY);
+
+
+    byte_left = size;
+
+    while (byte_left > 0) {
+
+        set_write_lock(true);
+
+        if (((start_address % 256) + byte_left) > 256) {
+            size = 256 - (start_address % 256);
+        } else {
+            size = byte_left;
+        }
+
+        address = start_address;
+
+        buffer[0] = PAGE_PROGRAM;
+        buffer[1] = ((address >> 16) & 0xFF);
+        buffer[2] = ((address >> 8) & 0xFF);
+        buffer[3] = ((address)&0xFF);
+
+        m_spi_xfer_done = false;
+
+        nrfx_spi_xfer_desc_t xfer = NRFX_SPI_XFER_TX(buffer, size + 4);
+
+        APP_ERROR_CHECK(nrfx_spi_xfer(hal_flash_spi, &xfer, 0));
+
+        while (!m_spi_xfer_done) {
+            __WFE();
+        }
+
+        byte_left -= size;
+        start_address += size;
+        buffer += size;
+
+        flash_wait_blocking();
+
+        set_write_lock(false);
+    }
+
+
+    xSemaphoreGive(flash_semaphore);
+
+    return true;
+}
+*/
 
 bool flash_erase_sector(uint32_t address)
 {
 
     uint8_t    buffer[4];
     ret_code_t ret;
+
+    xSemaphoreTake(flash_semaphore, portMAX_DELAY);
 
     set_write_lock(true);
 
@@ -144,10 +248,12 @@ bool flash_erase_sector(uint32_t address)
 
     flash_wait_blocking();
 
+    xSemaphoreGive(flash_semaphore);
+
     return true;
 }
 
-void flash_wait_blocking(void)
+static void flash_wait_blocking(void)
 {
     uint8_t tx_buf[1] = {STATUS_REG};
     uint8_t rx_buf[2];

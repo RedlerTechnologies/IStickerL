@@ -25,9 +25,10 @@ void peripherals_init(void)
 
     hal_init(hal_evt_handler, flash_spi_event_handler);
 
+/*
     uint16_t flash_id = flash_read_manufacture_id();
     NRFX_LOG_INFO("%s Flash ID 0x%04X", __func__, flash_id);
-
+*/
     lis3dh_init();
 
     buzzer_init();

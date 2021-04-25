@@ -6,9 +6,11 @@
 #include "commands.h"
 #include "configuration.h"
 #include "drivers/buzzer.h"
+#include "drivers/flash.h"
 #include "drivers/lis3dh.h"
 #include "event_groups.h"
 #include "events.h"
+#include "float.h"
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
@@ -16,6 +18,7 @@
 #include "logic/serial_comm.h"
 #include "nrf_power.h"
 #include "nrfx_log.h"
+#include "recording.h"
 #include "task.h"
 
 #include <math.h>
@@ -29,7 +32,7 @@ AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
 extern uint8_t             Acc_Table_Merged[];
 extern DeviceConfiguration device_config;
-extern uint32_t reset_count_x;
+extern uint32_t            reset_count_x;
 
 static uint8_t sample_buffer[7];
 static uint8_t alert_str[64];
@@ -85,14 +88,8 @@ void driver_behaviour_task(void *pvParameter)
 
     buzzer_train(1);
 
-    /////////////////
-    // run BLE now //
-    /////////////////
-
     ble_services_init_0();
-
     LoadConfiguration();
-
     ble_services_init();
 
 #ifdef BLE_ADVERTISING
@@ -109,8 +106,15 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.track_state   = TRACKING_STATE_WAKEUP;
     InitWakeupAlgorithm();
 
-    sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD, reset_count_x);
+    sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD,
+            reset_count_x);
     DisplayMessage(alert_str, 0);
+
+    // test external flash
+    uint16_t flash_id = flash_read_manufacture_id();
+    NRFX_LOG_INFO("%s Flash ID 0x%04X", __func__, flash_id);
+
+    record_init();
 
     while (1) {
 
@@ -189,7 +193,7 @@ void driver_behaviour_task(void *pvParameter)
         }
 
         if (need_sleep) {
-            vTaskDelay(500);
+            //vTaskDelay(500);
             DisplayMessage("\r\nSleep\r\n", 0);
             buzzer_long(1200);
             vTaskDelay(2000);
@@ -209,30 +213,6 @@ void driver_behaviour_task(void *pvParameter)
             // wakeup from sleep here
             // ..
         }
-
-        ///////////////////////
-        // check no activity //
-        ///////////////////////
-
-        /*
-                duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
-
-                if (duration > driver_behaviour_state.sleep_delay_time) {
-
-                    DisplayMessage("\r\nSleep\r\n", 0);
-                    buzzer_long(1200);
-                    vTaskDelay(2000);
-
-                    isticker_bsp_board_sleep();
-
-                    nrf_gpio_pin_sense_t sense = NRF_GPIO_PIN_SENSE_LOW;
-
-                    nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
-
-                    nrf_power_system_off();
-                    // sd_power_system_off();
-                }
-                */
     }
 }
 
@@ -240,6 +220,8 @@ bool CheckNoActivity(uint16_t timeout_in_sec)
 {
     uint32_t duration;
     bool     need_sleep = false;
+
+    return false; // ??????????
 
     duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
 
@@ -353,6 +335,9 @@ bool ProcessWakeupState(void)
     bool                  sense1 = false;
     bool                  found  = false;
 
+    // ??????????????
+    return true;
+
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&acc_samples[i];
         sense  = false;
@@ -380,7 +365,7 @@ bool ProcessWakeupState(void)
         DisplayMessage(alert_str, 0);
 
         if (state->movement_count >= 5) {
-            vTaskDelay(25);
+            //vTaskDelay(25);
             found = true;
         }
         InitWakeupAlgorithm();
@@ -533,24 +518,15 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
             state->hit_angle                 = calculate_accident_hit_angle(sample);
         }
 
-        if (state->accident_sample_count >= 5) {
+        if (state->accident_sample_count >= MIN_SAMPLES_FOR_ACCIDENT) {
             if (state->max_g >= MIN_G_FOR_ACCIDENT_EVENT) {
                 /////////////////////////
                 // accident identified //
                 /////////////////////////
 
-                // sending calibrate alert
-                sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
-                PostBleAlert(alert_str);
-                CreateAccidentEvent();
-
-                // beep a buzzer
-                buzzer_long(4000);
-
-                // create event
-                // ..
-
                 state->accident_state = ACCIDENT_STATE_IDENTIFIED;
+
+                record_trigger(1 /* ????????? */);
             } else {
                 state->accident_state = ACCIDENT_STATE_NONE;
             }
@@ -559,6 +535,18 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         break;
 
     case ACCIDENT_STATE_IDENTIFIED:
+
+        if (state->accident_sample_count == MIN_SAMPLES_FOR_ACCIDENT) {
+            // sending calibrate alert
+            sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
+            PostBleAlert(alert_str);
+
+            CreateAccidentEvent();
+
+            // beep a buzzer
+            buzzer_long(4000);
+        }
+
         state->accident_sample_count++;
         // continue recording
         // ..
@@ -568,6 +556,8 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
         break;
     }
+
+    record_add_sample(sample);
 }
 
 signed short calculate_accident_hit_angle(AccConvertedSample *sample)

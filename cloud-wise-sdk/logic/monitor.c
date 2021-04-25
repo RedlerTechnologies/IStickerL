@@ -8,6 +8,7 @@
 #include "drivers/buzzer.h"
 #include "event_groups.h"
 #include "events.h"
+#include "flash_data.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
 #include "logic/peripherals.h"
@@ -25,6 +26,9 @@ extern IStickerErrorBits    error_bits;
 
 APP_TIMER_DEF(m_clock_timer);
 
+static uint8_t alert_str[48];
+
+// ?????????????????
 static Calendar  absolute_time __attribute__((section(".non_init")));
 static uint32_t  clock_counter = 0;
 xSemaphoreHandle clock_semaphore;
@@ -123,7 +127,7 @@ void monitor_thread(void *arg)
     UNUSED_PARAMETER(arg);
 
     // setting default date/time
-    //SetTimeFromString("010120", "000000");
+    // SetTimeFromString("010120", "000000");
 
     InitClock();
 
@@ -147,6 +151,25 @@ void monitor_thread(void *arg)
         // DisplayMessageWithTime("Clock\r\n", 0);
 
         state_machine_feed_watchdog();
+
+#if (FLASH_TEST_ENABLE)
+
+        static uint32_t flash_address = 0x0000;
+        bool            result        = flash_data_test_sector(flash_address);
+
+        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+
+        sprintf(alert_str, "\r\nFlash Test: 0x%04X - %d\r\n", flash_address, result);
+        DisplayMessage(alert_str, 0);
+
+        flash_address += FLASH_SECTOR_SIZE;
+
+        if (flash_address >= END_OF_FLASH)
+            flash_address = 0x0;
+
+        continue;
+
+#endif
 
         if ((current_time % 16) == 0 || first) {
 
@@ -211,6 +234,11 @@ void SetTimeFromString(uint8_t *date_str, uint8_t *time_str)
     calendar->hour    = DD(time_str);
     calendar->minute  = DD(time_str + 2);
     calendar->seconds = DD(time_str + 4);
+}
+
+void GetSystemTime(Calendar *c) 
+{ 
+  memcpy((void *)c, (uint8_t*)&absolute_time, sizeof(Calendar)); 
 }
 
 void InitClock(void)

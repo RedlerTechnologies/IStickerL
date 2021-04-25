@@ -20,6 +20,7 @@ void monitor_thread(void *arg);
 
 void InitClock(void);
 void SetTimeFromString(uint8_t *date_str, uint8_t *time_str);
+void GetSystemTime(Calendar *c);
 uint32_t GetTimeStampFromDate(void);
 void SetClockString(uint8_t *buffer);
 void PostBleAlert(uint8_t *command_str);

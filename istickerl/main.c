@@ -33,6 +33,7 @@ extern xSemaphoreHandle sleep_semaphore;
 extern xSemaphoreHandle command_semaphore;
 extern xSemaphoreHandle ble_command__notify_semaphore;
 extern xSemaphoreHandle event_semaphore;
+extern xSemaphoreHandle flash_semaphore;
 
 extern EventGroupHandle_t event_acc_sample;
 extern EventGroupHandle_t event_uart_rx;
@@ -189,9 +190,6 @@ int main(void)
     NRF_LOG_FLUSH();
 
     peripherals_init();
-    bool result = flash_data_test_sector(0x0);
-    NRFX_LOG_INFO("Flash test: %s", result ? "OK" : "Error");
-    NRF_LOG_FLUSH();
 
     state_machine_init();
 
@@ -244,6 +242,9 @@ void init_tasks(void)
 
     event_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(event_semaphore);
+
+    flash_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(flash_semaphore);
 
     clock_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(clock_semaphore);

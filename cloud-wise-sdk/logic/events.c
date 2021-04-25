@@ -24,9 +24,10 @@ xSemaphoreHandle event_semaphore;
 
 static uint32_t event_id = 0;
 
-void CreateEvent(IStickerEvent *event)
+bool CreateEvent(IStickerEvent *event)
 {
-    xSemaphoreTake(event_semaphore, portMAX_DELAY);
+    if (xSemaphoreTake(event_semaphore, 100) == 0)
+        return false;
 
     // ????????? if (!event->immediate_event)
     if (false)
