@@ -26,8 +26,6 @@ extern IStickerErrorBits    error_bits;
 
 APP_TIMER_DEF(m_clock_timer);
 
-static uint8_t alert_str[48];
-
 // ?????????????????
 static Calendar  absolute_time __attribute__((section(".non_init")));
 static uint32_t  clock_counter = 0;
@@ -106,8 +104,6 @@ void SetClockString(uint8_t *buffer)
 
 void monitor_thread(void *arg)
 {
-    static uint8_t alert_str[32];
-
     uint32_t prev_current_time = 0;
     uint32_t current_time      = 0;
     uint32_t dt                = 0;
@@ -159,8 +155,10 @@ void monitor_thread(void *arg)
 
         driver_behaviour_state.last_activity_time = xTaskGetTickCount();
 
+        terminal_buffer_lock();
         sprintf(alert_str, "\r\nFlash Test: 0x%04X - %d\r\n", flash_address, result);
         DisplayMessage(alert_str, 0);
+        terminal_buffer_release();
 
         flash_address += FLASH_SECTOR_SIZE;
 
@@ -215,8 +213,10 @@ void monitor_thread(void *arg)
 #endif
 
                 if (!driver_behaviour_state.time_synced) {
+                terminal_buffer_lock();
                     sprintf(alert_str + 2, "@?TIME\r\n");
                     PostBleAlert(alert_str);
+                    terminal_buffer_release();
                 }
             }
         }

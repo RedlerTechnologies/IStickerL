@@ -9,6 +9,8 @@
 #include "nrf_log_ctrl.h"
 #include "nrfx_gpiote.h"
 #include "nrfx_saadc.h"
+#include "nrfx_rng.h"
+#include "nrf_drv_rng.h"
 
 #include <string.h>
 
@@ -40,6 +42,7 @@ static void init_saadc(void);
 static void init_saadc_channels(void);
 static void calibrate_saadc(void);
 static void init_pwm(void);
+static void init_random(void);
 
 static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_context);
 static void saadc_event_handler(nrfx_saadc_evt_t const *p_event);
@@ -68,6 +71,7 @@ void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler)
     init_pwm();
     init_uart();
     init_saadc();
+    init_random();
 
     // init timers module
     ret = app_timer_init();
@@ -328,4 +332,22 @@ void isticker_bsp_board_sleep(void)
 {
     nrf_gpio_pin_set(HAL_LED_RED);
     nrf_gpio_pin_set(HAL_LED_GREEN);
+}
+
+static void rng_event_handler(uint8_t rng_data)
+{
+  uint8_t i = 0;
+
+  i++;
+}
+
+static void init_random(void)
+{
+    nrfx_err_t err_code;
+
+    nrfx_rng_config_t rng_config = NRFX_RNG_DEFAULT_CONFIG;
+    //nrf_drv_rng_config_t rng_config = NRF_DRV_RNG_DEFAULT_CONFIG;
+
+    //nrf_drv_rng_init( &rng_config);
+    //nrfx_rng_init( &rng_config, rng_event_handler);
 }

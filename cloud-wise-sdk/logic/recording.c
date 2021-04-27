@@ -1,6 +1,7 @@
 #include "recording.h"
 
 #include "FreeRTOS.h"
+#include "ble_file_transfer.h"
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
 #include "events.h"
@@ -16,17 +17,17 @@
 #include <string.h>
 
 // ???????? static uint8_t          flash_buffer[4 + RECORD_BUFFER_SAMPLE_SIZE * 6 + RECORD_HEADER_SIZE];
-static uint8_t          flash_buffer[300];
-extern xSemaphoreHandle tx_uart_semaphore;
+static uint8_t              flash_buffer[300];
+extern xSemaphoreHandle     tx_uart_semaphore;
+extern DriverBehaviourState driver_behaviour_state;
 
 #define NRF_LOG_MODULE_NAME recording
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
 
-static uint8_t alert_str[128];
-
 static void record_create_new(void);
+static void SendRecordAlert(uint32_t record_id);
 
 AccRecord acc_record;
 
@@ -114,7 +115,7 @@ uint8_t record_scan_for_new_records(bool forced)
 
     duration = timeDiff(xTaskGetTickCount(), acc_record.last_found_record_time) / 1000;
 
-    if ((duration > 30 /* ????????? && connected*/) || forced) {
+    if ((duration > 30 && driver_behaviour_state.ble_connected) || forced) {
         acc_record.last_found_record_time = xTaskGetTickCount();
 
         for (i = 0; i < MAX_RECORDS; i++) {
@@ -142,16 +143,19 @@ uint8_t record_scan_for_new_records(bool forced)
             }
         }
     }
-
-    if (index >= 0 /* ?????????? && connected*/) {
-        // ????????????? SendRecordBleAlert(record_id);
+    if (index >= 0 && driver_behaviour_state.ble_connected) {
+        // SendRecordBleAlert(record_id);
+        SendRecordAlert(record_id);
         // ??????????? DelaySleep(180, 0);
     }
 
-    /* ???????
-        if (!forced)
-            DisplayOneNumericParameter("Records #", pending_counter);
-    */
+    if (!forced) {
+        terminal_buffer_lock();
+        sprintf(alert_str, "\r\nRecords #%d\r\n", pending_counter);
+        DisplayMessage(alert_str, 0);
+        terminal_buffer_release();
+    }
+
     return pending_counter;
 }
 
@@ -355,12 +359,15 @@ void record_add_sample(AccConvertedSample *acc_sample)
         if ((acc_record.flash_address + RECORD_BUFFER_SAMPLE_SIZE * 6) >= (RECORD_SIZE - RECORD_TERMINATOR_SIZE)) {
 
             buzzer_train(2);
+            terminal_buffer_lock();
             sprintf(alert_str, "\r\nAccident Recording: %d\r\n", acc_record.record_num);
             DisplayMessageWithTime(alert_str, strlen(alert_str));
+            terminal_buffer_release();
 
             // CreateDebugEvent(EVENT_DEBUG_ACC_RECORD_COMPLETE, acc_record.record_id, 3, 0);
 
-            // ?????????????? SendRecordBleAlert(acc_record.record_id);
+            // SendRecordBleAlert(acc_record.record_id);
+            SendRecordAlert(acc_record.record_id);
 
             record_write_status(acc_record.record_num, RECORD_CLOSE_IND, 0);
 
@@ -412,8 +419,10 @@ void record_print(unsigned char record_num)
 
     // print header //
 
+    terminal_buffer_lock();
     sprintf(alert_str, "Record %d: %d-%d-%d %d:%d:%d\r\n", value, buffer[7], buffer[8], buffer[9], buffer[4], buffer[5], buffer[6]);
     DisplayMessageWithNoLock(alert_str, strlen(alert_str));
+    terminal_buffer_release();
 
     // print binary //
 
@@ -428,8 +437,10 @@ void record_print(unsigned char record_num)
 
         while (j < 256) {
             value = buffer[j];
+            terminal_buffer_lock();
             sprintf(alert_str, "%02X ", value);
             DisplayMessageWithNoLock(alert_str, 0);
+            terminal_buffer_release();
             nrf_delay_ms(1);
             j++;
 
@@ -445,18 +456,29 @@ void record_print(unsigned char record_num)
     // print samples //
     i = RECORD_HEADER_SIZE;
 
-    while ( (i+6) < (RECORD_SIZE - RECORD_TERMINATOR_SIZE)) {
+    while ((i + 6) < (RECORD_SIZE - RECORD_TERMINATOR_SIZE)) {
         memset(flash_buffer, 0x00, 10);
         flash_read_buffer(flash_buffer, (flash_address + i), 6);
 
         memcpy(&sample, buffer, 6);
+
+        terminal_buffer_lock();
         sprintf(alert_str, "%d %d %d", sample.drive_direction, sample.turn_direction, sample.earth_direction);
         DisplayMessageWithNoLock(alert_str, 0);
         DisplayMessageWithNoLock("\r\n", 0);
         nrf_delay_ms(1);
+        terminal_buffer_release();
 
         i += 6;
     }
 
     xSemaphoreGive(tx_uart_semaphore);
+}
+
+static void SendRecordAlert(uint32_t record_id)
+{
+    terminal_buffer_lock();
+    sprintf(alert_str + 2, "@?REC,%d\r\n", record_id);
+    PostBleAlert(alert_str);
+    terminal_buffer_release();
 }

@@ -88,8 +88,10 @@ typedef struct {
     // flags
     bool time_synced;
     bool ble_connected;
+    bool new_transfer_protocol;
 
     unsigned last_ble_connected_time;
+
 } DriverBehaviourState;
 
 void driver_behaviour_task(void *pvParameter);

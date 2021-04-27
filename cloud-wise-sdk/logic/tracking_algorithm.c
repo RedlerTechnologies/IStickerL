@@ -35,7 +35,6 @@ extern DeviceConfiguration device_config;
 extern uint32_t            reset_count_x;
 
 static uint8_t sample_buffer[7];
-static uint8_t alert_str[64];
 
 DriverBehaviourState driver_behaviour_state;
 
@@ -96,7 +95,7 @@ void driver_behaviour_task(void *pvParameter)
     ble_services_advertising_start();
 #endif
 
-    sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, sample_timer_toggle_timer_callback);
+    sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, (TimerCallbackFunction_t)sample_timer_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
 
     configure_acc(Acc_Table_Merged, ACC_TABLE_DRIVER_SIZE);
@@ -106,9 +105,11 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.track_state   = TRACKING_STATE_WAKEUP;
     InitWakeupAlgorithm();
 
+    terminal_buffer_lock();
     sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD,
             reset_count_x);
     DisplayMessage(alert_str, 0);
+    terminal_buffer_release();
 
     // test external flash
     uint16_t flash_id = flash_read_manufacture_id();
@@ -193,7 +194,7 @@ void driver_behaviour_task(void *pvParameter)
         }
 
         if (need_sleep) {
-            //vTaskDelay(500);
+            // vTaskDelay(500);
             DisplayMessage("\r\nSleep\r\n", 0);
             buzzer_long(1200);
             vTaskDelay(2000);
@@ -361,17 +362,21 @@ bool ProcessWakeupState(void)
 
     if (state->movement_test_count >= 15) // about 5 seconds
     {
+        terminal_buffer_lock();
         sprintf(alert_str, "\r\n\r\nmovements# %d\r\n\r\n", state->movement_count);
         DisplayMessage(alert_str, 0);
+        terminal_buffer_release();
 
         if (state->movement_count >= 5) {
-            //vTaskDelay(25);
+            // vTaskDelay(25);
             found = true;
         }
         InitWakeupAlgorithm();
     } else if (sense1) {
+        terminal_buffer_lock();
         sprintf(alert_str, "\r\n\r\nm# %d\r\n\r\n", state->movement_count);
         DisplayMessage(alert_str, 0);
+        terminal_buffer_release();
     }
 
     return found;
@@ -479,8 +484,10 @@ void Process_Calibrate(void)
         buzzer_train(5);
 
         // sending calibrate alert
+        terminal_buffer_lock();
         sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", 1, -2, 0); // ???????????
         PostBleAlert(alert_str);
+        terminal_buffer_release();
     }
 }
 
@@ -526,7 +533,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
                 state->accident_state = ACCIDENT_STATE_IDENTIFIED;
 
-                record_trigger(1 /* ????????? */);
+                record_trigger(0 /* ????????? */);
             } else {
                 state->accident_state = ACCIDENT_STATE_NONE;
             }
@@ -538,8 +545,10 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
         if (state->accident_sample_count == MIN_SAMPLES_FOR_ACCIDENT) {
             // sending calibrate alert
+            terminal_buffer_lock();
             sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
             PostBleAlert(alert_str);
+            terminal_buffer_release();
 
             CreateAccidentEvent();
 

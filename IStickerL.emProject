@@ -49,8 +49,10 @@
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_temp.c" />
         <folder Name="Legacy">
           <file file_name="nrf5-sdk/integration/nrfx/legacy/nrf_drv_clock.c" />
+          <file file_name="nrf5-sdk/integration/nrfx/legacy/nrf_drv_rng.c" />
         </folder>
         <file file_name="nrf5-sdk/modules/nrfx/drivers/src/prs/nrfx_prs.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_rng.c" />
       </folder>
       <folder Name="SoftDevice">
         <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh.c" />

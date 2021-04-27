@@ -25,9 +25,9 @@
 #include "nrf_sdh_freertos.h"
 #include "nrf_sdh_soc.h"
 #include "nrf_sdm.h"
+#include "semphr.h"
 #include "task.h"
 #include "version.h"
-#include "semphr.h"
 
 #include <string.h>
 
@@ -323,6 +323,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
     switch (p_ble_evt->header.evt_id) {
     case BLE_GAP_EVT_DISCONNECTED:
+        driver_behaviour_state.ble_connected = false;
         NRFX_LOG_INFO("Disconnected.");
         NRFX_LOG_INFO("%s Connection 0x%x has been disconnected. Reason: 0x%X", __func__, p_ble_evt->evt.gap_evt.conn_handle,
                       p_ble_evt->evt.gap_evt.params.disconnected.reason);
@@ -334,12 +335,14 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         NRFX_LOG_INFO("Connected.");
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
 
+        driver_behaviour_state.ble_connected           = true;
         driver_behaviour_state.last_ble_connected_time = xTaskGetTickCount();
         break;
 
     case BLE_GATTC_EVT_TIMEOUT:
         // Disconnect on GATT Client timeout event.
         NRFX_LOG_DEBUG("GATT Client Timeout.");
+        driver_behaviour_state.ble_connected = false;
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
         break;
@@ -575,6 +578,16 @@ static void istickerl_evt_handler(ble_istickerl_evt_t *p_evt, void *p_context)
         // TODO
         break;
 
+    case BLE_ISTICKERL_FILE_TRANSFER_NOTIFICATION_STARTED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_FILE_TRANSFER_NOTIFICATION_STARTED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_FILE_TRANSFER_NOTIFICATION_STOPPED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_FILE_TRANSFER_NOTIFICATION_STOPPED", __func__);
+        // TODO
+        break;
+
     default:
         NRFX_LOG_WARNING("%s other (0x%x)", __func__, p_evt->type);
         break;
@@ -610,8 +623,7 @@ bool ble_services_notify_command(uint8_t *const data, size_t length)
 {
     ret_code_t err_code;
 
-    xSemaphoreTake(ble_command__notify_semaphore,portMAX_DELAY);
-    
+    xSemaphoreTake(ble_command__notify_semaphore, portMAX_DELAY);
 
     // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
     //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
@@ -619,7 +631,7 @@ bool ble_services_notify_command(uint8_t *const data, size_t length)
     //}
 
 #ifdef BLE_ISTICKERL_DATA_HEXDUMP
-        NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
     if (length > 0)
         NRFX_LOG_HEXDUMP_INFO(data, length);
     NRF_LOG_FLUSH();
@@ -712,6 +724,26 @@ bool ble_services_notify_event(uint8_t *const data, size_t length)
     return (err_code == NRF_SUCCESS);
 }
 
+bool ble_services_notify_file_transfer(uint8_t *const data, size_t length)
+{
+    // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+    //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
+    //    return false;
+    //}
+
+    ret_code_t err_code;
+
+#ifdef BLE_ISTICKERL_DATA_HEXDUMP
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+    if (length > 0)
+        NRFX_LOG_HEXDUMP_INFO(data, length);
+    NRF_LOG_FLUSH();
+#endif
+
+    err_code = ble_istickerl_notify_file_transfer(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
 bool ble_services_update_acc(uint8_t *const data, size_t length)
 {
     ret_code_t err_code;
@@ -741,6 +773,14 @@ bool ble_services_update_event(uint8_t *const data, size_t length)
     ret_code_t err_code;
 
     err_code = ble_istickerl_update_event(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+bool ble_services_update_file_transfer(uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = ble_istickerl_update_file_transfer(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
 }
 

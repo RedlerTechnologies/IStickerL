@@ -17,6 +17,9 @@
 xSemaphoreHandle   tx_uart_semaphore;
 EventGroupHandle_t event_uart_rx;
 
+uint8_t alert_str[256+16];
+
+
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
 
@@ -29,6 +32,8 @@ static uint8_t copy_rx_buffer[UART_RX_BUFFER_SIZE + 4];
 
 static uint8_t rx_buffer_xxx[UART_RX_BUFFER_SIZE];
 static uint8_t rx_ptr_xxx;
+
+xSemaphoreHandle terminal_buff_semaphore;
 
 void serial_comm_init(void)
 {
@@ -205,3 +210,7 @@ void DisplayMessageWithTime(uint8_t *message, uint8_t len)
 
     xSemaphoreGive(tx_uart_semaphore);
 }
+
+void terminal_buffer_lock(void) { xSemaphoreTake(terminal_buff_semaphore, portMAX_DELAY); }
+
+void terminal_buffer_release(void) { xSemaphoreGive(terminal_buff_semaphore); }

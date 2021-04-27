@@ -3,6 +3,7 @@
 #include "Configuration.h"
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
+#include "ble_file_transfer.h"
 #include "drivers/buzzer.h"
 #include "events.h"
 #include "flash_data.h"
@@ -25,7 +26,8 @@ extern DriverBehaviourState driver_behaviour_state;
 extern DeviceConfiguration  device_config;
 extern xSemaphoreHandle     clock_semaphore;
 
-extern Calendar absolute_time;
+extern Calendar            absolute_time;
+extern BleReadingFileState ble_reading_file_state;
 
 xSemaphoreHandle sleep_semaphore;
 xSemaphoreHandle command_semaphore;
@@ -46,6 +48,8 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"RESET", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
     {"MEM_CLEAR", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
     {"RECORD", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
+    {"FILE", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
+    {"BLE", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -236,7 +240,9 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             case 1:
                 flash_erase_sectors_in_range(FLASH_RECORDS_START_ADDRESS, END_OF_FLASH);
+                record_init();
                 result = param_num;
+                break;
             }
         }
         break;
@@ -249,16 +255,80 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
                 param_num = -param_num;
             }
 
-            if (param_num <= 0) {
-                if (!is_remote)
-                    record_print(-param_num);
-            }
+            /* ?????????
+                        if (param_num <= 0) {
+                            if (!is_remote)
+                                record_print(-param_num);
+                        }
+                        */
+
+            // ?????????????
+            is_remote = true;
 
             if (is_remote) {
                 // send record file here
-                // ..
+                ble_reading_file_state.file_type = FILE_TYPE_RECORD;
+                BFT_start(-param_num, 1);
+                result = param_num;
+            }
+        } else {
+            record_scan_for_new_records(true);
+        }
+        break;
+
+    case COMMAND_FILE:
+
+        if (is_set_command) {
+            if (param_num == 0) {
+                ble_reading_file_state.file_type             = param_num;
+                driver_behaviour_state.new_transfer_protocol = true;
+                BFT_start(param_num, 0);
             }
         }
+        break;
+
+    case COMMAND_BLE:
+        if (is_set_command) {
+            switch (param_num) {
+            case 14:
+                driver_behaviour_state.new_transfer_protocol = false;
+                BFT_start(0, 0);
+                result = param_num;
+                break;
+
+            case 15:
+                switch (ble_reading_file_state.state) {
+                case 1:
+                    ble_reading_file_state.state = 2;
+                    break;
+
+                default:
+                    ble_reading_file_state.state = 0xFF;
+                    break;
+                }
+
+                result = param_num;
+
+                break;
+
+            case 16:
+
+                switch (ble_reading_file_state.state) {
+                case 1:
+                    ble_reading_file_state.state = 3;
+                    break;
+
+                default:
+                    ble_reading_file_state.state = 0xFF;
+                    break;
+                }
+
+                result = param_num;
+
+                break;
+            }
+        }
+
         break;
 
     default:

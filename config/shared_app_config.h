@@ -1,6 +1,6 @@
 #pragma once
 
-// ??????????? #define BLE_ADVERTISING
+#define BLE_ADVERTISING
 #define FLASH_TEST_ENABLE   0
 
 
@@ -44,3 +44,6 @@
 
 
 //===============================================
+
+// <e> RNG_ENABLED - nrf_drv_rng - RNG peripheral driver - legacy layer
+//==========================================================

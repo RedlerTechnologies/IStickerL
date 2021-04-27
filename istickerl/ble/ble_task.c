@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
 #include "ble_istickerl.h"
+#include "logic/ble_file_transfer.h"
 #include "logic/commands.h"
 #include "logic/serial_comm.h"
 #include "nrf_log_ctrl.h"
@@ -14,6 +15,9 @@
 #define NRF_LOG_LEVEL BLE_ISTICKERL_BLE_LOG_LEVEL
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
+
+
+extern BleReadingFileState ble_reading_file_state;
 
 static QueueHandle_t ble_command_queue;
 
@@ -48,6 +52,8 @@ void ble_thread(void *pvParameters)
     static uint8_t result_buffer[COMMAND_CHAR_MAX_LEN];
     BleMessage *   p;
 
+    ble_reading_file_state.state = 0xFF;
+
     while (1) {
 
         if (xQueuePeek(ble_command_queue, &p, 0) == pdTRUE) {
@@ -70,25 +76,27 @@ void ble_thread(void *pvParameters)
 
             NRFX_LOG_INFO("result: <%s>", result_buffer + 2);
         }
+
+        if (ble_reading_file_state.state < 0xFF) {
+            BFT_send_next_packet();
+        }
     }
 }
-
 
 void PostBleAlert(uint8_t *command_str)
 {
     uint8_t len = strlen(command_str + 2);
-    
+
     // send to terminal with CRLF
     // sent to BLE without CRLF !!!
 
     DisplayMessage(command_str + 2, 0);
 
     command_str[0] = 0x80;
-    command_str[1] = len-2;
+    command_str[1] = len - 2;
 
 #ifdef BLE_ADVERTISING
     // this command need semaphore
     ble_services_notify_command(command_str, len);
 #endif
-
 }

@@ -86,7 +86,7 @@ bool CreateEvent(IStickerEvent *event)
 
     ble_buffer[0] = 0x80;
     ble_buffer[1] = ptr - 2;
-    ble_services_notify_event(ble_buffer, ptr);
+    // ???????????? ble_services_notify_event(ble_buffer, ptr);
 
     xSemaphoreGive(event_semaphore);
 }

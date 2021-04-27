@@ -34,6 +34,7 @@ extern xSemaphoreHandle command_semaphore;
 extern xSemaphoreHandle ble_command__notify_semaphore;
 extern xSemaphoreHandle event_semaphore;
 extern xSemaphoreHandle flash_semaphore;
+extern xSemaphoreHandle terminal_buff_semaphore;
 
 extern EventGroupHandle_t event_acc_sample;
 extern EventGroupHandle_t event_uart_rx;
@@ -230,6 +231,9 @@ void init_tasks(void)
 {
     tx_uart_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(tx_uart_semaphore);
+
+    terminal_buff_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(terminal_buff_semaphore);
 
     sleep_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(sleep_semaphore);

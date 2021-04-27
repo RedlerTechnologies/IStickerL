@@ -29,7 +29,7 @@ xSemaphoreHandle flash_semaphore;
 void flash_spi_event_handler(nrfx_spi_evt_t const *p_event, void *p_context)
 {
     m_spi_xfer_done = true;
-    NRF_LOG_INFO("Transfer completed.");
+    //NRF_LOG_INFO("Transfer completed.");
 
     // if (m_rx_buf[0] != 0) {
     //  NRF_LOG_INFO(" Received:");
