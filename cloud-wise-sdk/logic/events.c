@@ -9,6 +9,7 @@
 #include "hal/hal_drivers.h"
 #include "logic/serial_comm.h"
 #include "monitor.h"
+#include "recording.h"
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
@@ -19,6 +20,7 @@
 extern xSemaphoreHandle     clock_semaphore;
 extern Calendar             absolute_time;
 extern DriverBehaviourState driver_behaviour_state;
+extern AccRecord            acc_record;
 
 xSemaphoreHandle event_semaphore;
 
@@ -86,7 +88,7 @@ bool CreateEvent(IStickerEvent *event)
 
     ble_buffer[0] = 0x80;
     ble_buffer[1] = ptr - 2;
-    // ???????????? ble_services_notify_event(ble_buffer, ptr);
+    ble_services_notify_event(ble_buffer, ptr);
 
     xSemaphoreGive(event_semaphore);
 }
@@ -99,6 +101,8 @@ void CreateAccidentEvent(void)
     memset(buffer, 0x00, 8);
     buffer[0] = driver_behaviour_state.max_g / 10;
     buffer[1] = driver_behaviour_state.hit_angle / 2;
+
+    memcpy(buffer + 4, (uint8_t*)&acc_record.record_id, 4);
 
     accident_event.time       = 0;
     accident_event.data_len   = 8;
@@ -113,7 +117,7 @@ void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size)
     IStickerEvent accident_event;
     uint8_t       buffer[4];
 
-    //return; // ??????????
+    // return; // ??????????
 
     memset(buffer, 0x00, 4);
     memcpy(buffer, (uint8_t *)(&value), value_size);
@@ -137,7 +141,7 @@ void CreateEndRouteEvent(void)
     // 9-12 - odometer
 
     memset(buffer, 0x00, 13);
-  
+
     accident_event.time       = 0;
     accident_event.data_len   = 13;
     accident_event.data       = buffer;

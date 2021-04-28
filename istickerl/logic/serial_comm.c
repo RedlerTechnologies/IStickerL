@@ -17,8 +17,7 @@
 xSemaphoreHandle   tx_uart_semaphore;
 EventGroupHandle_t event_uart_rx;
 
-uint8_t alert_str[256+16];
-
+uint8_t alert_str[256 + 16];
 
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
@@ -27,11 +26,10 @@ static TaskHandle_t m_uart_thread;
 
 static void uart_thread(void *arg);
 
-static uint8_t rx_buffer[UART_RX_BUFFER_SIZE];
 static uint8_t copy_rx_buffer[UART_RX_BUFFER_SIZE + 4];
 
-static uint8_t rx_buffer_xxx[UART_RX_BUFFER_SIZE];
-static uint8_t rx_ptr_xxx;
+static uint8_t rx_buffer[UART_RX_BUFFER_SIZE];
+static uint8_t rx_ptr;
 
 xSemaphoreHandle terminal_buff_semaphore;
 
@@ -55,7 +53,6 @@ static void uart_thread(void *arg)
     static uint8_t rx_ptr      = 0;
     static char    crlf_data[] = "\r\n";
 
-    // ????????????????
     err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
 
     while (1) {
@@ -66,53 +63,11 @@ static void uart_thread(void *arg)
             DisplayMessage(copy_rx_buffer, 0);
             command_decoder(copy_rx_buffer, strlen(copy_rx_buffer), result_buffer, 0);
         }
-
-        // vTaskSuspend(NULL); // ????????????
-        continue;
-
-        err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
-        APP_ERROR_CHECK(err_code);
-
-        if (data[0] == 0x00) {
-            vTaskSuspend(NULL);
-            continue;
-        }
-
-        if (rx_ptr == 0)
-            memset(rx_buffer, 0x00, UART_RX_BUFFER_SIZE);
-
-        rx_buffer[rx_ptr] = data[0];
-
-        // echo
-        err_code = nrfx_uart_tx(hal_uart, data, 1);
-        // vTaskDelay(10);
-
-        if (rx_ptr < UART_RX_BUFFER_SIZE)
-            rx_ptr++;
-
-        if (data[0] == '\r') {
-            memcpy(copy_rx_buffer, rx_buffer, rx_ptr);
-            // err_code = nrfx_uart_tx(hal_uart, copy_rx_buffer, strlen(copy_rx_buffer));
-
-            copy_rx_buffer[rx_ptr]     = '\r';
-            copy_rx_buffer[rx_ptr + 1] = '\n';
-
-            DisplayMessage("\r\n\r\n\r\n", 6);
-            DisplayMessage(copy_rx_buffer, 0);
-            // ????????????????? command_decoder(copy_rx_buffer, rx_ptr, 0);
-            // ??????????? vTaskDelay(10);
-            err_code = nrfx_uart_tx(hal_uart, crlf_data, strlen(crlf_data));
-            // ??????????? vTaskDelay(10);
-            rx_ptr = 0;
-
-            // run command handler
-            // ..
-        }
-
-        vTaskSuspend(NULL);
-
-        NRFX_LOG_INFO("%s RX %c", __func__, data[0]);
     }
+
+    vTaskSuspend(NULL);
+
+    NRFX_LOG_INFO("%s RX %c", __func__, data[0]);
 }
 
 void serial_comm_process_rx(void)
@@ -120,9 +75,6 @@ void serial_comm_process_rx(void)
     BaseType_t xHigherPriorityTaskWoken, xResult;
 
     uint8_t ch;
-    // ??????????
-    // xTaskResumeFromISR(m_uart_thread);
-    // return;
 
     ret_code_t err_code;
     uint8_t    data[1];
@@ -132,15 +84,15 @@ void serial_comm_process_rx(void)
 
     ch = data[0];
 
-    if (rx_ptr_xxx == 0)
-        memset(rx_buffer_xxx, 0x00, UART_RX_BUFFER_SIZE);
+    if (rx_ptr == 0)
+        memset(rx_buffer, 0x00, UART_RX_BUFFER_SIZE);
 
-    rx_buffer_xxx[rx_ptr_xxx] = ch;
+    rx_buffer[rx_ptr] = ch;
     nrfx_uart_tx(hal_uart, &ch, 1);
 
     if (ch == 0x0D) {
-        memcpy(copy_rx_buffer, rx_buffer_xxx, UART_RX_BUFFER_SIZE);
-        rx_ptr_xxx = 0;
+        memcpy(copy_rx_buffer, rx_buffer, UART_RX_BUFFER_SIZE);
+        rx_ptr = 0;
 
         xHigherPriorityTaskWoken = pdFALSE;
         xResult                  = xEventGroupSetBitsFromISR(event_uart_rx, 0x01, &xHigherPriorityTaskWoken);
@@ -149,8 +101,8 @@ void serial_comm_process_rx(void)
             portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
     } else {
-        if (rx_ptr_xxx + 1 < UART_RX_BUFFER_SIZE)
-            rx_ptr_xxx++;
+        if (rx_ptr + 1 < UART_RX_BUFFER_SIZE)
+            rx_ptr++;
     }
 }
 
@@ -159,7 +111,6 @@ void DisplayMessage(uint8_t *message, uint8_t len)
     if (!xSemaphoreTake(tx_uart_semaphore, 50))
         return;
 
-    // vTaskDelay(10);
     while (nrfx_uart_tx_in_progress(hal_uart)) {
     }
 

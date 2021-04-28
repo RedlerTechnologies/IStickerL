@@ -79,6 +79,7 @@ typedef struct {
     signed short   sample_in_turn_direction;
     unsigned short accident_sample_count;
     signed short   hit_angle;
+    unsigned short time_to_sleep_left_in_sec;
     AccidentState  accident_state;
 
     // on_driving
@@ -89,6 +90,7 @@ typedef struct {
     bool time_synced;
     bool ble_connected;
     bool new_transfer_protocol;
+    bool record_triggered;
 
     unsigned last_ble_connected_time;
 

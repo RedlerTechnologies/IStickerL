@@ -181,7 +181,6 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->status_handle);
     VERIFY_SUCCESS(err_code);
 
-/* ????????????
     // Add the event Characteristic //
     memset(&add_char_params, 0, sizeof(add_char_params));
     add_char_params.uuid              = BLE_UUID_EVENT_CHARACTERISTIC;
@@ -198,7 +197,6 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
 
     err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->event_handle);
     VERIFY_SUCCESS(err_code);
-*/
 
     // Add the file transfer Characteristic //
     memset(&add_char_params, 0, sizeof(add_char_params));

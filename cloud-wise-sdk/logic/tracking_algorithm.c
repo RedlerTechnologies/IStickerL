@@ -41,15 +41,14 @@ DriverBehaviourState driver_behaviour_state;
 void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
 void           CalibrateAllSamples(void);
-// void           Process_DriverBehaviourAlgorithm(void);
-void         ProcessDrivingState(void);
-void         ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
-void         Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
-void         Process_Calibrate(void);
-void         InitWakeupAlgorithm(void);
-signed short calculate_accident_hit_angle(AccConvertedSample *sample);
-bool         ProcessWakeupState(void);
-bool         CheckNoActivity(uint16_t timeout_in_sec);
+void           ProcessDrivingState(void);
+void           ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
+void           Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
+void           Process_Calibrate(void);
+void           InitWakeupAlgorithm(void);
+signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
+bool           ProcessWakeupState(void);
+bool           CheckNoActivity(void);
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -100,10 +99,13 @@ void driver_behaviour_task(void *pvParameter)
 
     configure_acc(Acc_Table_Merged, ACC_TABLE_DRIVER_SIZE);
 
-    driver_behaviour_state.time_synced   = false;
-    driver_behaviour_state.ble_connected = false;
-    driver_behaviour_state.track_state   = TRACKING_STATE_WAKEUP;
+    driver_behaviour_state.time_synced      = false;
+    driver_behaviour_state.ble_connected    = false;
+    driver_behaviour_state.record_triggered = false;
+    driver_behaviour_state.track_state      = TRACKING_STATE_WAKEUP;
     InitWakeupAlgorithm();
+
+    driver_behaviour_state.sleep_delay_time = 40;
 
     terminal_buffer_lock();
     sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD,
@@ -141,9 +143,6 @@ void driver_behaviour_task(void *pvParameter)
         ///////////////////////////
 
         // handle last 32 samples
-        // ?????????????? Process_DriverBehaviourAlgorithm();
-
-        // ???????????????????????
 
         need_sleep = false;
 
@@ -162,12 +161,10 @@ void driver_behaviour_task(void *pvParameter)
                     CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
                     continue;
                 } else {
-                    need_sleep = CheckNoActivity(30);
+                    need_sleep = CheckNoActivity();
 
                     if (need_sleep) {
                         CreateGeneralEvent(LOG_FALSE_WAKEUP, EVENT_TYPE_LOG, 2);
-                        // need delay after creating end of route immediate events
-                        vTaskDelay(10000);
                     }
                 }
 
@@ -176,14 +173,11 @@ void driver_behaviour_task(void *pvParameter)
             case TRACKING_STATE_ROUTE:
                 ProcessDrivingState();
 
-                need_sleep = CheckNoActivity(driver_behaviour_state.sleep_delay_time);
+                need_sleep = CheckNoActivity();
 
                 if (need_sleep) {
                     CreateEndRouteEvent();
                     CreateGeneralEvent(LOG_SLEEP_BY_NO_MOVEMENT, EVENT_TYPE_LOG, 2);
-
-                    // need delay after creating end of route immediate events
-                    vTaskDelay(10000);
                 }
                 break;
 
@@ -194,7 +188,11 @@ void driver_behaviour_task(void *pvParameter)
         }
 
         if (need_sleep) {
-            // vTaskDelay(500);
+            DisplayMessage("\r\nSleeping...\r\n", 0);
+
+            // need after creating end of route immediate events
+            vTaskDelay(10000);
+
             DisplayMessage("\r\nSleep\r\n", 0);
             buzzer_long(1200);
             vTaskDelay(2000);
@@ -217,16 +215,24 @@ void driver_behaviour_task(void *pvParameter)
     }
 }
 
-bool CheckNoActivity(uint16_t timeout_in_sec)
+bool CheckNoActivity(void)
 {
     uint32_t duration;
+    int16_t  time_to_sleep;
     bool     need_sleep = false;
 
-    return false; // ??????????
+#ifdef SLEEP_DISABLE
+    return false;
+#endif
+
+    uint16_t timeout_in_sec = driver_behaviour_state.sleep_delay_time;
 
     duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
 
-    if (duration > timeout_in_sec) {
+    time_to_sleep                                    = timeout_in_sec - duration;
+    driver_behaviour_state.time_to_sleep_left_in_sec = time_to_sleep;
+
+    if (time_to_sleep <= 0) {
 
         need_sleep = true;
     }
@@ -336,8 +342,9 @@ bool ProcessWakeupState(void)
     bool                  sense1 = false;
     bool                  found  = false;
 
-    // ??????????????
+#ifdef SLEEP_DISABLE
     return true;
+#endif
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&acc_samples[i];
@@ -504,6 +511,9 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         if (sample->drive_direction >= ACC_MIN_ACCIDENT_VALUE)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
+        if (driver_behaviour_state.record_triggered)
+            state->accident_state = ACCIDENT_STATE_STARTED;
+
         if (state->accident_state == ACCIDENT_STATE_STARTED) {
             state->accident_sample_count = 1;
             state->max_g                 = GetGValue(sample);
@@ -526,14 +536,15 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         }
 
         if (state->accident_sample_count >= MIN_SAMPLES_FOR_ACCIDENT) {
-            if (state->max_g >= MIN_G_FOR_ACCIDENT_EVENT) {
+            if (state->max_g >= MIN_G_FOR_ACCIDENT_EVENT || driver_behaviour_state.record_triggered) {
                 /////////////////////////
                 // accident identified //
                 /////////////////////////
 
-                state->accident_state = ACCIDENT_STATE_IDENTIFIED;
+                state->accident_state                   = ACCIDENT_STATE_IDENTIFIED;
+                driver_behaviour_state.record_triggered = false;
 
-                record_trigger(0 /* ????????? */);
+                record_trigger(0);
             } else {
                 state->accident_state = ACCIDENT_STATE_NONE;
             }

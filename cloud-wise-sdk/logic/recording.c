@@ -14,7 +14,9 @@
 #include "timers.h"
 #include "tracking_algorithm.h"
 
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // ???????? static uint8_t          flash_buffer[4 + RECORD_BUFFER_SAMPLE_SIZE * 6 + RECORD_HEADER_SIZE];
 static uint8_t              flash_buffer[300];
@@ -194,7 +196,7 @@ void record_trigger(uint8_t reason)
     acc_record.record_reason = reason;
 
     // ????????? acc_record.record_id     = scan_result.write_marker.event_id;
-    record_id++;
+    record_id            = GetRandomNumber();
     acc_record.record_id = record_id;
 }
 
@@ -231,6 +233,7 @@ static void get_header(uint8_t *header)
     header[10]     = param_enabled1;
 
     ptr = &acc_record.record_id;
+    memcpy(header, ptr, 4);
 
     /* ???????????
         if (driver_behavior_state.calibration_state == CALIRATION_STATE_DONE) {
@@ -244,8 +247,6 @@ static void get_header(uint8_t *header)
 
     header[12] = flags;
     header[15] = RECORD_RESOLUTION;
-
-    memcpy(header, ptr, 4);
 }
 
 void record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t value)
@@ -481,4 +482,14 @@ static void SendRecordAlert(uint32_t record_id)
     sprintf(alert_str + 2, "@?REC,%d\r\n", record_id);
     PostBleAlert(alert_str);
     terminal_buffer_release();
+}
+
+uint32_t GetRandomNumber(void)
+{
+    uint32_t r = 0;
+
+    sd_rand_application_vector_get((uint8_t*)&r, 4);
+    r = r & 0xFFFFFFF;
+
+    return r;
 }

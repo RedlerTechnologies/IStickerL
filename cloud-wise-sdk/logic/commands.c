@@ -37,19 +37,20 @@ IStickerErrorBits error_bits;
 void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command, uint8_t source);
 
 ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
-    {"BEEP", NULL, 85, 0, PARAM_TYPE_STRING, 0, 0},
-    {"CALIBRATE", NULL, 85, 0, PARAM_TYPE_STRING, 0, 0},
-    {"SLPD", NULL, 85, 0, PARAM_TYPE_STRING, 0, 0},
-    {"SW_VERSION", NULL, 45, 2, PARAM_TYPE_INTEGER, 0, 1},
-    {"SW_BUILD", NULL, 46, 2, PARAM_TYPE_INTEGER, 0, 1},
-    {"DEVID", (uint32_t *)device_config.DeviceID, 46, 26, PARAM_TYPE_STRING, 0, 1},
-    {"BLEID", (uint32_t *)device_config.DeviceName, 46, 16, PARAM_TYPE_STRING, 0, 1},
-    {"TIME", NULL, 46, 0, PARAM_TYPE_STRING, 0, 1},
-    {"RESET", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
-    {"MEM_CLEAR", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
-    {"RECORD", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
-    {"FILE", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
-    {"BLE", NULL, 46, 0, PARAM_TYPE_INTEGER, 0, 1},
+    {"BEEP", NULL},
+    {"CALIBRATE", NULL},
+    {"SLPD", NULL},
+    {"SW_VERSION", NULL},
+    {"SW_BUILD", NULL},
+    {"DEVID", (uint32_t *)device_config.DeviceID},
+    {"BLEID", (uint32_t *)device_config.DeviceName},
+    {"TIME", NULL},
+    {"RESET", NULL},
+    {"MEM_CLEAR", NULL},
+    {"RECORD", NULL},
+    {"FILE", NULL},
+    {"BLE", NULL},
+    {"TEST_MODE", NULL},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -255,15 +256,10 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
                 param_num = -param_num;
             }
 
-            /* ?????????
-                        if (param_num <= 0) {
-                            if (!is_remote)
-                                record_print(-param_num);
-                        }
-                        */
-
-            // ?????????????
-            is_remote = true;
+            if (param_num <= 0) {
+                if (!is_remote)
+                    record_print(-param_num);
+            }
 
             if (is_remote) {
                 // send record file here
@@ -328,6 +324,19 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
                 break;
             }
         }
+
+        break;
+
+    case COMMAND_TEST_MODE:
+
+        switch (param_num) {
+        
+        case 8:
+            driver_behaviour_state.record_triggered = true;
+            break;
+        }
+
+        result = param_num;
 
         break;
 

@@ -137,7 +137,7 @@ void monitor_thread(void *arg)
         if (current_time == prev_current_time)
             continue;
 
-        // handle overlow in ciunter later;
+        // handle overlow in counter later;
         dt                = (current_time - prev_current_time);
         prev_current_time = current_time;
 
@@ -169,7 +169,7 @@ void monitor_thread(void *arg)
 
 #endif
 
-        if ((current_time % 16) == 0 || first) {
+        if ((current_time % 8) == 0 || first) {
 
             first = false;
 
@@ -178,19 +178,18 @@ void monitor_thread(void *arg)
             vdd         = peripherals_read_vdd();
             vdd_float   = ((float)vdd) / 1000;
 
-            duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
-            duration = driver_behaviour_state.sleep_delay_time - duration;
+            // duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
+            // duration = driver_behaviour_state.sleep_delay_time - duration;
 
-            sprintf(status_buffer, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level, duration, vdd_float);
-            // DisplayMessage(status_buffer, 0);
+            sprintf(status_buffer, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level,
+                    driver_behaviour_state.time_to_sleep_left_in_sec, vdd_float);
             DisplayMessageWithTime(status_buffer, 0);
 
-            // NRFX_LOG_INFO("%s Temperature: %dC", __func__, peripherals_read_temperature());
-
-            // uint8_t bat_level = peripherals_read_battery_level();
-            // NRFX_LOG_INFO("%s Battery: %u%% VDD mV: %u", __func__, bat_level, peripherals_read_vdd());
-
             if (is_connected()) {
+
+                // enable this line when supprting non immediate events
+                // record_scan_for_new_records(false); // ????????????
+
 #ifdef BLE_ADVERTISING
                 ble_services_update_battery_level(bat_level);
 
@@ -210,14 +209,14 @@ void monitor_thread(void *arg)
                 // error_bits.NotCalibrated    = 1;
                 memcpy(ble_buffer + 6, (uint8_t *)(&error_bits), 4);
                 ble_services_notify_status(ble_buffer, 16);
-#endif
 
                 if (!driver_behaviour_state.time_synced) {
-                terminal_buffer_lock();
+                    terminal_buffer_lock();
                     sprintf(alert_str + 2, "@?TIME\r\n");
                     PostBleAlert(alert_str);
                     terminal_buffer_release();
                 }
+#endif
             }
         }
     }
@@ -236,10 +235,7 @@ void SetTimeFromString(uint8_t *date_str, uint8_t *time_str)
     calendar->seconds = DD(time_str + 4);
 }
 
-void GetSystemTime(Calendar *c) 
-{ 
-  memcpy((void *)c, (uint8_t*)&absolute_time, sizeof(Calendar)); 
-}
+void GetSystemTime(Calendar *c) { memcpy((void *)c, (uint8_t *)&absolute_time, sizeof(Calendar)); }
 
 void InitClock(void)
 {

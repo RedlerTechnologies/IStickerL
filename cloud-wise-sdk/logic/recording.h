@@ -62,3 +62,4 @@ void record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t val
 void record_add_sample(AccConvertedSample *acc_sample);
 void record_print(unsigned char record_num);
 int16_t record_search(uint32_t record_id);
+uint32_t GetRandomNumber(void);
