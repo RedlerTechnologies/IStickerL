@@ -158,6 +158,13 @@ extern uint32_t SystemCoreClock;
 #endif
 #endif /* !assembler */
 
+/* Fix for Errata #87 nrf52832 */                                       \
+#define configPRE_SLEEP_PROCESSING(xMIdleTime) if ( xMIdleTime > 0 ) {  \
+        __set_FPSCR(__get_FPSCR() & ~(0x0000009F));                     \
+        (void) __get_FPSCR();                                           \
+         NVIC_ClearPendingIRQ(FPU_IRQn);                                \
+}
+
 /** Implementation note:  Use this with caution and set this to 1 ONLY for debugging
  * ----------------------------------------------------------
  * Set the value of configUSE_DISABLE_TICK_AUTO_CORRECTION_DEBUG to below for enabling or disabling RTOS tick auto correction:

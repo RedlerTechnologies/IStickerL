@@ -125,7 +125,15 @@ static void blinky_thread(void *arg)
         peripherals_toggle_leds();
         ble_services_update_data((uint8_t *)&counter, sizeof(counter));
 
-        vTaskDelay(500);
+        if (counter == 11) {
+          serial_comm_send_text("sleep\r\n");
+
+          //vTaskSuspend(NULL);
+          vPortSuppressTicksAndSleep(10000);
+          serial_comm_send_text("wakeup\r\n");
+        } else {
+          vTaskDelay(500);
+        }
     }
 }
 
@@ -134,7 +142,7 @@ static void monitor_thread(void *arg)
     UNUSED_PARAMETER(arg);
 
     while (1) {
-        state_machine_feed_watchdog();
+        //state_machine_feed_watchdog();
 
         NRFX_LOG_INFO("%s Temperature: %dC", __func__, peripherals_read_temperature());
 
@@ -143,9 +151,10 @@ static void monitor_thread(void *arg)
 
         ble_services_update_battery_level(bat_level);
 
-        serial_comm_send_text();
+        serial_comm_send_text("monitor\r\n");
 
-        vTaskDelay(10000);
+        //vTaskDelay(10000);
+        vTaskSuspend(NULL);
     }
 }
 
@@ -183,7 +192,7 @@ int main(void)
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    ble_services_advertising_start();
+    //ble_services_advertising_start();
 
     NRFX_LOG_INFO("%s Free Heap: %u", __func__, xPortGetFreeHeapSize());
     // Start FreeRTOS scheduler.

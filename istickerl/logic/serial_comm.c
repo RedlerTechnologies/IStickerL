@@ -38,9 +38,8 @@ static void uart_thread(void *arg)
     }
 }
 
-void serial_comm_send_text(void)
+void serial_comm_send_text(char tx_data[])
 {
-    static char tx_data[] = "Hello\r\n";
     ret_code_t  err_code;
 
     err_code = nrfx_uart_tx(hal_uart, tx_data, strlen(tx_data));

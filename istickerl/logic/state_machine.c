@@ -22,8 +22,8 @@ static const nrfx_rtc_t rtc = NRFX_RTC_INSTANCE(2);
 void state_machine_init(void)
 {
     //
-    init_wdt();
-    init_rtc();
+    //init_wdt();
+    //init_rtc();
 }
 
 static void init_wdt(void)
