@@ -3,6 +3,7 @@
 #include "hal/hal_data_types.h"
 
 #define ACC_TABLE_DRIVER_SIZE 17
+#define ACC_TABLE_SLEEP_SIZE 1
 
 bool lis3dh_init(void);
 void lis3dh_write_reg(uint8_t reg, uint8_t value);

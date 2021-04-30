@@ -16,7 +16,11 @@
 #include "hal/hal_drivers.h"
 #include "logic/clock.h"
 #include "logic/serial_comm.h"
+#include "nrf_delay.h"
+#include "nrf_gpio.h"
 #include "nrf_power.h"
+#include "nrf_pwr_mgmt.h"
+#include "nrfx_gpiote.h"
 #include "nrfx_log.h"
 #include "recording.h"
 #include "task.h"
@@ -30,7 +34,8 @@ static TimerHandle_t sample_timer_handle;
 
 AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
-extern uint8_t             Acc_Table_Merged[];
+extern uint8_t             Acc_Table[];
+extern uint8_t             Acc_Sleep_Table[];
 extern DeviceConfiguration device_config;
 extern uint32_t            reset_count_x;
 
@@ -87,6 +92,16 @@ void driver_behaviour_task(void *pvParameter)
     buzzer_train(1);
 
     ble_services_init_0();
+
+    /*
+    // test power off
+    nrf_power_system_off();
+
+    while (1) {
+        nrf_pwr_mgmt_run();
+    }
+    */
+
     LoadConfiguration();
     ble_services_init();
 
@@ -97,7 +112,8 @@ void driver_behaviour_task(void *pvParameter)
     sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, (TimerCallbackFunction_t)sample_timer_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
 
-    configure_acc(Acc_Table_Merged, ACC_TABLE_DRIVER_SIZE);
+    configure_acc(Acc_Table, ACC_TABLE_DRIVER_SIZE);
+    //configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
 
     driver_behaviour_state.time_synced      = false;
     driver_behaviour_state.ble_connected    = false;
@@ -156,6 +172,7 @@ void driver_behaviour_task(void *pvParameter)
                 if (ProcessWakeupState()) {
                     driver_behaviour_state.track_state        = TRACKING_STATE_ROUTE;
                     driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+                    driver_behaviour_state.sleep_delay_time = 120;
 
                     DisplayMessage("\r\nStart route\r\n", 0);
                     CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
@@ -200,17 +217,13 @@ void driver_behaviour_task(void *pvParameter)
             isticker_bsp_board_sleep();
 
             nrf_gpio_pin_sense_t sense = NRF_GPIO_PIN_SENSE_LOW;
-
             nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
 
             nrf_power_system_off();
-            // sd_power_system_off();
 
-            // sleep loop here
-            // ..
-
-            // wakeup from sleep here
-            // ..
+            while (1) {
+                nrf_pwr_mgmt_run();
+            }
         }
     }
 }

@@ -145,6 +145,7 @@ static TaskHandle_t m_blinky_thread;
 static TaskHandle_t m_monitor_thread;
 static TaskHandle_t m_ble_thread;
 
+
 static void blinky_thread(void *arg)
 {
     UNUSED_PARAMETER(arg);
@@ -158,6 +159,7 @@ static void blinky_thread(void *arg)
         vTaskDelay(2500);
     }
 }
+
 
 /**@brief Function for application main entry.
  */
@@ -191,9 +193,9 @@ int main(void)
     NRF_LOG_FLUSH();
 
     peripherals_init();
+    
 
     state_machine_init();
-
     // ble_services_init();
 
     NRF_LOG_FLUSH();
@@ -209,6 +211,7 @@ int main(void)
     }
 
     UNUSED_VARIABLE(xTaskCreate(driver_behaviour_task, "Tracking", configMINIMAL_STACK_SIZE + 200, NULL, 2, &driver_behaviour_task_handle));
+    
 
     init_tasks();
 

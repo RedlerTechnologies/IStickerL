@@ -12,7 +12,7 @@ NRF_LOG_MODULE_REGISTER();
 #define LIS3DH_WHO_AM_I_ADDR 0x0F
 
 
-unsigned char Acc_Table_Merged[ ACC_TABLE_DRIVER_SIZE* 2] =
+unsigned char Acc_Table[ ACC_TABLE_DRIVER_SIZE* 2] =
 {
   0x20, 0x57,
   0x21, 0x00,
@@ -29,11 +29,15 @@ unsigned char Acc_Table_Merged[ ACC_TABLE_DRIVER_SIZE* 2] =
   0x36, 0x40,
   0x37, 0x64,
   0x38, 0x00,
-  //0x3A, 0x00,
-  //0x3B, 0x00,
   0x3E, 0x02,
   0x3F, 0x10,
 };
+
+unsigned char Acc_Sleep_Table[ ACC_TABLE_SLEEP_SIZE* 2] =
+{
+  0x20, 0x00,
+};
+
 
 
 uint8_t lis3dh_read_reg(uint8_t reg);

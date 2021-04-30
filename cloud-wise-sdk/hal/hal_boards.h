@@ -4,7 +4,7 @@
 
 #define APP_MAJOR_VERSION   1
 #define APP_MINOR_VERSION   1
-#define APP_BUILD           1
+#define APP_BUILD           2
 
 #define HAL_UICR_DEVICE_SERIAL_NUMBER 0
 

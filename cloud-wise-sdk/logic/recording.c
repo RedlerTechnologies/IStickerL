@@ -18,7 +18,6 @@
 #include <string.h>
 #include <time.h>
 
-// ???????? static uint8_t          flash_buffer[4 + RECORD_BUFFER_SAMPLE_SIZE * 6 + RECORD_HEADER_SIZE];
 static uint8_t              flash_buffer[300];
 extern xSemaphoreHandle     tx_uart_semaphore;
 extern DriverBehaviourState driver_behaviour_state;
