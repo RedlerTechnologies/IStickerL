@@ -287,6 +287,312 @@
     </folder>
     <folder Name="config" exclude="" filter="" path="config" recurse="No" />
   </project>
+  <project Name="LIS3DH Tester">
+    <configuration
+      Name="Common"
+      arm_linker_heap_size="2048"
+      arm_linker_process_stack_size="0"
+      arm_linker_stack_size="2048"
+      c_user_include_directories="test_lis3dh;test_lis3dh/config"
+      linker_printf_fp_enabled="Float"
+      linker_section_placement_file="config/flash_placement.xml"
+      linker_section_placement_macros="FLASH_PH_START=0x0;FLASH_PH_SIZE=0x80000;RAM_PH_START=0x20000000;RAM_PH_SIZE=0x10000;FLASH_START=0x1C000;FLASH_SIZE=0x2D800;RAM_START=0x20003500;RAM_SIZE=0xCB00"
+      project_directory=""
+      project_type="Executable" />
+    <folder Name="src" exclude="" filter="" path="test_lis3dh" recurse="Yes" />
+    <folder Name="Nordic">
+      <folder Name="BLE">
+        <file file_name="nrf5-sdk/components/ble/common/ble_advdata.c" />
+        <file file_name="nrf5-sdk/components/ble/ble_advertising/ble_advertising.c" />
+        <file file_name="nrf5-sdk/components/ble/common/ble_conn_params.c" />
+        <file file_name="nrf5-sdk/components/ble/common/ble_conn_state.c" />
+        <file file_name="nrf5-sdk/components/ble/common/ble_srv_common.c" />
+        <file file_name="nrf5-sdk/components/ble/nrf_ble_gatt/nrf_ble_gatt.c" />
+        <file file_name="nrf5-sdk/components/ble/ble_services/ble_dis/ble_dis.c" />
+        <file file_name="nrf5-sdk/components/ble/ble_services/ble_bas/ble_bas.c" />
+        <folder
+          Name="Peer Manager"
+          filter="*.c"
+          path="nrf5-sdk/components/ble/peer_manager" />
+        <folder Name="DFU">
+          <file file_name="nrf5-sdk/components/ble/ble_services/ble_dfu/ble_dfu.c" />
+          <file file_name="nrf5-sdk/components/ble/ble_services/ble_dfu/ble_dfu_bonded.c" />
+          <file file_name="nrf5-sdk/components/ble/ble_services/ble_dfu/ble_dfu_unbonded.c" />
+        </folder>
+      </folder>
+      <folder Name="Drivers">
+        <file file_name="nrf5-sdk/modules/nrfx/soc/nrfx_atomic.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/hal/nrf_nvmc.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_clock.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_gpiote.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_ppi.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_twim.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_pwm.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_pdm.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_spi.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_rtc.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_wdt.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_saadc.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_temp.c" />
+        <folder Name="Legacy">
+          <file file_name="nrf5-sdk/integration/nrfx/legacy/nrf_drv_clock.c" />
+          <file file_name="nrf5-sdk/integration/nrfx/legacy/nrf_drv_rng.c" />
+        </folder>
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/prs/nrfx_prs.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_rng.c" />
+      </folder>
+      <folder Name="SoftDevice">
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh.c" />
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh_ble.c" />
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh_freertos.c" />
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh_soc.c" />
+      </folder>
+      <folder Name="Log">
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_backend_rtt.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_backend_serial.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_default_backends.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_frontend.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_str_formatter.c" />
+      </folder>
+      <folder Name="Libraries">
+        <file file_name="nrf5-sdk/components/libraries/button/app_button.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_error.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_error_handler_gcc.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_error_weak.c" />
+        <file file_name="nrf5-sdk/components/libraries/scheduler/app_scheduler.c" />
+        <file file_name="nrf5-sdk/components/libraries/timer/app_timer_freertos.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_util_platform.c" />
+        <file file_name="nrf5-sdk/components/libraries/hardfault/hardfault_implementation.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/nrf_assert.c" />
+        <file file_name="nrf5-sdk/components/libraries/atomic_fifo/nrf_atfifo.c" />
+        <file file_name="nrf5-sdk/components/libraries/atomic_flags/nrf_atflags.c" />
+        <file file_name="nrf5-sdk/components/libraries/atomic/nrf_atomic.c" />
+        <file file_name="nrf5-sdk/components/libraries/balloc/nrf_balloc.c" />
+        <file file_name="nrf5-sdk/external/fprintf/nrf_fprintf.c" />
+        <file file_name="nrf5-sdk/external/fprintf/nrf_fprintf_format.c" />
+        <file file_name="nrf5-sdk/components/libraries/memobj/nrf_memobj.c" />
+        <file file_name="nrf5-sdk/components/libraries/pwr_mgmt/nrf_pwr_mgmt.c" />
+        <file file_name="nrf5-sdk/components/libraries/ringbuf/nrf_ringbuf.c" />
+        <file file_name="nrf5-sdk/components/libraries/experimental_section_vars/nrf_section_iter.c" />
+        <file file_name="nrf5-sdk/components/libraries/strerror/nrf_strerror.c" />
+        <file file_name="nrf5-sdk/components/libraries/mem_manager/mem_manager.c" />
+        <file file_name="nrf5-sdk/components/libraries/low_power_pwm/low_power_pwm.c" />
+        <file file_name="nrf5-sdk/components/libraries/led_softblink/led_softblink.c" />
+        <file file_name="nrf5-sdk/components/libraries/crc32/crc32.c" />
+        <file file_name="nrf5-sdk/components/libraries/fds/fds.c" />
+        <file file_name="nrf5-sdk/components/libraries/fstorage/nrf_fstorage.c" />
+        <file file_name="nrf5-sdk/components/libraries/fstorage/nrf_fstorage_nvmc.c" />
+        <file file_name="nrf5-sdk/components/libraries/fstorage/nrf_fstorage_sd.c" />
+        <file file_name="nrf5-sdk/components/libraries/bootloader/dfu/nrf_dfu_svci.c" />
+        <file file_name="nrf5-sdk/components/libraries/queue/nrf_queue.c" />
+        <folder Name="Crypto">
+          <file file_name="nrf5-sdk/components/libraries/crypto/nrf_crypto_ecc.c" />
+          <file file_name="nrf5-sdk/components/libraries/crypto/nrf_crypto_ecdsa.c" />
+          <file file_name="nrf5-sdk/components/libraries/crypto/nrf_crypto_hash.c" />
+          <file file_name="nrf5-sdk/components/libraries/crypto/nrf_crypto_shared.c" />
+          <file file_name="nrf5-sdk/components/libraries/crypto/nrf_crypto_init.c" />
+          <folder Name="Oberon">
+            <file file_name="nrf5-sdk/components/libraries/crypto/backend/oberon/oberon_backend_chacha_poly_aead.c" />
+            <file file_name="nrf5-sdk/components/libraries/crypto/backend/oberon/oberon_backend_ecc.c" />
+            <file file_name="nrf5-sdk/components/libraries/crypto/backend/oberon/oberon_backend_ecdh.c" />
+            <file file_name="nrf5-sdk/components/libraries/crypto/backend/oberon/oberon_backend_ecdsa.c" />
+            <file file_name="nrf5-sdk/components/libraries/crypto/backend/oberon/oberon_backend_eddsa.c" />
+            <file file_name="nrf5-sdk/components/libraries/crypto/backend/oberon/oberon_backend_hash.c" />
+            <file file_name="nrf5-sdk/components/libraries/crypto/backend/oberon/oberon_backend_hmac.c" />
+            <file file_name="nrf5-sdk/external/nrf_oberon/lib/cortex-m4/hard-float/liboberon_3.0.6.a" />
+          </folder>
+        </folder>
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_uart.c" />
+      </folder>
+      <folder Name="System">
+        <file file_name="nrf5-sdk/modules/nrfx/mdk/system_nrf52.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/mdk/ses_startup_nrf52.s" />
+        <file file_name="nrf5-sdk/modules/nrfx/mdk/ses_startup_nrf_common.s" />
+      </folder>
+      <folder Name="Board Definition">
+        <file file_name="nrf5-sdk/components/boards/boards.c" />
+      </folder>
+    </folder>
+    <folder Name="Segger">
+      <folder Name="Startup Files">
+        <file file_name="$(StudioDir)/source/thumb_crt0.s" />
+      </folder>
+      <folder Name="RTT">
+        <file file_name="nrf5-sdk/external/segger_rtt/SEGGER_RTT.c" />
+        <file file_name="nrf5-sdk/external/segger_rtt/SEGGER_RTT_Syscalls_SES.c" />
+        <file file_name="nrf5-sdk/external/segger_rtt/SEGGER_RTT_printf.c" />
+      </folder>
+    </folder>
+    <folder
+      Name="Cloud-Wise SDK"
+      exclude=""
+      filter="hal*.*;lis3dh.*"
+      path="cloud-wise-sdk"
+      recurse="Yes" />
+    <folder Name="Config" exclude="" filter="" path="config" recurse="No" />
+    <folder Name="FreeRTOS">
+      <folder
+        Name="Kernel"
+        exclude=""
+        filter="*.c"
+        path="FreeRTOS-Kernel"
+        recurse="No" />
+      <folder Name="Portable">
+        <folder
+          Name="CMSIS"
+          exclude=""
+          filter="*.c"
+          path="nrf5-sdk/external/freertos/portable/CMSIS/nrf52"
+          recurse="No" />
+        <folder
+          Name="GCC"
+          exclude=""
+          filter="*.c"
+          path="nrf5-sdk/external/freertos/portable/GCC/nrf52"
+          recurse="No" />
+        <folder Name="Memory Manager">
+          <file file_name="FreeRTOS-Kernel/portable/MemMang/heap_1.c" />
+        </folder>
+      </folder>
+    </folder>
+  </project>
+  <project Name="Power Tester">
+    <configuration
+      Name="Common"
+      arm_linker_heap_size="2048"
+      arm_linker_process_stack_size="0"
+      arm_linker_stack_size="2048"
+      c_user_include_directories="test_power;test_powerconfig"
+      linker_section_placement_file="config/flash_placement.xml"
+      linker_section_placement_macros="FLASH_PH_START=0x0;FLASH_PH_SIZE=0x80000;RAM_PH_START=0x20000000;RAM_PH_SIZE=0x10000;FLASH_START=0x1C000;FLASH_SIZE=0x5B000;RAM_START=0x20003500;RAM_SIZE=0xCB00"
+      project_directory=""
+      project_type="Executable" />
+    <folder Name="src" exclude="" filter="" path="test_power" recurse="Yes" />
+    <folder Name="Nordic">
+      <folder Name="BLE">
+        <file file_name="nrf5-sdk/components/ble/common/ble_advdata.c" />
+        <file file_name="nrf5-sdk/components/ble/ble_advertising/ble_advertising.c" />
+        <file file_name="nrf5-sdk/components/ble/common/ble_conn_params.c" />
+        <file file_name="nrf5-sdk/components/ble/common/ble_conn_state.c" />
+        <file file_name="nrf5-sdk/components/ble/common/ble_srv_common.c" />
+        <file file_name="nrf5-sdk/components/ble/nrf_ble_gatt/nrf_ble_gatt.c" />
+        <file file_name="nrf5-sdk/components/ble/nrf_ble_qwr/nrf_ble_qwr.c" />
+        <file file_name="nrf5-sdk/components/ble/ble_services/ble_dis/ble_dis.c" />
+        <file file_name="nrf5-sdk/components/ble/ble_services/ble_bas/ble_bas.c" />
+        <file file_name="nrf5-sdk/components/ble/ble_services/ble_hrs/ble_hrs.c" />
+      </folder>
+      <folder Name="Drivers">
+        <file file_name="nrf5-sdk/modules/nrfx/soc/nrfx_atomic.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/hal/nrf_nvmc.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_clock.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_gpiote.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/prs/nrfx_prs.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_ppi.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_twim.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_pwm.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_pdm.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_uart.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_spim.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_rtc.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_wdt.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_saadc.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/drivers/src/nrfx_temp.c" />
+        <folder Name="Legacy">
+          <file file_name="nrf5-sdk/integration/nrfx/legacy/nrf_drv_clock.c" />
+        </folder>
+      </folder>
+      <folder Name="SoftDevice">
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh.c" />
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh_ble.c" />
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh_freertos.c" />
+        <file file_name="nrf5-sdk/components/softdevice/common/nrf_sdh_soc.c" />
+      </folder>
+      <folder Name="Log">
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_backend_rtt.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_backend_serial.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_default_backends.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_frontend.c" />
+        <file file_name="nrf5-sdk/components/libraries/log/src/nrf_log_str_formatter.c" />
+      </folder>
+      <folder Name="Libraries">
+        <file file_name="nrf5-sdk/components/libraries/button/app_button.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_error.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_error_handler_gcc.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_error_weak.c" />
+        <file file_name="nrf5-sdk/components/libraries/scheduler/app_scheduler.c" />
+        <file file_name="nrf5-sdk/components/libraries/timer/app_timer_freertos.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/app_util_platform.c" />
+        <file file_name="nrf5-sdk/components/libraries/hardfault/hardfault_implementation.c" />
+        <file file_name="nrf5-sdk/components/libraries/util/nrf_assert.c" />
+        <file file_name="nrf5-sdk/components/libraries/atomic_fifo/nrf_atfifo.c" />
+        <file file_name="nrf5-sdk/components/libraries/atomic_flags/nrf_atflags.c" />
+        <file file_name="nrf5-sdk/components/libraries/atomic/nrf_atomic.c" />
+        <file file_name="nrf5-sdk/components/libraries/balloc/nrf_balloc.c" />
+        <file file_name="nrf5-sdk/external/fprintf/nrf_fprintf.c" />
+        <file file_name="nrf5-sdk/external/fprintf/nrf_fprintf_format.c" />
+        <file file_name="nrf5-sdk/components/libraries/memobj/nrf_memobj.c" />
+        <file file_name="nrf5-sdk/components/libraries/pwr_mgmt/nrf_pwr_mgmt.c" />
+        <file file_name="nrf5-sdk/components/libraries/ringbuf/nrf_ringbuf.c" />
+        <file file_name="nrf5-sdk/components/libraries/experimental_section_vars/nrf_section_iter.c" />
+        <file file_name="nrf5-sdk/components/libraries/strerror/nrf_strerror.c" />
+        <file file_name="nrf5-sdk/components/libraries/mem_manager/mem_manager.c" />
+        <file file_name="nrf5-sdk/components/libraries/low_power_pwm/low_power_pwm.c" />
+        <file file_name="nrf5-sdk/components/libraries/led_softblink/led_softblink.c" />
+        <file file_name="nrf5-sdk/components/libraries/crc32/crc32.c" />
+        <file file_name="nrf5-sdk/components/libraries/fds/fds.c" />
+        <file file_name="nrf5-sdk/components/libraries/fstorage/nrf_fstorage.c" />
+        <file file_name="nrf5-sdk/components/libraries/fstorage/nrf_fstorage_nvmc.c" />
+        <file file_name="nrf5-sdk/components/libraries/fstorage/nrf_fstorage_sd.c" />
+        <file file_name="nrf5-sdk/components/libraries/bootloader/dfu/nrf_dfu_svci.c" />
+        <file file_name="nrf5-sdk/components/libraries/queue/nrf_queue.c" />
+        <file file_name="nrf5-sdk/components/libraries/sensorsim/sensorsim.c" />
+      </folder>
+      <folder Name="System">
+        <file file_name="nrf5-sdk/modules/nrfx/mdk/system_nrf52.c" />
+        <file file_name="nrf5-sdk/modules/nrfx/mdk/ses_startup_nrf52.s" />
+        <file file_name="nrf5-sdk/modules/nrfx/mdk/ses_startup_nrf_common.s" />
+      </folder>
+      <folder Name="Board Definition">
+        <file file_name="nrf5-sdk/components/boards/boards.c" />
+      </folder>
+    </folder>
+    <folder Name="Segger">
+      <folder Name="Startup Files">
+        <file file_name="$(StudioDir)/source/thumb_crt0.s" />
+      </folder>
+      <folder Name="RTT">
+        <file file_name="nrf5-sdk/external/segger_rtt/SEGGER_RTT.c" />
+        <file file_name="nrf5-sdk/external/segger_rtt/SEGGER_RTT_Syscalls_SES.c" />
+        <file file_name="nrf5-sdk/external/segger_rtt/SEGGER_RTT_printf.c" />
+      </folder>
+    </folder>
+    <folder Name="Config" exclude="" filter="" path="config" recurse="No" />
+    <folder Name="FreeRTOS">
+      <folder
+        Name="Kernel"
+        exclude=""
+        filter="*.c"
+        path="FreeRTOS-Kernel"
+        recurse="No" />
+      <folder Name="Portable">
+        <folder
+          Name="CMSIS"
+          exclude=""
+          filter="*.c"
+          path="nrf5-sdk/external/freertos/portable/CMSIS/nrf52"
+          recurse="No" />
+        <folder
+          Name="GCC"
+          exclude=""
+          filter="*.c"
+          path="nrf5-sdk/external/freertos/portable/GCC/nrf52"
+          recurse="No" />
+        <folder Name="Memory Manager">
+          <file file_name="FreeRTOS-Kernel/portable/MemMang/heap_1.c" />
+        </folder>
+      </folder>
+    </folder>
+  </project>
   <configuration
     Name="Release"
     arm_linker_treat_warnings_as_errors="Yes"
@@ -371,10 +677,10 @@
     inherited_configurations="PCA10040;S113;nRF52832;Cloud-Wise SDK;nRF5 BLE;Debug;nRF5 Crypto;FreeRTOS" />
   <configuration
     Name="Release PCA10040 S113"
-    inherited_configurations="PCA10040;S113;nRF52832;Cloud-Wise SDK;nRF5 BLE;Release;nRF5 Crypto;FreeRTOS" />
+    c_preprocessor_definitions="NRF_LOG_ENABLED=0" />
   <configuration
     Name="Debug IStickerL Rev1 S113"
-    inherited_configurations="Debug;S113;nRF52832;Cloud-Wise SDK;nRF5 BLE;nRF5 Crypto;IStickerLRev1;FreeRTOS;NRF_LOG_DEFAULT_LEVEL=4" />
+    inherited_configurations="Debug;S113;nRF52832;Cloud-Wise SDK;nRF5 BLE;nRF5 Crypto;IStickerLRev1;FreeRTOS" />
   <configuration
     Name="Release IStickerL Rev1 S113"
     inherited_configurations="S113;nRF52832;Release;Cloud-Wise SDK;nRF5 BLE;nRF5 Crypto;IStickerLRev1;FreeRTOS" />

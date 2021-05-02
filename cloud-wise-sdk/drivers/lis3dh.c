@@ -1,7 +1,8 @@
 #include "lis3dh.h"
 
 #include "hal/hal_drivers.h"
-#include "logic/serial_comm.h"
+// TODO This logic module should be optional
+//#include "logic/serial_comm.h"
 
 #define NRF_LOG_MODULE_NAME cloud_wise_sdk_drivers_lis3dh
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -67,7 +68,7 @@ typedef enum {
     LISDH_ACT_DUR = 0x3F,
 } eLis3dh;
 
-uint8_t Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
+static uint8_t m_acc_table[34] = {
 
     // low power mode disabled, sample rate 200hz, x,y,z axis enabled
     LISDH_CTRL_REG1,
@@ -134,7 +135,7 @@ uint8_t Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     0x00,
 };
 
-uint8_t Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
+static uint8_t m_acc_sleep_table[6] = {
 
     // TODO Disable INT1 - INT1_CFG
 
@@ -157,39 +158,56 @@ uint8_t Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
    0x08,
 };
 
-static void    write_reg(uint8_t reg, uint8_t value);
-static uint8_t lis3dh_read_reg(uint8_t reg);
+static volatile bool m_xfer_done = false;
+
+static void    write_reg_blocking(uint8_t reg, uint8_t value);
+static uint8_t read_reg_blocking(uint8_t reg);
 
 bool lis3dh_init(void)
 {
     uint8_t value;
 
-    value = lis3dh_read_reg(LIS3DH_WHO_AM_I_ADDR);
+    value = read_reg_blocking(LIS3DH_WHO_AM_I_ADDR);
     NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
     return true;
 }
 
-static uint8_t lis3dh_read_reg(uint8_t reg)
+void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
 {
-    ret_code_t err_code;
-    uint8_t    tx_temp_data = reg;
-    uint8_t    rx_temp_data;
+    switch (p_event->type) {
+    case NRFX_TWIM_EVT_DONE:
+        m_xfer_done = true;
+        break;
 
-    const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data));
-    const nrfx_twim_xfer_desc_t xfer_rx = NRFX_TWIM_XFER_DESC_RX(LIS3DH_ADDR, &rx_temp_data, sizeof(rx_temp_data));
+    default:
+        NRFX_LOG_ERROR("%s %u", __func__, p_event->type);
+        break;
+    }
+}
 
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_tx, NRFX_TWIM_FLAG_TX_NO_STOP);
+static uint8_t read_reg_blocking(uint8_t reg)
+{
+    ret_code_t     err_code;
+    static uint8_t tx_temp_data;
+    static uint8_t rx_temp_data;
+
+    tx_temp_data = reg;
+
+    const nrfx_twim_xfer_desc_t xfer_txrx =
+        NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), &rx_temp_data, sizeof(rx_temp_data));
+
+    m_xfer_done = false;
+
+    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
     if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
+        // TODO Fix
         return false;
     }
 
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_rx, 0);
-    if (err_code != NRFX_SUCCESS) {
-        NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-        return false;
-    }
+    while (m_xfer_done == false)
+        ;
 
     // NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, rx_temp_data);
 
@@ -198,8 +216,8 @@ static uint8_t lis3dh_read_reg(uint8_t reg)
 
 void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
 {
-    ret_code_t err_code;
-    static uint8_t    tx_temp_data;
+    ret_code_t     err_code;
+    static uint8_t tx_temp_data;
 
     tx_temp_data = reg;
 
@@ -218,55 +236,69 @@ void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
         return;
     }
 
-    //const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
+    // const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
 
-    //err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
-    //if (err_code != NRFX_SUCCESS) {
+    // err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
+    // if (err_code != NRFX_SUCCESS) {
     //    NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     //    return;
     //}
 }
 
-static void write_reg(uint8_t reg, uint8_t value)
+static void write_reg_blocking(uint8_t reg, uint8_t value)
 {
     ret_code_t err_code;
     uint8_t    tx_temp_data[2];
-    // uint8_t    rx_temp_data;
 
     tx_temp_data[0] = reg;
     tx_temp_data[1] = value;
 
     const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, tx_temp_data, sizeof(tx_temp_data));
 
+    m_xfer_done = false;
+
     err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_tx, 0);
     if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
         return;
     }
+
+    while (m_xfer_done == false)
+        ;
 }
 
-bool lis3dh_configure(uint8_t *table, uint8_t table_size)
+static bool configure(uint8_t *table, uint8_t table_size)
 {
     unsigned char i, j, reg;
     bool          success = true;
 
     for (i = 0, j = 0; i < table_size; i++, j += 2) {
-        write_reg(table[j], table[j + 1]);
+        write_reg_blocking(table[j], table[j + 1]);
     }
 
     for (i = 0, j = 0; i < table_size; i++, j += 2) {
-        reg = lis3dh_read_reg(table[j]);
+        reg = read_reg_blocking(table[j]);
 
         if (reg != table[j + 1]) {
             success = false;
+            NRFX_LOG_ERROR("%s 0x%02x 0x%02x 0x%02x", __func__, table[j], reg, table[j + 1]);
             break;
         }
     }
 
-    if (success)
-        DisplayMessage("\r\nAcc configured - OK\r\n", 0, true);
-    else
-        DisplayMessage("\r\nError Acc Configuration\r\n", 0, true);
+    if (success) {
+        NRFX_LOG_INFO("%s Acc configured OK", __func__);
+    } else {
+        NRFX_LOG_ERROR("%s Acc Configuration Failed", __func__);
+    }
 
     return success;
+}
+
+bool lis3dh_configure(bool sleep_mode)
+{
+    if (sleep_mode)
+        return configure(m_acc_sleep_table, sizeof(m_acc_sleep_table) >> 1);
+    else
+        return configure(m_acc_table, sizeof(m_acc_table) >> 1);
 }
