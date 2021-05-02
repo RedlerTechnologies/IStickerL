@@ -323,7 +323,6 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
     switch (p_ble_evt->header.evt_id) {
     case BLE_GAP_EVT_DISCONNECTED:
-        driver_behaviour_state.ble_connected = false;
         NRFX_LOG_INFO("Disconnected.");
         NRFX_LOG_INFO("%s Connection 0x%x has been disconnected. Reason: 0x%X", __func__, p_ble_evt->evt.gap_evt.conn_handle,
                       p_ble_evt->evt.gap_evt.params.disconnected.reason);
@@ -335,14 +334,12 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         NRFX_LOG_INFO("Connected.");
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
 
-        driver_behaviour_state.ble_connected           = true;
         driver_behaviour_state.last_ble_connected_time = xTaskGetTickCount();
         break;
 
     case BLE_GATTC_EVT_TIMEOUT:
         // Disconnect on GATT Client timeout event.
         NRFX_LOG_DEBUG("GATT Client Timeout.");
-        driver_behaviour_state.ble_connected = false;
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
         break;
@@ -370,7 +367,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
     }
 }
 
-bool is_connected(void) { return !(m_conn_handle == BLE_CONN_HANDLE_INVALID); }
+bool ble_services_is_connected(void) { return !(m_conn_handle == BLE_CONN_HANDLE_INVALID); }
 
 /**@brief Function for starting advertising.
  */

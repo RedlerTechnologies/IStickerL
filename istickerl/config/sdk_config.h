@@ -4516,7 +4516,7 @@
 // <o> NRFX_WDT_CONFIG_RELOAD_VALUE - Reload value  <15-4294967295>
 
 #ifndef NRFX_WDT_CONFIG_RELOAD_VALUE
-#define NRFX_WDT_CONFIG_RELOAD_VALUE 180000 // 3 minutes -> meaning we need to miss 3 times the main clock in a row.
+#define NRFX_WDT_CONFIG_RELOAD_VALUE 35000 //180000 // 3 minutes -> meaning we need to miss 3 times the main clock in a row.
 #endif
 
 // <o> NRFX_WDT_CONFIG_NO_IRQ  - Remove WDT IRQ handling from WDT driver

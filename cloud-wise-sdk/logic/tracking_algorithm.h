@@ -88,7 +88,7 @@ typedef struct {
 
     // flags
     bool time_synced;
-    bool ble_connected;
+    //bool ble_connected;
     bool new_transfer_protocol;
     bool record_triggered;
 
@@ -97,3 +97,4 @@ typedef struct {
 } DriverBehaviourState;
 
 void driver_behaviour_task(void *pvParameter);
+void SleepCPU(bool with_memory_retention);

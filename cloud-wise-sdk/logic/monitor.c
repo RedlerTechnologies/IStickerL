@@ -26,10 +26,15 @@ extern IStickerErrorBits    error_bits;
 
 APP_TIMER_DEF(m_clock_timer);
 
+#define DD(s) ((int)((s)[0] - '0') * 10 + (int)((s)[1] - '0'));
+
 // ?????????????????
 static Calendar  absolute_time __attribute__((section(".non_init")));
 static uint32_t  clock_counter = 0;
 xSemaphoreHandle clock_semaphore;
+xSemaphoreHandle watchdog_monitor_semaphore;
+
+static MonitorState monitor_state;
 
 uint8_t GetDaysInMonth(uint8_t year, uint8_t month);
 void    InitClock(void);
@@ -108,6 +113,7 @@ void monitor_thread(void *arg)
     uint32_t current_time      = 0;
     uint32_t dt                = 0;
     bool     first             = true;
+    bool     led_flag          = false;
 
     static uint8_t  status_buffer[128];
     static uint8_t  ble_buffer[16];
@@ -131,11 +137,31 @@ void monitor_thread(void *arg)
 
     while (1) {
 
+        // led blinking peridically //
+
+        if ((current_time % 8) == 0) {
+            if (!led_flag) {
+                led_flag = true;
+
+                nrf_gpio_pin_clear(HAL_LED_RED);
+
+                if (ble_services_is_connected())
+                    nrf_gpio_pin_clear(HAL_LED_GREEN);
+
+                vTaskDelay(100);
+
+                nrf_gpio_pin_set(HAL_LED_RED);
+                nrf_gpio_pin_set(HAL_LED_GREEN);
+            }
+        }
+
         vTaskDelay(100);
         current_time = getTick();
 
         if (current_time == prev_current_time)
             continue;
+
+        led_flag = false;
 
         // handle overlow in counter later;
         dt                = (current_time - prev_current_time);
@@ -146,7 +172,9 @@ void monitor_thread(void *arg)
         AddSecondsToDate(&absolute_time, dt);
         // DisplayMessageWithTime("Clock\r\n", 0);
 
-        state_machine_feed_watchdog();
+        // ?????????????
+        // state_machine_feed_watchdog();
+        monitor_task_check();
 
 #if (FLASH_TEST_ENABLE)
 
@@ -185,7 +213,7 @@ void monitor_thread(void *arg)
                     driver_behaviour_state.time_to_sleep_left_in_sec, vdd_float);
             DisplayMessageWithTime(status_buffer, 0);
 
-            if (is_connected()) {
+            if (ble_services_is_connected()) {
 
                 // enable this line when supprting non immediate events
                 // record_scan_for_new_records(false); // ????????????
@@ -369,4 +397,58 @@ uint8_t GetDaysInMonth(uint8_t year, uint8_t month)
     }
 
     return days;
+}
+
+void monitor_task_set(uint16_t task_bit)
+{
+    xSemaphoreTake(watchdog_monitor_semaphore, portMAX_DELAY);
+
+    monitor_state.task_bits |= (1 << task_bit);
+
+    xSemaphoreGive(watchdog_monitor_semaphore);
+}
+
+bool monitor_task_check(void)
+{
+    uint32_t duration;
+    uint8_t  i;
+    bool     status = true;
+
+#ifdef DISABLE_WATCHDOG
+    return true;
+#endif
+
+    xSemaphoreTake(watchdog_monitor_semaphore, portMAX_DELAY);
+
+    duration = timeDiff(xTaskGetTickCount(), monitor_state.last_monitor_time) / 1000;
+
+    if (duration > MONITOR_TEST_TIME) {
+        monitor_state.last_monitor_time = xTaskGetTickCount();
+
+        i = 0;
+        while (i < TASK_MONITOR_NUM) {
+
+            if ((monitor_state.task_bits & 0x01) == 0) {
+                status = false;
+                break;
+            }
+
+            monitor_state.task_bits = monitor_state.task_bits >> 1;
+            i++;
+        }
+
+        if (!status) {
+            // force reset on stucked task
+            DisplayMessage("\r\nTask is stucked\r\n", 0);
+            // reset event here .. // ???????????
+            vTaskDelay(200);
+            NVIC_SystemReset();
+        }
+    }
+
+    state_machine_feed_watchdog();
+
+    xSemaphoreGive(watchdog_monitor_semaphore);
+
+    return status;
 }

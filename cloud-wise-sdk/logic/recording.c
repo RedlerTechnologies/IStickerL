@@ -1,6 +1,7 @@
 #include "recording.h"
 
 #include "FreeRTOS.h"
+#include "ble/ble_services_manager.h"
 #include "ble_file_transfer.h"
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
@@ -116,7 +117,7 @@ uint8_t record_scan_for_new_records(bool forced)
 
     duration = timeDiff(xTaskGetTickCount(), acc_record.last_found_record_time) / 1000;
 
-    if ((duration > 30 && driver_behaviour_state.ble_connected) || forced) {
+    if ((duration > 30 && ble_services_is_connected()) || forced) {
         acc_record.last_found_record_time = xTaskGetTickCount();
 
         for (i = 0; i < MAX_RECORDS; i++) {
@@ -144,7 +145,7 @@ uint8_t record_scan_for_new_records(bool forced)
             }
         }
     }
-    if (index >= 0 && driver_behaviour_state.ble_connected) {
+    if (index >= 0 && ble_services_is_connected()) {
         // SendRecordBleAlert(record_id);
         SendRecordAlert(record_id);
         // ??????????? DelaySleep(180, 0);
@@ -487,7 +488,7 @@ uint32_t GetRandomNumber(void)
 {
     uint32_t r = 0;
 
-    sd_rand_application_vector_get((uint8_t*)&r, 4);
+    sd_rand_application_vector_get((uint8_t *)&r, 4);
     r = r & 0xFFFFFFF;
 
     return r;

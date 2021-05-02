@@ -16,6 +16,7 @@
 #include "hal/hal_drivers.h"
 #include "logic/clock.h"
 #include "logic/serial_comm.h"
+#include "monitor.h"
 #include "nrf_delay.h"
 #include "nrf_gpio.h"
 #include "nrf_power.h"
@@ -93,15 +94,6 @@ void driver_behaviour_task(void *pvParameter)
 
     ble_services_init_0();
 
-    /*
-    // test power off
-    nrf_power_system_off();
-
-    while (1) {
-        nrf_pwr_mgmt_run();
-    }
-    */
-
     LoadConfiguration();
     ble_services_init();
 
@@ -113,10 +105,9 @@ void driver_behaviour_task(void *pvParameter)
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
 
     configure_acc(Acc_Table, ACC_TABLE_DRIVER_SIZE);
-    //configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
+    // configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
 
     driver_behaviour_state.time_synced      = false;
-    driver_behaviour_state.ble_connected    = false;
     driver_behaviour_state.record_triggered = false;
     driver_behaviour_state.track_state      = TRACKING_STATE_WAKEUP;
     InitWakeupAlgorithm();
@@ -136,6 +127,8 @@ void driver_behaviour_task(void *pvParameter)
     record_init();
 
     while (1) {
+
+        monitor_task_set(TASK_MONITOR_BIT_TRACKING);
 
         if (wait_for_sample()) {
             lis3dh_read_buffer(sample_buffer, 7, (0x27 | 0x80));
@@ -172,7 +165,7 @@ void driver_behaviour_task(void *pvParameter)
                 if (ProcessWakeupState()) {
                     driver_behaviour_state.track_state        = TRACKING_STATE_ROUTE;
                     driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-                    driver_behaviour_state.sleep_delay_time = 120;
+                    driver_behaviour_state.sleep_delay_time   = 120;
 
                     DisplayMessage("\r\nStart route\r\n", 0);
                     CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
@@ -219,12 +212,35 @@ void driver_behaviour_task(void *pvParameter)
             nrf_gpio_pin_sense_t sense = NRF_GPIO_PIN_SENSE_LOW;
             nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
 
-            nrf_power_system_off();
-
-            while (1) {
-                nrf_pwr_mgmt_run();
-            }
+            SleepCPU(true);
         }
+    }
+}
+
+void SleepCPU(bool with_memory_retention)
+{
+
+    uint8_t i;
+
+#ifdef BLE_ADVERTISING
+
+    for (i = 0; i < 8; i++) // Retain RAM 0 - RAM 7
+    {
+        sd_power_ram_power_set(i, (POWER_RAM_POWER_S0POWER_On << POWER_RAM_POWER_S0POWER_Pos) |
+                                      (POWER_RAM_POWER_S1POWER_On << POWER_RAM_POWER_S1POWER_Pos) |
+                                      (POWER_RAM_POWER_S0RETENTION_On << POWER_RAM_POWER_S0RETENTION_Pos) |
+                                      (POWER_RAM_POWER_S1RETENTION_On << POWER_RAM_POWER_S1RETENTION_Pos));
+        // if (ret_value != NRF_SUCCESS) {
+        //    ret_value = 1;
+        //}
+    }
+
+#endif
+
+    nrf_power_system_off();
+
+    while (1) {
+        nrf_pwr_mgmt_run();
     }
 }
 
@@ -295,18 +311,6 @@ void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
     acc_sample->Y = -y1 * 12;
     acc_sample->Z = z1 * 12;
 }
-
-/*
-void Process_DriverBehaviourAlgorithm(void)
-{
-    if (driver_behaviour_state.calibrated) {
-        CalibrateAllSamples();
-        ProcessAllSamples();
-    } else {
-        Process_Calibrate();
-    }
-}
-*/
 
 void CalibrateAllSamples(void)
 {
@@ -388,7 +392,6 @@ bool ProcessWakeupState(void)
         terminal_buffer_release();
 
         if (state->movement_count >= 5) {
-            // vTaskDelay(25);
             found = true;
         }
         InitWakeupAlgorithm();
@@ -584,7 +587,8 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         // continue recording
         // ..
 
-        if (state->accident_sample_count >= 100)
+        // ~30 seconds delay between accident
+        if (state->accident_sample_count >= 2000)
             state->accident_state = ACCIDENT_STATE_NONE;
 
         break;

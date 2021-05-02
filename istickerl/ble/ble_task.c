@@ -5,6 +5,7 @@
 #include "ble_istickerl.h"
 #include "logic/ble_file_transfer.h"
 #include "logic/commands.h"
+#include "logic/monitor.h"
 #include "logic/serial_comm.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_ringbuf.h"
@@ -16,7 +17,6 @@
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
 
-
 extern BleReadingFileState ble_reading_file_state;
 
 static QueueHandle_t ble_command_queue;
@@ -26,8 +26,6 @@ void init_ble_task(void) { ble_command_queue = xQueueCreate(1, sizeof(BleMessage
 bool PostBleCommand(uint8_t *command_str, uint8_t size)
 {
     static BleMessage ble_message;
-
-    // NRFX_LOG_INFO("command: size:%d, <%s>", size, command_str);
 
     BleMessage *p;
 
@@ -55,6 +53,8 @@ void ble_thread(void *pvParameters)
     ble_reading_file_state.state = 0xFF;
 
     while (1) {
+
+        monitor_task_set(TASK_MONITOR_BIT_BLE);
 
         if (xQueuePeek(ble_command_queue, &p, 0) == pdTRUE) {
 

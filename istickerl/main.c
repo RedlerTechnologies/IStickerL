@@ -35,6 +35,7 @@ extern xSemaphoreHandle ble_command__notify_semaphore;
 extern xSemaphoreHandle event_semaphore;
 extern xSemaphoreHandle flash_semaphore;
 extern xSemaphoreHandle terminal_buff_semaphore;
+extern xSemaphoreHandle watchdog_monitor_semaphore;
 
 extern EventGroupHandle_t event_acc_sample;
 extern EventGroupHandle_t event_uart_rx;
@@ -138,14 +139,15 @@ static void clock_init(void)
 {
     ret_code_t err_code = nrf_drv_clock_init();
     APP_ERROR_CHECK(err_code);
+
+    nrf_drv_clock_lfclk_request(NULL);
 }
 
-// Demo Threads
-static TaskHandle_t m_blinky_thread;
+// static TaskHandle_t m_blinky_thread;
 static TaskHandle_t m_monitor_thread;
 static TaskHandle_t m_ble_thread;
 
-
+/*
 static void blinky_thread(void *arg)
 {
     UNUSED_PARAMETER(arg);
@@ -154,15 +156,13 @@ static void blinky_thread(void *arg)
 
     while (1) {
         ++counter;
-        peripherals_toggle_leds();
+        //peripherals_toggle_leds();
 
         vTaskDelay(2500);
     }
 }
+*/
 
-
-/**@brief Function for application main entry.
- */
 int main(void)
 {
     // Initialize.
@@ -193,16 +193,17 @@ int main(void)
     NRF_LOG_FLUSH();
 
     peripherals_init();
-    
 
     state_machine_init();
     // ble_services_init();
 
     NRF_LOG_FLUSH();
 
-    if (pdPASS != xTaskCreate(blinky_thread, "Blink", 64, NULL, 1, &m_blinky_thread)) {
-        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-    }
+    /*
+        if (pdPASS != xTaskCreate(blinky_thread, "Blink", 64, NULL, 1, &m_blinky_thread)) {
+            APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+        }
+    */
     if (pdPASS != xTaskCreate(monitor_thread, "Monitor", 256, NULL, 1, &m_monitor_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
@@ -211,7 +212,6 @@ int main(void)
     }
 
     UNUSED_VARIABLE(xTaskCreate(driver_behaviour_task, "Tracking", configMINIMAL_STACK_SIZE + 200, NULL, 2, &driver_behaviour_task_handle));
-    
 
     init_tasks();
 
@@ -255,6 +255,9 @@ void init_tasks(void)
 
     clock_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(clock_semaphore);
+
+    watchdog_monitor_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(watchdog_monitor_semaphore);
 
     event_acc_sample = xEventGroupCreate();
     event_uart_rx    = xEventGroupCreate();
