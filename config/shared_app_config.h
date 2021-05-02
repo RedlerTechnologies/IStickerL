@@ -1,9 +1,9 @@
 #pragma once
 
-// ?????????????? #define BLE_ADVERTISING
+#define BLE_ADVERTISING
 #define FLASH_TEST_ENABLE   0
 //#define SLEEP_DISABLE
-#define DISABLE_WATCHDOG
+//#define DISABLE_WATCHDOG
 
 
 #define NRFX_LOG_LEVEL_OFF 0
