@@ -153,8 +153,8 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.uuid_type         = p_istickerl->uuid_type;
     add_char_params.max_len           = 16;
     add_char_params.is_var_len        = false;
-    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value; // ?????????
-    add_char_params.init_len          = p_istickerl_init->data_init_len;     // ????????????
+    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value;
+    add_char_params.init_len          = p_istickerl_init->data_init_len;
     add_char_params.char_props.read   = 1;
     add_char_params.char_props.notify = 1;
 
@@ -170,8 +170,8 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.uuid_type         = p_istickerl->uuid_type;
     add_char_params.max_len           = 16;
     add_char_params.is_var_len        = false;
-    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value; // ?????????
-    add_char_params.init_len          = p_istickerl_init->data_init_len;     // ????????????
+    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value;
+    add_char_params.init_len          = p_istickerl_init->data_init_len;
     add_char_params.char_props.read   = 1;
     add_char_params.char_props.notify = 1;
 
@@ -187,8 +187,8 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.uuid_type         = p_istickerl->uuid_type;
     add_char_params.max_len           = 64;
     add_char_params.is_var_len        = true;
-    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value; // ?????????
-    add_char_params.init_len          = p_istickerl_init->data_init_len;     // ????????????
+    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value;
+    add_char_params.init_len          = p_istickerl_init->data_init_len;
     add_char_params.char_props.read   = 1;
     add_char_params.char_props.notify = 1;
 
@@ -204,8 +204,8 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     add_char_params.uuid_type         = p_istickerl->uuid_type;
     add_char_params.max_len           = 64;
     add_char_params.is_var_len        = true;
-    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value; // ?????????
-    add_char_params.init_len          = p_istickerl_init->data_init_len;     // ????????????
+    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value;
+    add_char_params.init_len          = p_istickerl_init->data_init_len;
     add_char_params.char_props.read   = 1;
     add_char_params.char_props.notify = 1;
 

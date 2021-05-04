@@ -28,7 +28,6 @@ APP_TIMER_DEF(m_clock_timer);
 
 #define DD(s) ((int)((s)[0] - '0') * 10 + (int)((s)[1] - '0'));
 
-// ?????????????????
 static Calendar  absolute_time __attribute__((section(".non_init")));
 static uint32_t  clock_counter = 0;
 xSemaphoreHandle clock_semaphore;
@@ -36,9 +35,10 @@ xSemaphoreHandle watchdog_monitor_semaphore;
 
 static MonitorState monitor_state;
 
-uint8_t GetDaysInMonth(uint8_t year, uint8_t month);
-void    InitClock(void);
-void    AddSecondsToDate(Calendar *c, uint32_t seconds);
+uint8_t     GetDaysInMonth(uint8_t year, uint8_t month);
+void        InitClock(void);
+void        AddSecondsToDate(Calendar *c, uint32_t seconds);
+static void BlinkStatusLeds(void);
 
 static void clock_tick_handler(void *p_context)
 {
@@ -113,7 +113,6 @@ void monitor_thread(void *arg)
     uint32_t current_time      = 0;
     uint32_t dt                = 0;
     bool     first             = true;
-    bool     led_flag          = false;
 
     static uint8_t  status_buffer[128];
     static uint8_t  ble_buffer[16];
@@ -137,31 +136,13 @@ void monitor_thread(void *arg)
 
     while (1) {
 
-        // led blinking peridically //
-
-        if ((current_time % 8) == 0) {
-            if (!led_flag) {
-                led_flag = true;
-
-                nrf_gpio_pin_clear(HAL_LED_RED);
-
-                if (ble_services_is_connected())
-                    nrf_gpio_pin_clear(HAL_LED_GREEN);
-
-                vTaskDelay(100);
-
-                nrf_gpio_pin_set(HAL_LED_RED);
-                nrf_gpio_pin_set(HAL_LED_GREEN);
-            }
-        }
+        BlinkStatusLeds();
 
         vTaskDelay(100);
         current_time = getTick();
 
         if (current_time == prev_current_time)
             continue;
-
-        led_flag = false;
 
         // handle overlow in counter later;
         dt                = (current_time - prev_current_time);
@@ -172,7 +153,6 @@ void monitor_thread(void *arg)
         AddSecondsToDate(&absolute_time, dt);
         // DisplayMessageWithTime("Clock\r\n", 0);
 
-        // ?????????????
         // state_machine_feed_watchdog();
         monitor_task_check();
 
@@ -234,6 +214,8 @@ void monitor_thread(void *arg)
                 ble_buffer[0]               = 1; // record type
                 error_bits.GPSNotFixed      = 1;
                 error_bits.GPS_Disconnected = 1;
+                error_bits.Tampered = driver_behaviour_state.tampered;
+                error_bits.NotCalibrated = !(driver_behaviour_state.calibrated);
                 // error_bits.NotCalibrated    = 1;
                 memcpy(ble_buffer + 6, (uint8_t *)(&error_bits), 4);
                 ble_services_notify_status(ble_buffer, 16);
@@ -272,6 +254,37 @@ void InitClock(void)
     ret = app_timer_create(&m_clock_timer, APP_TIMER_MODE_REPEATED, clock_tick_handler);
     APP_ERROR_CHECK(ret);
     app_timer_start(m_clock_timer, APP_TIMER_TICKS(1000), NULL);
+}
+
+static void BlinkStatusLeds(void)
+{
+    static uint32_t last_blink_time = 0;
+    uint32_t        duration;
+    uint8_t         pin_index;
+    uint8_t         i;
+    uint8_t         blinks = 1;
+
+    duration = timeDiff(xTaskGetTickCount(), last_blink_time) / 1000;
+
+    if (duration >= 8) {
+        last_blink_time = xTaskGetTickCount();
+
+        if (ble_services_is_connected())
+            pin_index = HAL_LED_GREEN;
+        else
+            pin_index = HAL_LED_RED;
+
+        if (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE)
+            blinks = 2;
+
+        for (i = 0; i < blinks; i++) {
+
+            nrf_gpio_pin_clear(pin_index);
+            vTaskDelay(100);
+            nrf_gpio_pin_set(pin_index);
+            vTaskDelay(100);
+        }
+    }
 }
 
 uint32_t GetTimeStampFromDate(void)

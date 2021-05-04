@@ -117,8 +117,6 @@ void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size)
     IStickerEvent accident_event;
     uint8_t       buffer[4];
 
-    // return; // ??????????
-
     memset(buffer, 0x00, 4);
     memcpy(buffer, (uint8_t *)(&value), value_size);
 

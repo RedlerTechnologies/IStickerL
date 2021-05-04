@@ -3,10 +3,13 @@
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
 #include "ble_istickerl.h"
+#include "event_groups.h"
+#include "hal/hal_boards.h"
 #include "logic/ble_file_transfer.h"
 #include "logic/commands.h"
 #include "logic/monitor.h"
 #include "logic/serial_comm.h"
+#include "logic/tracking_algorithm.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_ringbuf.h"
 #include "nrfx_atomic.h"
@@ -17,9 +20,13 @@
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
 
-extern BleReadingFileState ble_reading_file_state;
+extern DriverBehaviourState driver_behaviour_state;
+extern BleReadingFileState  ble_reading_file_state;
+EventGroupHandle_t          ble_log_event;
 
 static QueueHandle_t ble_command_queue;
+static void          check_ble_events(void);
+static void          CheckBleAdvertising();
 
 void init_ble_task(void) { ble_command_queue = xQueueCreate(1, sizeof(BleMessage *)); }
 
@@ -56,6 +63,8 @@ void ble_thread(void *pvParameters)
 
         monitor_task_set(TASK_MONITOR_BIT_BLE);
 
+        check_ble_events();
+
         if (xQueuePeek(ble_command_queue, &p, 0) == pdTRUE) {
 
             DisplayMessage(p->message, p->size);
@@ -80,6 +89,11 @@ void ble_thread(void *pvParameters)
         if (ble_reading_file_state.state < 0xFF) {
             BFT_send_next_packet();
         }
+
+        CheckBleAdvertising();
+
+        if (!ble_services_is_connected()) {
+        }
     }
 }
 
@@ -99,4 +113,60 @@ void PostBleAlert(uint8_t *command_str)
     // this command need semaphore
     ble_services_notify_command(command_str, len);
 #endif
+}
+
+static void check_ble_events(void)
+{
+    EventBits_t uxBits;
+
+    uxBits = xEventGroupWaitBits(ble_log_event, 0x0000FFFF, pdTRUE, pdFALSE, 1);
+
+    if (uxBits) {
+
+        switch (uxBits) {
+
+        case BLE_EVENTS_ENTER_FAST_ADV:
+            DisplayMessage("\r\nFast Advertising\r\n", 0);
+            break;
+
+        case BLE_EVENTS_ENTER_SLOW_ADV:
+            DisplayMessage("\r\nSlow Advertising\r\n", 0);
+            break;
+
+        case BLE_EVENTS_ENTER_NO_ADV:
+            DisplayMessage("\r\nStop Advertising\r\n", 0);
+            driver_behaviour_state.stop_advertising_time = xTaskGetTickCount();
+            break;
+
+        case BLE_EVENTS_CONNECTED:
+            DisplayMessage("\r\nBLE connected\r\n", 0);
+            break;
+
+        case BLE_EVENTS_DISCONNECTED:
+            DisplayMessage("\r\nBLE disconnected\r\n", 0);
+            break;
+
+        case BLE_EVENTS_SERVER_TIMEOUT:
+        case BLE_EVENTS_CLIENT_TIMEOUT:
+            DisplayMessage("\r\nBLE timeout\r\n", 0);
+            break;
+        }
+    }
+}
+
+static void CheckBleAdvertising()
+{
+    uint32_t duration;
+
+    if (driver_behaviour_state.stop_advertising_time) {
+
+        duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.stop_advertising_time) / 1000;
+
+        if (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE) {
+            if (duration > RESTART_BLE_ADVERTISING_AFTER_IDLE) {
+                driver_behaviour_state.stop_advertising_time = 0;
+                ble_services_advertising_start();
+            }
+        }
+    }
 }

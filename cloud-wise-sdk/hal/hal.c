@@ -110,7 +110,7 @@ static void init_gpio(void)
     nrfx_gpiote_in_config_t in_config;
 
     in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(false);
-    // in_config.pull = NRF_GPIO_PIN_PULLUP; // ????????????
+    // in_config.pull = NRF_GPIO_PIN_PULLUP;
     in_config.pull = NRF_GPIO_PIN_NOPULL;
     err_code       = nrfx_gpiote_in_init(HAL_LIS3DH_INT1, &in_config, gpiote_event_handler);
     if (NRFX_SUCCESS != err_code)
@@ -118,7 +118,7 @@ static void init_gpio(void)
     APP_ERROR_CHECK(err_code);
 
     in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(false);
-    // in_config.pull = NRF_GPIO_PIN_PULLUP; // ????????????
+    // in_config.pull = NRF_GPIO_PIN_PULLUP;
     in_config.pull = NRF_GPIO_PIN_NOPULL;
     err_code       = nrfx_gpiote_in_init(HAL_LIS3DH_INT2, &in_config, gpiote_event_handler);
     if (NRFX_SUCCESS != err_code)

@@ -8,7 +8,7 @@
 #define ACC_MIN_ACCIDENT_VALUE 25
 #define MIN_G_FOR_ACCIDENT_EVENT 140
 
-#define MIN_SAMPLES_FOR_ACCIDENT  3
+#define MIN_SAMPLES_FOR_ACCIDENT 3
 
 #define ACC_NORMALIZATION_VALUE 1024
 
@@ -18,8 +18,8 @@
 
 typedef enum {
     TRACKING_STATE_WAKEUP = 0,
-    TRACKING_STATE_ROUTE = 1,
-    TRACKING_STATE_SLEEP = 2,
+    TRACKING_STATE_ROUTE  = 1,
+    TRACKING_STATE_SLEEP  = 2,
 } TrackingState;
 
 typedef struct {
@@ -33,6 +33,11 @@ typedef struct {
     signed short Y;
     signed short Z;
 } AccSample;
+
+typedef struct {
+    AccSample avg_value;
+    uint8_t   axis;
+} CalibratedValue;
 
 typedef enum {
     ACCIDENT_STATE_NONE = 0,
@@ -56,19 +61,17 @@ typedef struct {
     ///////////////////////////
 
     unsigned char calibrated;
+    unsigned char store_calibration;
 
     signed int sum_x;
     signed int sum_y;
     signed int sum_z;
 
-    signed short avg_x;
-    signed short avg_y;
-    signed short avg_z;
+    CalibratedValue calibrated_value;
 
     float angle1;
 
     unsigned short block_count;
-    unsigned char  direction_axis;
 
     ////////////////////////
     // accident algorithm //
@@ -88,13 +91,16 @@ typedef struct {
 
     // flags
     bool time_synced;
-    //bool ble_connected;
     bool new_transfer_protocol;
     bool record_triggered;
+    bool tampered;
 
     unsigned last_ble_connected_time;
+    unsigned stop_advertising_time;
 
 } DriverBehaviourState;
 
 void driver_behaviour_task(void *pvParameter);
 void SleepCPU(bool with_memory_retention);
+void clear_calibration(void);
+void copy_calibration(void);

@@ -14,7 +14,7 @@ extern DriverBehaviourState driver_behaviour_state;
 
 void LoadConfiguration(void)
 {
-    device_config.max_sleep_time = 120;
+    device_config.max_sleep_time = 600; // ??????????? 120;
     // strcpy ( device_config.DeviceName , "S-KKKK0000001" );
 
     // driver_behaviour_state.sleep_delay_time = device_config.max_sleep_time;

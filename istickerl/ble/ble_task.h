@@ -10,6 +10,8 @@
 
 #include "ble_istickerl.h"
 
+#define RESTART_BLE_ADVERTISING_AFTER_IDLE 5 // (2*60) // ????????????????
+
 
 typedef struct {
     uint8_t message[COMMAND_CHAR_MAX_LEN];

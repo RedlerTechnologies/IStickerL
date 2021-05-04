@@ -31,7 +31,7 @@ extern xSemaphoreHandle tx_uart_semaphore;
 extern xSemaphoreHandle clock_semaphore;
 extern xSemaphoreHandle sleep_semaphore;
 extern xSemaphoreHandle command_semaphore;
-extern xSemaphoreHandle ble_command__notify_semaphore;
+extern xSemaphoreHandle ble_command_notify_semaphore;
 extern xSemaphoreHandle event_semaphore;
 extern xSemaphoreHandle flash_semaphore;
 extern xSemaphoreHandle terminal_buff_semaphore;
@@ -39,9 +39,10 @@ extern xSemaphoreHandle watchdog_monitor_semaphore;
 
 extern EventGroupHandle_t event_acc_sample;
 extern EventGroupHandle_t event_uart_rx;
+extern EventGroupHandle_t ble_log_event;
 
-static uint32_t reset_count __attribute__((section(".non_init")));
-static uint32_t test_value __attribute__((section(".non_init")));
+static uint32_t  reset_count __attribute__((section(".non_init")));
+static uint32_t  test_value __attribute__((section(".non_init")));
 
 uint32_t reset_count_x;
 
@@ -49,7 +50,8 @@ uint32_t reset_count_x;
 static TaskHandle_t m_logger_thread; // Logger thread
 #endif
 
-TaskHandle_t driver_behaviour_task_handle;
+TaskHandle_t                driver_behaviour_task_handle;
+extern DriverBehaviourState driver_behaviour_state;
 
 void init_tasks(void);
 
@@ -143,25 +145,8 @@ static void clock_init(void)
     nrf_drv_clock_lfclk_request(NULL);
 }
 
-// static TaskHandle_t m_blinky_thread;
 static TaskHandle_t m_monitor_thread;
 static TaskHandle_t m_ble_thread;
-
-/*
-static void blinky_thread(void *arg)
-{
-    UNUSED_PARAMETER(arg);
-
-    static uint32_t counter = 0;
-
-    while (1) {
-        ++counter;
-        //peripherals_toggle_leds();
-
-        vTaskDelay(2500);
-    }
-}
-*/
 
 int main(void)
 {
@@ -170,13 +155,25 @@ int main(void)
     clock_init();
 
     if (test_value != 0x5A5A5A5A) {
-        test_value  = 0x5A5A5A5A;
-        reset_count = 0;
+        test_value = 0x5A5A5A5A;
 
+        reset_count = 0;
         SetTimeFromString("010120", "000000");
+        clear_calibration();
+        driver_behaviour_state.calibrated   = false;
     } else {
         reset_count++;
+
+        copy_calibration();
+
+        if (driver_behaviour_state.calibrated_value.avg_value.Z == 0) {
+            driver_behaviour_state.calibrated = false;
+        } else {
+            driver_behaviour_state.calibrated = true;
+        }
     }
+
+    driver_behaviour_state.tampered = !driver_behaviour_state.calibrated;
 
     reset_count_x = reset_count;
 
@@ -195,15 +192,9 @@ int main(void)
     peripherals_init();
 
     state_machine_init();
-    // ble_services_init();
 
     NRF_LOG_FLUSH();
 
-    /*
-        if (pdPASS != xTaskCreate(blinky_thread, "Blink", 64, NULL, 1, &m_blinky_thread)) {
-            APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-        }
-    */
     if (pdPASS != xTaskCreate(monitor_thread, "Monitor", 256, NULL, 1, &m_monitor_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
@@ -244,8 +235,8 @@ void init_tasks(void)
     command_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(command_semaphore);
 
-    ble_command__notify_semaphore = xSemaphoreCreateBinary();
-    xSemaphoreGive(ble_command__notify_semaphore);
+    ble_command_notify_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(ble_command_notify_semaphore);
 
     event_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(event_semaphore);
@@ -261,6 +252,7 @@ void init_tasks(void)
 
     event_acc_sample = xEventGroupCreate();
     event_uart_rx    = xEventGroupCreate();
+    ble_log_event    = xEventGroupCreate();
 
     init_ble_task();
 }

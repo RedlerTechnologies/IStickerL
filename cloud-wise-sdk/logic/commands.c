@@ -184,6 +184,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_CALIBRATE:
         if (is_set_command) {
             driver_behaviour_state.calibrated = false;
+            driver_behaviour_state.store_calibration = true;
             result                            = 0;
         }
         break;
@@ -286,6 +287,13 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_BLE:
         if (is_set_command) {
             switch (param_num) {
+
+            case 9:
+                ble_services_disconnect();
+                //driver_behaviour_state.request_advertising = true;
+                result = param_num;
+                break;
+
             case 14:
                 driver_behaviour_state.new_transfer_protocol = false;
                 BFT_start(0, 0);
@@ -330,7 +338,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_TEST_MODE:
 
         switch (param_num) {
-        
+
         case 8:
             driver_behaviour_state.record_triggered = true;
             break;

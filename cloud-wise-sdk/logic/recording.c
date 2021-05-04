@@ -359,7 +359,7 @@ void record_add_sample(AccConvertedSample *acc_sample)
 
         if ((acc_record.flash_address + RECORD_BUFFER_SAMPLE_SIZE * 6) >= (RECORD_SIZE - RECORD_TERMINATOR_SIZE)) {
 
-            buzzer_train(2);
+            buzzer_train(3);
             terminal_buffer_lock();
             sprintf(alert_str, "\r\nAccident Recording: %d\r\n", acc_record.record_num);
             DisplayMessageWithTime(alert_str, strlen(alert_str));

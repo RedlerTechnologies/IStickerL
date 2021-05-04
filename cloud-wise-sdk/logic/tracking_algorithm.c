@@ -30,8 +30,9 @@
 #include <stdio.h>
 #include <string.h>
 
-EventGroupHandle_t   event_acc_sample;
-static TimerHandle_t sample_timer_handle;
+EventGroupHandle_t     event_acc_sample;
+static TimerHandle_t   sample_timer_handle;
+static CalibratedValue calibrated_value __attribute__((section(".non_init")));
 
 AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
@@ -55,6 +56,10 @@ void           InitWakeupAlgorithm(void);
 signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
 bool           ProcessWakeupState(void);
 bool           CheckNoActivity(void);
+
+void clear_calibration(void) { memset(&calibrated_value, 0x00, sizeof(CalibratedValue)); }
+
+void copy_calibration(void) { memcpy(&driver_behaviour_state.calibrated_value, &calibrated_value, sizeof(CalibratedValue)); }
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -107,9 +112,14 @@ void driver_behaviour_task(void *pvParameter)
     configure_acc(Acc_Table, ACC_TABLE_DRIVER_SIZE);
     // configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
 
-    driver_behaviour_state.time_synced      = false;
-    driver_behaviour_state.record_triggered = false;
-    driver_behaviour_state.track_state      = TRACKING_STATE_WAKEUP;
+    // init glabal state variables //
+
+    driver_behaviour_state.time_synced           = false;
+    driver_behaviour_state.record_triggered      = false;
+    driver_behaviour_state.track_state           = TRACKING_STATE_WAKEUP;
+    driver_behaviour_state.stop_advertising_time = 0;
+    driver_behaviour_state.store_calibration     = false;
+
     InitWakeupAlgorithm();
 
     driver_behaviour_state.sleep_delay_time = 40;
@@ -165,7 +175,9 @@ void driver_behaviour_task(void *pvParameter)
                 if (ProcessWakeupState()) {
                     driver_behaviour_state.track_state        = TRACKING_STATE_ROUTE;
                     driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-                    driver_behaviour_state.sleep_delay_time   = 120;
+                    driver_behaviour_state.sleep_delay_time   = 600; // ??????????? 120;
+
+                    buzzer_train(2);
 
                     DisplayMessage("\r\nStart route\r\n", 0);
                     CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
@@ -200,10 +212,12 @@ void driver_behaviour_task(void *pvParameter)
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0);
 
+            ble_services_disconnect();
+
             // need after creating end of route immediate events
             vTaskDelay(10000);
 
-            DisplayMessage("\r\nSleep\r\n", 0);
+            DisplayMessageWithTime("Sleep\r\n", 0);
             buzzer_long(1200);
             vTaskDelay(2000);
 
@@ -412,9 +426,9 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     float x, y, z;
     float drive_direction, turn_direction, earth_direction;
 
-    acc_sample_in->X -= state->avg_x;
-    acc_sample_in->Y -= state->avg_y;
-    acc_sample_in->Z -= state->avg_z;
+    acc_sample_in->X -= state->calibrated_value.avg_value.X;
+    acc_sample_in->Y -= state->calibrated_value.avg_value.Y;
+    acc_sample_in->Z -= state->calibrated_value.avg_value.Z;
 
     x = acc_sample_in->X;
     y = acc_sample_in->Y;
@@ -424,7 +438,7 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     y /= ACC_NORMALIZATION_VALUE;
     z /= ACC_NORMALIZATION_VALUE;
 
-    switch (state->direction_axis) {
+    switch (state->calibrated_value.axis) {
     case 0:
         // error in calibration
         break;
@@ -477,13 +491,13 @@ void Process_Calibrate(void)
         state->sum_y /= state->block_count;
         state->sum_z /= state->block_count;
 
-        state->avg_x = state->sum_x;
-        state->avg_y = state->sum_y;
-        state->avg_z = state->sum_z;
+        state->calibrated_value.avg_value.X = state->sum_x;
+        state->calibrated_value.avg_value.Y = state->sum_y;
+        state->calibrated_value.avg_value.Z = state->sum_z;
 
-        x = state->avg_x;
-        y = state->avg_y;
-        z = state->avg_z;
+        x = state->calibrated_value.avg_value.X;
+        y = state->calibrated_value.avg_value.Y;
+        z = state->calibrated_value.avg_value.Z;
 
         x /= ACC_NORMALIZATION_VALUE;
         y /= ACC_NORMALIZATION_VALUE;
@@ -496,14 +510,20 @@ void Process_Calibrate(void)
 
         if (angle1 < PI * 45 / 180) {
             // y is the driving axis
-            state->direction_axis = 2;
+            state->calibrated_value.axis = 2;
         } else {
             // z is the driving axis
-            state->direction_axis = 3;
+            state->calibrated_value.axis = 3;
         }
 
-        state->block_count = 0;
-        state->calibrated  = true;
+        if (driver_behaviour_state.store_calibration) {
+            memcpy(&calibrated_value, &state->calibrated_value, sizeof(CalibratedValue));
+            state->tampered = false;
+        }
+
+        driver_behaviour_state.store_calibration = false;
+        state->block_count                       = 0;
+        state->calibrated                        = true;
         buzzer_train(5);
 
         // sending calibrate alert

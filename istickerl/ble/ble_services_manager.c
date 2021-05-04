@@ -13,6 +13,7 @@
 #include "ble_dfu.h"
 #include "ble_dis.h"
 #include "ble_task.h"
+#include "event_groups.h"
 #include "logic/commands.h"
 #include "logic/configuration.h"
 #include "logic/peripherals.h"
@@ -34,7 +35,8 @@
 extern DeviceConfiguration  device_config;
 extern DriverBehaviourState driver_behaviour_state;
 
-xSemaphoreHandle ble_command__notify_semaphore;
+xSemaphoreHandle          ble_command_notify_semaphore;
+extern EventGroupHandle_t ble_log_event;
 
 void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address);
 void SetBleID(uint8_t *dev_id);
@@ -52,11 +54,11 @@ NRF_LOG_MODULE_REGISTER();
 // Number of attempts before giving up the connection parameter negotiation
 #define MAX_CONN_PARAMS_UPDATE_COUNT 3
 
-#define APP_ADV_FAST_INTERVAL 100 // 400 // ????????? // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
+#define APP_ADV_FAST_INTERVAL 100 // ???????? 400 // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
 #define APP_ADV_FAST_TIMEOUT_IN_SECONDS (60 * 100) // The Fast advertising duration in units of 10 milliseconds
 
 #define APP_ADV_SLOW_INTERVAL 1800                 // The advertising interval (in units of 0.625 ms. This value corresponds to 562.5 ms)
-#define APP_ADV_SLOW_TIMEOUT_IN_SECONDS (60 * 100) // The Slow advertising duration in units of 10 milliseconds
+#define APP_ADV_SLOW_TIMEOUT_IN_SECONDS (10 * 100) // The Slow advertising duration in units of 10 milliseconds
 
 #define APP_BLE_CONN_CFG_TAG 1  // A tag identifying the SoftDevice BLE configuration
 #define APP_BLE_OBSERVER_PRIO 3 // Application's BLE observer priority. You shouldn't need to modify this value
@@ -248,16 +250,19 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 
     switch (ble_adv_evt) {
     case BLE_ADV_EVT_FAST:
-        NRFX_LOG_INFO("%s Fast advertising", __func__);
-
+        // NRFX_LOG_INFO("%s Fast advertising", __func__);
+        xEventGroupSetBits(ble_log_event, BLE_EVENTS_ENTER_FAST_ADV);
         break;
 
     case BLE_ADV_EVT_SLOW:
-        NRFX_LOG_INFO("%s Slow advertising", __func__);
+        // NRFX_LOG_INFO("%s Slow advertising", __func__);
+        xEventGroupSetBits(ble_log_event, BLE_EVENTS_ENTER_SLOW_ADV);
+
         break;
 
     case BLE_ADV_EVT_IDLE:
-        NRFX_LOG_INFO("%s Idle advertising", __func__);
+        // NRFX_LOG_INFO("%s Idle advertising", __func__);
+        xEventGroupSetBits(ble_log_event, BLE_EVENTS_ENTER_NO_ADV);
         break;
 
     default:
@@ -323,32 +328,40 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
     switch (p_ble_evt->header.evt_id) {
     case BLE_GAP_EVT_DISCONNECTED:
-        NRFX_LOG_INFO("Disconnected.");
-        NRFX_LOG_INFO("%s Connection 0x%x has been disconnected. Reason: 0x%X", __func__, p_ble_evt->evt.gap_evt.conn_handle,
-                      p_ble_evt->evt.gap_evt.params.disconnected.reason);
+        // NRFX_LOG_INFO("Disconnected.");
+        // NRFX_LOG_INFO("%s Connection 0x%x has been disconnected. Reason: 0x%X", __func__, p_ble_evt->evt.gap_evt.conn_handle,
+        //              p_ble_evt->evt.gap_evt.params.disconnected.reason);
 
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
+        xEventGroupSetBits(ble_log_event, BLE_EVENTS_DISCONNECTED);
+
         break;
 
     case BLE_GAP_EVT_CONNECTED:
-        NRFX_LOG_INFO("Connected.");
+        // NRFX_LOG_INFO("Connected.");
         m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
 
+        driver_behaviour_state.stop_advertising_time   = 0;
         driver_behaviour_state.last_ble_connected_time = xTaskGetTickCount();
+        
+        xEventGroupSetBits(ble_log_event, BLE_EVENTS_CONNECTED);
         break;
 
     case BLE_GATTC_EVT_TIMEOUT:
         // Disconnect on GATT Client timeout event.
-        NRFX_LOG_DEBUG("GATT Client Timeout.");
+        // NRFX_LOG_DEBUG("GATT Client Timeout.");
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
+        xEventGroupSetBits(ble_log_event, BLE_EVENTS_CLIENT_TIMEOUT);
+
         break;
 
     case BLE_GATTS_EVT_TIMEOUT:
         // Disconnect on GATT Server timeout event.
-        NRFX_LOG_DEBUG("GATT Server Timeout.");
+        // NRFX_LOG_DEBUG("GATT Server Timeout.");
         err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
+        xEventGroupSetBits(ble_log_event, BLE_EVENTS_SERVER_TIMEOUT);
         break;
 
     case BLE_GAP_EVT_PHY_UPDATE_REQUEST: {
@@ -365,6 +378,21 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
         // No implementation needed.
         break;
     }
+}
+
+void ble_services_disconnect(void)
+{
+    uint32_t error_code = 99;
+
+    if (ble_services_is_connected()) {
+        error_code = sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+    } else {
+    }
+
+    terminal_buffer_lock();
+    sprintf(alert_str, "\r\nForce Disconnect BLE: %d\r\n", error_code);
+    DisplayMessage(alert_str, 0);
+    terminal_buffer_release();
 }
 
 bool ble_services_is_connected(void) { return !(m_conn_handle == BLE_CONN_HANDLE_INVALID); }
@@ -517,11 +545,6 @@ static void istickerl_evt_handler(ble_istickerl_evt_t *p_evt, void *p_context)
         NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_COMMAND_WRITE (%u bytes)", __func__, p_evt->params.command_len);
 
         PostBleCommand(p_evt->params.p_command, p_evt->params.command_len);
-        /*
-        DisplayMessage(p_evt->params.p_command, p_evt->params.command_len);
-        DisplayMessage("\r\n", 2);
-        command_decoder(p_evt->params.p_command, p_evt->params.command_len, 1);
-        */
 
         break;
 
@@ -620,7 +643,7 @@ bool ble_services_notify_command(uint8_t *const data, size_t length)
 {
     ret_code_t err_code;
 
-    xSemaphoreTake(ble_command__notify_semaphore, portMAX_DELAY);
+    xSemaphoreTake(ble_command_notify_semaphore, portMAX_DELAY);
 
     // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
     //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
@@ -636,7 +659,7 @@ bool ble_services_notify_command(uint8_t *const data, size_t length)
 
     err_code = ble_istickerl_notify_command(&m_istickerl, data, length);
 
-    xSemaphoreGive(ble_command__notify_semaphore);
+    xSemaphoreGive(ble_command_notify_semaphore);
 
     return (err_code == NRF_SUCCESS);
 }
