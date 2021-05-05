@@ -154,7 +154,7 @@ uint8_t record_scan_for_new_records(bool forced)
     if (!forced) {
         terminal_buffer_lock();
         sprintf(alert_str, "\r\nRecords #%d\r\n", pending_counter);
-        DisplayMessage(alert_str, 0);
+        DisplayMessage(alert_str, 0, false);
         terminal_buffer_release();
     }
 
@@ -362,7 +362,7 @@ void record_add_sample(AccConvertedSample *acc_sample)
             buzzer_train(3);
             terminal_buffer_lock();
             sprintf(alert_str, "\r\nAccident Recording: %d\r\n", acc_record.record_num);
-            DisplayMessageWithTime(alert_str, strlen(alert_str));
+            DisplayMessageWithTime(alert_str, strlen(alert_str), false);
             terminal_buffer_release();
 
             // CreateDebugEvent(EVENT_DEBUG_ACC_RECORD_COMPLETE, acc_record.record_id, 3, 0);
@@ -422,7 +422,7 @@ void record_print(unsigned char record_num)
 
     terminal_buffer_lock();
     sprintf(alert_str, "Record %d: %d-%d-%d %d:%d:%d\r\n", value, buffer[7], buffer[8], buffer[9], buffer[4], buffer[5], buffer[6]);
-    DisplayMessageWithNoLock(alert_str, strlen(alert_str));
+    DisplayMessage(alert_str, strlen(alert_str), false);
     terminal_buffer_release();
 
     // print binary //
@@ -437,18 +437,21 @@ void record_print(unsigned char record_num)
         j = 0;
 
         while (j < 256) {
-            value = buffer[j];
+
             terminal_buffer_lock();
+
+            value = buffer[j];
             sprintf(alert_str, "%02X ", value);
-            DisplayMessageWithNoLock(alert_str, 0);
-            terminal_buffer_release();
+            DisplayMessage(alert_str, 0, false);
             nrf_delay_ms(1);
             j++;
 
             if ((j % 16) == 0) {
-                DisplayMessageWithNoLock("\r\n", 0);
+                DisplayMessage("\r\n", 0, false);
                 nrf_delay_ms(1);
             }
+
+            terminal_buffer_release();
         }
 
         i += 256;
@@ -465,8 +468,8 @@ void record_print(unsigned char record_num)
 
         terminal_buffer_lock();
         sprintf(alert_str, "%d %d %d", sample.drive_direction, sample.turn_direction, sample.earth_direction);
-        DisplayMessageWithNoLock(alert_str, 0);
-        DisplayMessageWithNoLock("\r\n", 0);
+        DisplayMessage(alert_str, 0, false);
+        DisplayMessage("\r\n", 0, false);
         nrf_delay_ms(1);
         terminal_buffer_release();
 

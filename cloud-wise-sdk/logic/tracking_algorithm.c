@@ -40,6 +40,7 @@ extern uint8_t             Acc_Table[];
 extern uint8_t             Acc_Sleep_Table[];
 extern DeviceConfiguration device_config;
 extern uint32_t            reset_count_x;
+extern ResetData           reset_data;
 
 static uint8_t sample_buffer[7];
 
@@ -119,16 +120,18 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.track_state           = TRACKING_STATE_WAKEUP;
     driver_behaviour_state.stop_advertising_time = 0;
     driver_behaviour_state.store_calibration     = false;
+    driver_behaviour_state.acc_int_counter       = 0;
 
     InitWakeupAlgorithm();
 
     driver_behaviour_state.sleep_delay_time = 40;
 
     terminal_buffer_lock();
-    sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION, APP_BUILD,
-            reset_count_x);
-    DisplayMessage(alert_str, 0);
+    sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d reason=%d,%x,%x,%x\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION,
+            APP_BUILD, reset_count_x, reset_data.reason, reset_data.v1, reset_data.v2, reset_data.v3);
+    DisplayMessage(alert_str, 0, false);
     terminal_buffer_release();
+    memset(&reset_data, 0x00, sizeof(ResetData));
 
     // test external flash
     uint16_t flash_id = flash_read_manufacture_id();
@@ -179,11 +182,13 @@ void driver_behaviour_task(void *pvParameter)
 
                     buzzer_train(2);
 
-                    DisplayMessage("\r\nStart route\r\n", 0);
+                    DisplayMessage("\r\nStart route\r\n", 0, true);
                     CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
                     continue;
                 } else {
                     need_sleep = CheckNoActivity();
+
+                    need_sleep = false; // ???????????? 
 
                     if (need_sleep) {
                         CreateGeneralEvent(LOG_FALSE_WAKEUP, EVENT_TYPE_LOG, 2);
@@ -210,16 +215,18 @@ void driver_behaviour_task(void *pvParameter)
         }
 
         if (need_sleep) {
-            DisplayMessage("\r\nSleeping...\r\n", 0);
+            DisplayMessage("\r\nSleeping...\r\n", 0, true);
 
             ble_services_disconnect();
 
             // need after creating end of route immediate events
             vTaskDelay(10000);
 
-            DisplayMessageWithTime("Sleep\r\n", 0);
+            DisplayMessageWithTime("Sleep\r\n", 0, true);
             buzzer_long(1200);
             vTaskDelay(2000);
+
+            reset_data.reason = RESET_AFTER_SLEEP;
 
             isticker_bsp_board_sleep();
 
@@ -372,10 +379,13 @@ bool ProcessWakeupState(void)
     bool                  sense;
     bool                  sense1 = false;
     bool                  found  = false;
+    EventBits_t           uxBits;
 
 #ifdef SLEEP_DISABLE
     return true;
 #endif
+
+    // state->movement_count = driver_behaviour_state.acc_int_counter;
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&acc_samples[i];
@@ -402,7 +412,7 @@ bool ProcessWakeupState(void)
     {
         terminal_buffer_lock();
         sprintf(alert_str, "\r\n\r\nmovements# %d\r\n\r\n", state->movement_count);
-        DisplayMessage(alert_str, 0);
+        DisplayMessage(alert_str, 0, false);
         terminal_buffer_release();
 
         if (state->movement_count >= 5) {
@@ -412,7 +422,7 @@ bool ProcessWakeupState(void)
     } else if (sense1) {
         terminal_buffer_lock();
         sprintf(alert_str, "\r\n\r\nm# %d\r\n\r\n", state->movement_count);
-        DisplayMessage(alert_str, 0);
+        DisplayMessage(alert_str, 0, false);
         terminal_buffer_release();
     }
 
@@ -608,9 +618,10 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         // ..
 
         // ~30 seconds delay between accident
-        if (state->accident_sample_count >= 2000)
+        if (state->accident_sample_count >= DELAY_BETWEEN_ACCIDENTS) {
             state->accident_state = ACCIDENT_STATE_NONE;
-
+            DisplayMessage("\r\nListen to accident on\r\n", 0, true);
+        }
         break;
     }
 

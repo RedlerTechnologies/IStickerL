@@ -57,21 +57,27 @@ static void uart_thread(void *arg)
 
     while (1) {
 
+        monitor_task_set(TASK_MONITOR_BIT_UART_RX);
+
         uxBits = xEventGroupWaitBits(event_uart_rx, 0x01, pdTRUE, pdFALSE, 5);
 
         if (uxBits) {
-            DisplayMessage(copy_rx_buffer, 0);
+            terminal_buffer_lock();
+            DisplayMessage(copy_rx_buffer, 0, false);
+            terminal_buffer_release();
             command_decoder(copy_rx_buffer, strlen(copy_rx_buffer), result_buffer, 0);
         }
     }
 
     vTaskSuspend(NULL);
 
-    NRFX_LOG_INFO("%s RX %c", __func__, data[0]);
+    // NRFX_LOG_INFO("%s RX %c", __func__, data[0]);
 }
 
 void serial_comm_process_rx(void)
 {
+    static uint8_t ch_before = 0;
+
     BaseType_t xHigherPriorityTaskWoken, xResult;
 
     uint8_t ch;
@@ -90,8 +96,9 @@ void serial_comm_process_rx(void)
     rx_buffer[rx_ptr] = ch;
     nrfx_uart_tx(hal_uart, &ch, 1);
 
-    if (ch == 0x0D) {
+    if (ch == 0x0d) {
         memcpy(copy_rx_buffer, rx_buffer, UART_RX_BUFFER_SIZE);
+        memset(rx_buffer, 0x00, UART_RX_BUFFER_SIZE);
         rx_ptr = 0;
 
         xHigherPriorityTaskWoken = pdFALSE;
@@ -100,16 +107,23 @@ void serial_comm_process_rx(void)
         if (xResult != pdFAIL) {
             portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
+
+        ch_before = 0;
+
     } else {
         if (rx_ptr + 1 < UART_RX_BUFFER_SIZE)
             rx_ptr++;
+
+        ch_before = ch;
     }
 }
 
-void DisplayMessage(uint8_t *message, uint8_t len)
+void DisplayMessage(uint8_t *message, uint8_t len, bool with_lock)
 {
-    if (!xSemaphoreTake(tx_uart_semaphore, 50))
-        return;
+    if (with_lock) {
+        if (!xSemaphoreTake(tx_uart_semaphore, 50))
+            return;
+    }
 
     while (nrfx_uart_tx_in_progress(hal_uart)) {
     }
@@ -119,27 +133,19 @@ void DisplayMessage(uint8_t *message, uint8_t len)
 
     nrfx_uart_tx(hal_uart, message, len);
 
-    xSemaphoreGive(tx_uart_semaphore);
+    if (with_lock)
+        xSemaphoreGive(tx_uart_semaphore);
 }
 
-void DisplayMessageWithNoLock(uint8_t *message, uint8_t len)
-{
-    while (nrfx_uart_tx_in_progress(hal_uart)) {
-    }
-
-    if (len == 0)
-        len = strlen(message);
-
-    nrfx_uart_tx(hal_uart, message, len);
-}
-
-void DisplayMessageWithTime(uint8_t *message, uint8_t len)
+void DisplayMessageWithTime(uint8_t *message, uint8_t len, bool with_lock)
 {
     static uint8_t time_buffer[20];
     uint8_t        len1;
 
-    if (!xSemaphoreTake(tx_uart_semaphore, 50))
-        return;
+    if (with_lock) {
+        if (!xSemaphoreTake(terminal_buff_semaphore /*tx_uart_semaphore*/, 50))
+            return;
+    }
 
     while (nrfx_uart_tx_in_progress(hal_uart)) {
     }
@@ -159,7 +165,8 @@ void DisplayMessageWithTime(uint8_t *message, uint8_t len)
 
     nrfx_uart_tx(hal_uart, message, len);
 
-    xSemaphoreGive(tx_uart_semaphore);
+    if (with_lock)
+        xSemaphoreGive(tx_uart_semaphore);
 }
 
 void terminal_buffer_lock(void) { xSemaphoreTake(terminal_buff_semaphore, portMAX_DELAY); }

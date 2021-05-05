@@ -62,7 +62,7 @@ static void FileTransferFailed(void)
     ble_reading_file_state.state             = 0xFF;
     ble_reading_file_state.record_num        = -1;
 
-    DisplayMessage("\r\nFile transfer aborted\r\n", 0);
+    DisplayMessage("\r\nFile transfer aborted\r\n", 0, true);
     // CreateLogEvent(LOG_BLE_READ_FILE_ABORTED, 2);
 }
 
@@ -74,7 +74,7 @@ static void FileTransferSucceed(void)
     ble_reading_file_state.state      = 0xFF;
     ble_reading_file_state.record_num = -1;
 
-    DisplayMessage("\r\nFile transfer succeed\r\n", 0);
+    DisplayMessage("\r\nFile transfer succeed\r\n", 0, true);
     // CreateLogEvent(LOG_BLE_READ_FILE_COMPLETED, 2);
 
     /* ??????????
@@ -149,7 +149,7 @@ void BFT_send_next_packet(void)
     } else if (ble_reading_file_state.next_read_address == 0) {
         // send file start message
 
-        DisplayMessage("BLE: File read Started", 0);
+        DisplayMessage("BLE: File read Started", 0, true);
         // CreateLogEvent(LOG_BLE_READ_FILE_STARTED, 2);
 
         //        memcpy(ble_file_read_packet + 4, ble_reading_file_state.file_length, 4); <-- a bug
@@ -278,7 +278,7 @@ void BFT_send_next_packet(void)
         terminal_buffer_lock();
         sprintf(alert_str, "\r\nBLE: read file address: %d/%d\r\n",
                 (ble_reading_file_state.prev_packet_address + BLE_READ_BUFFER_FILE_SIZE), ble_reading_file_state.file_length);
-        DisplayMessage(alert_str, 0);
+        DisplayMessage(alert_str, 0, false);
         terminal_buffer_release();
 
         // ???????????? DelaySleep(10, 1);
@@ -308,7 +308,7 @@ void BFT_send_next_packet(void)
 #ifdef SIMULATE_TRANSFER
         terminal_buffer_lock();
         sprintf(alert_str, "\r\ndata: %d\r\n", packet_index);
-        DisplayMessage(alert_str, 0);
+        DisplayMessageWithNoLock(alert_str, 0);
         ret_ble_error = false;
         terminal_buffer_release();
         vTaskDelay(FILE_DELAY);

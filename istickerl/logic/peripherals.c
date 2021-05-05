@@ -1,13 +1,16 @@
 #include "peripherals.h"
 
+#include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
 #include "drivers/lis3dh.h"
+#include "event_groups.h"
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "nrf_log_ctrl.h"
 #include "serial_comm.h"
+#include "logic/tracking_algorithm.h"
 
 #define NRF_LOG_MODULE_NAME logic_peripherals
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -17,6 +20,8 @@ NRF_LOG_MODULE_REGISTER();
 char device_serial_number[SERIAL_NUMBER_WIDTH];
 
 static void hal_evt_handler(const hal_event_type_t event);
+
+extern DriverBehaviourState driver_behaviour_state;
 
 void peripherals_init(void)
 {
@@ -39,21 +44,27 @@ void peripherals_init(void)
 static void hal_evt_handler(const hal_event_type_t event)
 {
     switch (event) {
+
     case HAL_EVENT_NOTHING:
         NRFX_LOG_INFO("%s HAL_EVENT_NOTHING", __func__);
         break;
 
     case HAL_EVENT_LIS3DH_INT1:
-        NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
+        // NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
         break;
 
     case HAL_EVENT_LIS3DH_INT2:
         NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT2", __func__);
+        driver_behaviour_state.acc_int_counter++;
         break;
 
     case HAL_EVENT_UART0_RX:
         serial_comm_process_rx();
         break;
+
+    case HAL_EVENT_UART0_TX:
+        break;
+
 
     default:
         NRFX_LOG_WARNING("%s Unknown HAL_EVENT %d", __func__, event);

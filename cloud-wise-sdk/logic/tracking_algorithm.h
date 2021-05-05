@@ -14,6 +14,8 @@
 
 #define ACC_MIN_DRIVE_VALUE 25
 
+#define DELAY_BETWEEN_ACCIDENTS   2000  // ~30 seconds
+
 #define PI 3.1415
 
 typedef enum {
@@ -88,6 +90,8 @@ typedef struct {
     // on_driving
     unsigned       last_activity_time;
     unsigned short sleep_delay_time;
+
+    unsigned short acc_int_counter;
 
     // flags
     bool time_synced;

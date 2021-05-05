@@ -33,12 +33,24 @@ static uint32_t  clock_counter = 0;
 xSemaphoreHandle clock_semaphore;
 xSemaphoreHandle watchdog_monitor_semaphore;
 
+ResetData reset_data __attribute__((section(".non_init")));
+
 static MonitorState monitor_state;
 
 uint8_t     GetDaysInMonth(uint8_t year, uint8_t month);
 void        InitClock(void);
 void        AddSecondsToDate(Calendar *c, uint32_t seconds);
 static void BlinkStatusLeds(void);
+
+void ActivateSoftwareReset(uint8_t reason, uint32_t v1, uint32_t v2, uint32_t v3)
+{
+    reset_data.reason = reason;
+    reset_data.v1   = v1;
+    reset_data.v2   = v2;
+    reset_data.v3   = v3;
+
+    NVIC_SystemReset();
+}
 
 static void clock_tick_handler(void *p_context)
 {
@@ -114,7 +126,6 @@ void monitor_thread(void *arg)
     uint32_t dt                = 0;
     bool     first             = true;
 
-    static uint8_t  status_buffer[128];
     static uint8_t  ble_buffer[16];
     static uint32_t clock_count = 0;
 
@@ -126,9 +137,6 @@ void monitor_thread(void *arg)
     uint32_t duration;
 
     UNUSED_PARAMETER(arg);
-
-    // setting default date/time
-    // SetTimeFromString("010120", "000000");
 
     InitClock();
 
@@ -151,7 +159,6 @@ void monitor_thread(void *arg)
         // progress clock here ..
         // ..
         AddSecondsToDate(&absolute_time, dt);
-        // DisplayMessageWithTime("Clock\r\n", 0);
 
         // state_machine_feed_watchdog();
         monitor_task_check();
@@ -165,7 +172,7 @@ void monitor_thread(void *arg)
 
         terminal_buffer_lock();
         sprintf(alert_str, "\r\nFlash Test: 0x%04X - %d\r\n", flash_address, result);
-        DisplayMessage(alert_str, 0);
+        DisplayMessageWithNoLock(alert_str, 0);
         terminal_buffer_release();
 
         flash_address += FLASH_SECTOR_SIZE;
@@ -189,9 +196,11 @@ void monitor_thread(void *arg)
             // duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
             // duration = driver_behaviour_state.sleep_delay_time - duration;
 
-            sprintf(status_buffer, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level,
+            terminal_buffer_lock();
+            sprintf(alert_str, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level,
                     driver_behaviour_state.time_to_sleep_left_in_sec, vdd_float);
-            DisplayMessageWithTime(status_buffer, 0);
+            DisplayMessageWithTime(alert_str, 0, false);
+            terminal_buffer_release();
 
             if (ble_services_is_connected()) {
 
@@ -214,8 +223,8 @@ void monitor_thread(void *arg)
                 ble_buffer[0]               = 1; // record type
                 error_bits.GPSNotFixed      = 1;
                 error_bits.GPS_Disconnected = 1;
-                error_bits.Tampered = driver_behaviour_state.tampered;
-                error_bits.NotCalibrated = !(driver_behaviour_state.calibrated);
+                error_bits.Tampered         = driver_behaviour_state.tampered;
+                error_bits.NotCalibrated    = !(driver_behaviour_state.calibrated);
                 // error_bits.NotCalibrated    = 1;
                 memcpy(ble_buffer + 6, (uint8_t *)(&error_bits), 4);
                 ble_services_notify_status(ble_buffer, 16);
@@ -426,8 +435,10 @@ bool monitor_task_check(void)
     uint32_t duration;
     uint8_t  i;
     bool     status = true;
+    uint8_t  task_id;
 
 #ifdef DISABLE_WATCHDOG
+    state_machine_feed_watchdog();
     return true;
 #endif
 
@@ -442,7 +453,8 @@ bool monitor_task_check(void)
         while (i < TASK_MONITOR_NUM) {
 
             if ((monitor_state.task_bits & 0x01) == 0) {
-                status = false;
+                status  = false;
+                task_id = (i + 1);
                 break;
             }
 
@@ -452,10 +464,11 @@ bool monitor_task_check(void)
 
         if (!status) {
             // force reset on stucked task
-            DisplayMessage("\r\nTask is stucked\r\n", 0);
+            DisplayMessage("\r\nTask is stucked\r\n", 0, true);
             // reset event here .. // ???????????
             vTaskDelay(200);
-            NVIC_SystemReset();
+
+            ActivateSoftwareReset(RESET_WATCHDOG, task_id, 0, 0);
         }
     }
 

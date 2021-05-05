@@ -391,7 +391,7 @@ void ble_services_disconnect(void)
 
     terminal_buffer_lock();
     sprintf(alert_str, "\r\nForce Disconnect BLE: %d\r\n", error_code);
-    DisplayMessage(alert_str, 0);
+    DisplayMessage(alert_str, 0, false);
     terminal_buffer_release();
 }
 

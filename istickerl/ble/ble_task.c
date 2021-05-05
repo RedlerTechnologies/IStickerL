@@ -67,8 +67,10 @@ void ble_thread(void *pvParameters)
 
         if (xQueuePeek(ble_command_queue, &p, 0) == pdTRUE) {
 
-            DisplayMessage(p->message, p->size);
-            DisplayMessage("\r\n", 2);
+            terminal_buffer_lock();
+            DisplayMessage(p->message, p->size, false);
+            DisplayMessage("\r\n", 2, false);
+            terminal_buffer_release();
 
             NRFX_LOG_INFO("command pop-up size=%d <%s>", p->size, p->message);
 
@@ -104,7 +106,7 @@ void PostBleAlert(uint8_t *command_str)
     // send to terminal with CRLF
     // sent to BLE without CRLF !!!
 
-    DisplayMessage(command_str + 2, 0);
+    DisplayMessage(command_str + 2, 0, true);
 
     command_str[0] = 0x80;
     command_str[1] = len - 2;
@@ -126,29 +128,29 @@ static void check_ble_events(void)
         switch (uxBits) {
 
         case BLE_EVENTS_ENTER_FAST_ADV:
-            DisplayMessage("\r\nFast Advertising\r\n", 0);
+            DisplayMessage("\r\nFast Advertising\r\n", 0, true);
             break;
 
         case BLE_EVENTS_ENTER_SLOW_ADV:
-            DisplayMessage("\r\nSlow Advertising\r\n", 0);
+            DisplayMessage("\r\nSlow Advertising\r\n", 0, true);
             break;
 
         case BLE_EVENTS_ENTER_NO_ADV:
-            DisplayMessage("\r\nStop Advertising\r\n", 0);
+            DisplayMessage("\r\nStop Advertising\r\n", 0, true);
             driver_behaviour_state.stop_advertising_time = xTaskGetTickCount();
             break;
 
         case BLE_EVENTS_CONNECTED:
-            DisplayMessage("\r\nBLE connected\r\n", 0);
+            DisplayMessage("\r\nBLE connected\r\n", 0, true);
             break;
 
         case BLE_EVENTS_DISCONNECTED:
-            DisplayMessage("\r\nBLE disconnected\r\n", 0);
+            DisplayMessage("\r\nBLE disconnected\r\n", 0, true);
             break;
 
         case BLE_EVENTS_SERVER_TIMEOUT:
         case BLE_EVENTS_CLIENT_TIMEOUT:
-            DisplayMessage("\r\nBLE timeout\r\n", 0);
+            DisplayMessage("\r\nBLE timeout\r\n", 0, true);
             break;
         }
     }

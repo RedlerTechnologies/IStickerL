@@ -80,7 +80,7 @@ bool flash_erase_sectors_in_range(uint32_t start_address, uint32_t end_address)
 
         if ((count % 10) == 0) {
             sprintf(erase_buffer, "\r\nsector: %d\r\n", count);
-            DisplayMessage(erase_buffer, 0);
+            DisplayMessage(erase_buffer, 0, true);
             // CreateOutput( OUT_RED_LED, 250, 50, 1, OUTPUT_PRIORITY_LOW, 0);
             // CreateOutputX(OUTPUT_X_LED, OUTPUT_SUB_LED_RED, 50, 1, 1);
             // DelaySleep(20, 0);
@@ -90,7 +90,7 @@ bool flash_erase_sectors_in_range(uint32_t start_address, uint32_t end_address)
     }
 
     sprintf(erase_buffer, "\r\nsector: %d\r\n", count);
-    DisplayMessage(erase_buffer, 0);
+    DisplayMessage(erase_buffer, 0, true);
 
     xSemaphoreGive(event_semaphore);
 

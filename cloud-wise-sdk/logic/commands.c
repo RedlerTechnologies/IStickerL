@@ -132,11 +132,13 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
 
     vTaskDelay(10);
 
+    terminal_buffer_lock();
+
     if (param[0] == '?')
         is_set_command = 0;
 
     if (flag) {
-        DisplayMessage("\r\nCOMMAND OK\r\n", 0);
+        DisplayMessage("\r\nCOMMAND OK\r\n", 0, false);
 
         for (i = 0; i < NUM_OF_PARAMETERS; i++) {
             p = &parameter_list[i];
@@ -148,14 +150,16 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
 
         run_command(index, param, result_buffer, is_set_command, source);
     } else {
-        DisplayMessage("\r\nCOMMAND ERROR\r\n", 0);
+        DisplayMessage("\r\nCOMMAND ERROR\r\n", 0, false);
     }
 
-    DisplayMessage("\r\nResponse: \r\n", 0);
+    DisplayMessage("\r\nResponse: \r\n", 0, false);
 
     if (strlen(result_buffer) > 0)
-        DisplayMessage(result_buffer, 0);
-    DisplayMessage("\r\n", 0);
+        DisplayMessage(result_buffer, 0, false);
+    DisplayMessage("\r\n", 0, false);
+
+    terminal_buffer_release();
 
     xSemaphoreGive(command_semaphore);
 
@@ -232,7 +236,9 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_RESET:
         if (is_set_command)
-            NVIC_SystemReset();
+        {
+          ActivateSoftwareReset( RESET_COMMAND, 0, 0, 0);
+        }
         break;
 
     case COMMAND_CLEAR_MEMORY:
