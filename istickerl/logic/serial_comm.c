@@ -76,7 +76,7 @@ static void uart_thread(void *arg)
 
 void serial_comm_process_rx(void)
 {
-    static uint8_t ch_before = 0;
+    static uint8_t echo = 0;
 
     BaseType_t xHigherPriorityTaskWoken, xResult;
 
@@ -90,16 +90,25 @@ void serial_comm_process_rx(void)
 
     ch = data[0];
 
-    if (rx_ptr == 0)
+    if (rx_ptr == 0) {
         memset(rx_buffer, 0x00, UART_RX_BUFFER_SIZE);
 
+        if (ch == 'X') {
+            echo = 1;
+            return;
+        }
+    }
+
     rx_buffer[rx_ptr] = ch;
-    nrfx_uart_tx(hal_uart, &ch, 1);
+
+    if (echo)
+        nrfx_uart_tx(hal_uart, &ch, 1);
 
     if (ch == 0x0d) {
         memcpy(copy_rx_buffer, rx_buffer, UART_RX_BUFFER_SIZE);
         memset(rx_buffer, 0x00, UART_RX_BUFFER_SIZE);
         rx_ptr = 0;
+        echo = 0;
 
         xHigherPriorityTaskWoken = pdFALSE;
         xResult                  = xEventGroupSetBitsFromISR(event_uart_rx, 0x01, &xHigherPriorityTaskWoken);
@@ -108,13 +117,9 @@ void serial_comm_process_rx(void)
             portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         }
 
-        ch_before = 0;
-
     } else {
         if (rx_ptr + 1 < UART_RX_BUFFER_SIZE)
             rx_ptr++;
-
-        ch_before = ch;
     }
 }
 

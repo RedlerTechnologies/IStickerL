@@ -188,7 +188,7 @@ void driver_behaviour_task(void *pvParameter)
                 } else {
                     need_sleep = CheckNoActivity();
 
-                    need_sleep = false; // ???????????? 
+                    //need_sleep = false; 
 
                     if (need_sleep) {
                         CreateGeneralEvent(LOG_FALSE_WAKEUP, EVENT_TYPE_LOG, 2);

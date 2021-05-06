@@ -263,7 +263,7 @@ static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_contex
         break;
 
     case NRFX_UART_EVT_TX_DONE:
-        // ?????????? p_evt_handler(HAL_EVENT_UART0_TX);
+        // p_evt_handler(HAL_EVENT_UART0_TX);
         NRFX_LOG_DEBUG("%s TX %u", __func__, p_event->data.rxtx.bytes);
         break;
 
