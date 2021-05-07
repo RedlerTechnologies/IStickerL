@@ -144,7 +144,7 @@ static void logger_thread(void *arg)
 void vApplicationIdleHook(void)
 {
 #if NRF_LOG_ENABLED
-    // ?????????????? vTaskResume(m_logger_thread);
+    vTaskResume(m_logger_thread);
 #endif
 }
 
@@ -192,9 +192,11 @@ int main(void)
     reset_count_x = reset_count;
 
     // Start execution.
+    #if NRF_LOG_ENABLED
     if (pdPASS != xTaskCreate(logger_thread, "NRF_LOG", 256, NULL, 1, &m_logger_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
+    #endif
 
     // Activate deep sleep mode.
     SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;

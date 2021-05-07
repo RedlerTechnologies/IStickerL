@@ -6,7 +6,7 @@
 
 #define SAMPLE_BUFFER_SIZE 32
 #define ACC_MIN_ACCIDENT_VALUE 25
-#define MIN_G_FOR_ACCIDENT_EVENT 140
+#define MIN_G_FOR_ACCIDENT_EVENT 14 // 25 // ???????????
 
 #define MIN_SAMPLES_FOR_ACCIDENT 3
 
@@ -14,7 +14,12 @@
 
 #define ACC_MIN_DRIVE_VALUE 25
 
-#define DELAY_BETWEEN_ACCIDENTS   2000  // ~30 seconds
+#define DELAY_BETWEEN_ACCIDENTS 2000 // ~30 seconds
+
+#define SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED (10 * 60)
+#define SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED (2 * 60)
+#define SLEEP_TIMEOUT_ON_WAKEUP_BLE_CONNECTED (10 * 60)
+#define SLEEP_TIMEOUT_ON_WAKEUP_BLE_DISCONNECTED (45)
 
 #define PI 3.1415
 
@@ -98,6 +103,7 @@ typedef struct {
     bool new_transfer_protocol;
     bool record_triggered;
     bool tampered;
+    bool manual_delayed;
 
     unsigned last_ble_connected_time;
     unsigned stop_advertising_time;
@@ -108,3 +114,7 @@ void driver_behaviour_task(void *pvParameter);
 void SleepCPU(bool with_memory_retention);
 void clear_calibration(void);
 void copy_calibration(void);
+
+bool IsDeviceMoved(unsigned moved_in_last_seconds);
+void set_sleep_timeout(uint16_t value);
+void set_sleep_timeout_on_ble(void);

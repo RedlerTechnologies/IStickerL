@@ -33,3 +33,5 @@ bool ble_services_update_status(uint8_t *const data, size_t length);
 bool ble_services_update_measurement(uint8_t *const data, size_t length);
 bool ble_services_update_event(uint8_t *const data, size_t length);
 bool ble_services_update_file_transfer(uint8_t *const data, size_t length);
+
+void set_device_name(void);

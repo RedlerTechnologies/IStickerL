@@ -142,10 +142,12 @@ static void check_ble_events(void)
 
         case BLE_EVENTS_CONNECTED:
             DisplayMessage("\r\nBLE connected\r\n", 0, true);
+            set_sleep_timeout_on_ble();
             break;
 
         case BLE_EVENTS_DISCONNECTED:
             DisplayMessage("\r\nBLE disconnected\r\n", 0, true);
+            set_sleep_timeout_on_ble();
             break;
 
         case BLE_EVENTS_SERVER_TIMEOUT:
@@ -164,11 +166,11 @@ static void CheckBleAdvertising()
 
         duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.stop_advertising_time) / 1000;
 
-        if (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE) {
-            if (duration > RESTART_BLE_ADVERTISING_AFTER_IDLE) {
-                driver_behaviour_state.stop_advertising_time = 0;
-                ble_services_advertising_start();
-            }
+        // if (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE) {
+        if (duration > RESTART_BLE_ADVERTISING_AFTER_IDLE) {
+            driver_behaviour_state.stop_advertising_time = 0;
+            ble_services_advertising_start();
         }
+        //}
     }
 }

@@ -148,7 +148,7 @@ void DisplayMessageWithTime(uint8_t *message, uint8_t len, bool with_lock)
     uint8_t        len1;
 
     if (with_lock) {
-        if (!xSemaphoreTake(terminal_buff_semaphore /*tx_uart_semaphore*/, 50))
+        if (!xSemaphoreTake( tx_uart_semaphore, 50))
             return;
     }
 

@@ -28,6 +28,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 EventGroupHandle_t     event_acc_sample;
@@ -121,6 +122,7 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.stop_advertising_time = 0;
     driver_behaviour_state.store_calibration     = false;
     driver_behaviour_state.acc_int_counter       = 0;
+    driver_behaviour_state.manual_delayed        = false;
 
     InitWakeupAlgorithm();
 
@@ -138,6 +140,7 @@ void driver_behaviour_task(void *pvParameter)
     NRFX_LOG_INFO("%s Flash ID 0x%04X", __func__, flash_id);
 
     record_init();
+    set_sleep_timeout_on_ble();
 
     while (1) {
 
@@ -176,9 +179,9 @@ void driver_behaviour_task(void *pvParameter)
             switch (driver_behaviour_state.track_state) {
             case TRACKING_STATE_WAKEUP:
                 if (ProcessWakeupState()) {
-                    driver_behaviour_state.track_state        = TRACKING_STATE_ROUTE;
-                    driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-                    driver_behaviour_state.sleep_delay_time   = 600; // ??????????? 120;
+                    driver_behaviour_state.track_state = TRACKING_STATE_ROUTE;
+
+                    set_sleep_timeout_on_ble();
 
                     buzzer_train(2);
 
@@ -188,7 +191,7 @@ void driver_behaviour_task(void *pvParameter)
                 } else {
                     need_sleep = CheckNoActivity();
 
-                    //need_sleep = false; 
+                    // need_sleep = false;
 
                     if (need_sleep) {
                         CreateGeneralEvent(LOG_FALSE_WAKEUP, EVENT_TYPE_LOG, 2);
@@ -400,31 +403,41 @@ bool ProcessWakeupState(void)
         if (sense) {
             sense1 = true;
 
-            if (state->movement_count == 0)
-                InitWakeupAlgorithm();
+            /*
+              if (state->movement_count == 0)
+                  InitWakeupAlgorithm();
+                  */
             state->movement_count++;
+            driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+            break;
         }
     }
 
-    state->movement_test_count++;
-
-    if (state->movement_test_count >= 15) // about 5 seconds
-    {
-        terminal_buffer_lock();
-        sprintf(alert_str, "\r\n\r\nmovements# %d\r\n\r\n", state->movement_count);
-        DisplayMessage(alert_str, 0, false);
-        terminal_buffer_release();
-
-        if (state->movement_count >= 5) {
-            found = true;
-        }
-        InitWakeupAlgorithm();
-    } else if (sense1) {
-        terminal_buffer_lock();
-        sprintf(alert_str, "\r\n\r\nm# %d\r\n\r\n", state->movement_count);
-        DisplayMessage(alert_str, 0, false);
-        terminal_buffer_release();
+    if (state->movement_count >= 7) {
+        found = true;
     }
+
+    /*
+        state->movement_test_count++;
+
+        if (state->movement_test_count >= 15) // about 5 seconds
+        {
+            terminal_buffer_lock();
+            sprintf(alert_str, "\r\n\r\nmovements# %d\r\n\r\n", state->movement_count);
+            DisplayMessage(alert_str, 0, false);
+            terminal_buffer_release();
+
+            if (state->movement_count >= 3) {
+                found = true;
+            }
+            InitWakeupAlgorithm();
+        } else if (sense1) {
+            terminal_buffer_lock();
+            sprintf(alert_str, "\r\n\r\nm# %d\r\n\r\n", state->movement_count);
+            DisplayMessage(alert_str, 0, false);
+            terminal_buffer_release();
+        }
+        */
 
     return found;
 }
@@ -551,18 +564,18 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
     switch (state->accident_state) {
     case ACCIDENT_STATE_NONE:
 
-        if (sample->turn_direction >= ACC_MIN_ACCIDENT_VALUE)
+        if (abs(sample->turn_direction) >= ACC_MIN_ACCIDENT_VALUE)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
-        if (sample->drive_direction >= ACC_MIN_ACCIDENT_VALUE)
+        if (abs(sample->drive_direction) >= ACC_MIN_ACCIDENT_VALUE)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
         if (driver_behaviour_state.record_triggered)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
         if (state->accident_state == ACCIDENT_STATE_STARTED) {
-            state->accident_sample_count = 1;
-            state->max_g                 = GetGValue(sample);
+            state->accident_sample_count = 0;
+            state->max_g                 = 0;
 
             state->last_activity_time = xTaskGetTickCount();
         }
@@ -582,7 +595,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         }
 
         if (state->accident_sample_count >= MIN_SAMPLES_FOR_ACCIDENT) {
-            if (state->max_g >= MIN_G_FOR_ACCIDENT_EVENT || driver_behaviour_state.record_triggered) {
+            if (state->max_g >= (device_config.AccidentG * 10) || driver_behaviour_state.record_triggered) {
                 /////////////////////////
                 // accident identified //
                 /////////////////////////
@@ -630,7 +643,8 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
 signed short calculate_accident_hit_angle(AccConvertedSample *sample)
 {
-    float value;
+    float        value;
+    signed short v1;
 
     if (sample->drive_direction == 0)
         sample->drive_direction = 1;
@@ -645,7 +659,16 @@ signed short calculate_accident_hit_angle(AccConvertedSample *sample)
         value = 180 + value;
     }
 
-    return (short)value;
+    v1 = (short)value;
+
+    /*
+        // patch (reverse direction)
+        v1 -= 180;
+        if (v1 < 0)
+            v1 += 360;
+     */
+
+    return v1;
 }
 
 unsigned short GetGValue(AccConvertedSample *sample)
@@ -657,4 +680,42 @@ unsigned short GetGValue(AccConvertedSample *sample)
 
     value = sqrt(value);
     return value;
+}
+
+bool IsDeviceMoved(unsigned moved_in_last_seconds)
+{
+    uint32_t duration;
+
+    duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
+
+    if (duration <= moved_in_last_seconds)
+        return true;
+    else
+        return false;
+}
+
+void set_sleep_timeout(uint16_t value)
+{
+    if (value > driver_behaviour_state.sleep_delay_time || !driver_behaviour_state.manual_delayed)
+        driver_behaviour_state.sleep_delay_time = value;
+}
+
+void set_sleep_timeout_on_ble(void)
+{
+    uint16_t timeout_value;
+
+    if (ble_services_is_connected()) {
+        if (driver_behaviour_state.track_state == TRACKING_STATE_WAKEUP)
+            timeout_value = SLEEP_TIMEOUT_ON_WAKEUP_BLE_CONNECTED;
+        else
+            timeout_value = SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED;
+
+    } else {
+        if (driver_behaviour_state.track_state == TRACKING_STATE_WAKEUP)
+            timeout_value = SLEEP_TIMEOUT_ON_WAKEUP_BLE_DISCONNECTED;
+        else
+            timeout_value = SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED;
+    }
+
+    set_sleep_timeout(timeout_value);
 }

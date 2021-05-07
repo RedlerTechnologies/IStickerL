@@ -51,6 +51,7 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"FILE", NULL},
     {"BLE", NULL},
     {"TEST_MODE", NULL},
+    {"ACCIDENT_G", (uint32_t *)&device_config.AccidentG},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -132,13 +133,11 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
 
     vTaskDelay(10);
 
-    terminal_buffer_lock();
-
     if (param[0] == '?')
         is_set_command = 0;
 
     if (flag) {
-        DisplayMessage("\r\nCOMMAND OK\r\n", 0, false);
+        DisplayMessage("\r\nCOMMAND OK\r\n", 0, true);
 
         for (i = 0; i < NUM_OF_PARAMETERS; i++) {
             p = &parameter_list[i];
@@ -150,11 +149,12 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
 
         run_command(index, param, result_buffer, is_set_command, source);
     } else {
-        DisplayMessage("\r\nCOMMAND ERROR\r\n", 0, false);
+        DisplayMessage("\r\nCOMMAND ERROR\r\n", 0, true);
     }
 
-    DisplayMessage("\r\nResponse: \r\n", 0, false);
+    terminal_buffer_lock();
 
+    DisplayMessage("\r\nResponse: \r\n", 0, false);
     if (strlen(result_buffer) > 0)
         DisplayMessage(result_buffer, 0, false);
     DisplayMessage("\r\n", 0, false);
@@ -187,14 +187,15 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_CALIBRATE:
         if (is_set_command) {
-            driver_behaviour_state.calibrated = false;
+            driver_behaviour_state.calibrated        = false;
             driver_behaviour_state.store_calibration = true;
-            result                            = 0;
+            result                                   = 0;
         }
         break;
 
     case COMMAND_SLEEP:
-        delay_sleep(param_num);
+        set_sleep_timeout(param_num);
+        driver_behaviour_state.manual_delayed = true;
         result = param_num;
         break;
 
@@ -235,9 +236,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
         break;
 
     case COMMAND_RESET:
-        if (is_set_command)
-        {
-          ActivateSoftwareReset( RESET_COMMAND, 0, 0, 0);
+        if (is_set_command) {
+            ActivateSoftwareReset(RESET_COMMAND, 0, 0, 0);
         }
         break;
 
@@ -296,7 +296,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             case 9:
                 ble_services_disconnect();
-                //driver_behaviour_state.request_advertising = true;
+                set_sleep_timeout(SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED);
+                // driver_behaviour_state.request_advertising = true;
                 result = param_num;
                 break;
 
@@ -354,6 +355,18 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         break;
 
+    case COMMAND_ACCIDENT_G:
+
+        if (is_set_command) {
+            memcpy((uint32_t *)p->param_address, &param_num, 1);
+
+        } else {
+            memset(&result, 0x00, 4);
+            memcpy(&result, (uint32_t *)p->param_address, 1);
+        }
+
+        break;
+
     default:
         result = -9;
         break;
@@ -366,6 +379,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     }
 }
 
+/* 
 void delay_sleep(int32_t delay_in_seconds)
 {
     uint32_t current_delay;
@@ -386,3 +400,5 @@ void delay_sleep(int32_t delay_in_seconds)
 
     xSemaphoreGive(sleep_semaphore);
 }
+*/
+

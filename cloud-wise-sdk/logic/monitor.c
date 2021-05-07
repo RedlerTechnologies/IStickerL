@@ -45,9 +45,9 @@ static void BlinkStatusLeds(void);
 void ActivateSoftwareReset(uint8_t reason, uint32_t v1, uint32_t v2, uint32_t v3)
 {
     reset_data.reason = reason;
-    reset_data.v1   = v1;
-    reset_data.v2   = v2;
-    reset_data.v3   = v3;
+    reset_data.v1     = v1;
+    reset_data.v2     = v2;
+    reset_data.v3     = v3;
 
     NVIC_SystemReset();
 }
@@ -185,7 +185,7 @@ void monitor_thread(void *arg)
 #endif
 
         if ((current_time % 8) == 0 || first) {
-
+                
             first = false;
 
             temperature = peripherals_read_temperature();

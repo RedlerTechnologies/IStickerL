@@ -343,7 +343,8 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         driver_behaviour_state.stop_advertising_time   = 0;
         driver_behaviour_state.last_ble_connected_time = xTaskGetTickCount();
-        
+        driver_behaviour_state.last_activity_time      = xTaskGetTickCount();
+
         xEventGroupSetBits(ble_log_event, BLE_EVENTS_CONNECTED);
         break;
 
@@ -393,6 +394,8 @@ void ble_services_disconnect(void)
     sprintf(alert_str, "\r\nForce Disconnect BLE: %d\r\n", error_code);
     DisplayMessage(alert_str, 0, false);
     terminal_buffer_release();
+
+    set_sleep_timeout_on_ble();
 }
 
 bool ble_services_is_connected(void) { return !(m_conn_handle == BLE_CONN_HANDLE_INVALID); }
@@ -427,10 +430,20 @@ static void gap_params_init(void)
     ble_gap_conn_params_t   gap_conn_params;
     ble_gap_conn_sec_mode_t sec_mode;
 
+    static uint8_t device_name_converted[18];
+
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
+    memset(device_name_converted, 0x00, 18);
+    strcpy(device_name_converted, device_config.DeviceName);
+
+    if (IsDeviceMoved(10))
+        device_name_converted[12] = '*';
+    else
+        device_name_converted[12] = 'V';
+
     // err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)DEVICE_NAME, strlen(DEVICE_NAME));
-    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)device_config.DeviceName, strlen(device_config.DeviceName));
+    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)device_name_converted, strlen(device_name_converted));
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -443,6 +456,35 @@ static void gap_params_init(void)
     err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
     APP_ERROR_CHECK(err_code);
 }
+
+/*
+void set_device_name(void)
+{
+    ret_code_t              err_code;
+    static uint8_t device_name_converted[18];
+
+    ble_gap_conn_sec_mode_t sec_mode;
+
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
+
+    memset(device_name_converted, 0x00, 18);
+    strcpy(device_name_converted, device_config.DeviceName);
+
+    if (IsDeviceMoved(10))
+        device_name_converted[12] = '*';
+    else
+        device_name_converted[12] = 'V';
+
+    // err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)DEVICE_NAME, strlen(DEVICE_NAME));
+    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)device_name_converted, strlen(device_name_converted));
+    APP_ERROR_CHECK(err_code);
+
+   // static uint8_t xxx = 0;
+   // uint8_t len = m_advertising.adv_data.adv_data.len;
+   // m_advertising.adv_data.adv_data.p_data[len-1] = 'A' + xxx;
+   // xxx++;
+}
+*/
 
 static void conn_evt_len_ext_set(bool status)
 {
