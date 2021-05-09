@@ -196,7 +196,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_SLEEP:
         set_sleep_timeout(param_num);
         driver_behaviour_state.manual_delayed = true;
-        result = param_num;
+        result                                = param_num;
         break;
 
     case COMMAND_SW_VERSION:
@@ -349,6 +349,13 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
         case 8:
             driver_behaviour_state.record_triggered = true;
             break;
+
+        case 9:
+            if (driver_behaviour_state.print_signal_mode == param_num)
+                driver_behaviour_state.print_signal_mode = 0;
+            else
+                driver_behaviour_state.print_signal_mode = param_num;
+            break;
         }
 
         result = param_num;
@@ -379,7 +386,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     }
 }
 
-/* 
+/*
 void delay_sleep(int32_t delay_in_seconds)
 {
     uint32_t current_delay;
@@ -401,4 +408,3 @@ void delay_sleep(int32_t delay_in_seconds)
     xSemaphoreGive(sleep_semaphore);
 }
 */
-

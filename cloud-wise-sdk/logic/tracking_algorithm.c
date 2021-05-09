@@ -58,6 +58,8 @@ void           InitWakeupAlgorithm(void);
 signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
 bool           ProcessWakeupState(void);
 bool           CheckNoActivity(void);
+void           Calculate_Energy(void);
+static void    terminal_print_signal_mode(void);
 
 void clear_calibration(void) { memset(&calibrated_value, 0x00, sizeof(CalibratedValue)); }
 
@@ -123,6 +125,8 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.store_calibration     = false;
     driver_behaviour_state.acc_int_counter       = 0;
     driver_behaviour_state.manual_delayed        = false;
+    driver_behaviour_state.energy                = -1;
+    driver_behaviour_state.print_signal_mode     = 0;
 
     InitWakeupAlgorithm();
 
@@ -170,6 +174,8 @@ void driver_behaviour_task(void *pvParameter)
         // handle last 32 samples
 
         need_sleep = false;
+
+        Calculate_Energy();
 
         if (!driver_behaviour_state.calibrated) {
             Process_Calibrate();
@@ -238,7 +244,31 @@ void driver_behaviour_task(void *pvParameter)
 
             SleepCPU(true);
         }
+
+        terminal_print_signal_mode();
     }
+}
+
+static void terminal_print_signal_mode(void)
+{
+    uint8_t len;
+    terminal_buffer_lock();
+
+    alert_str[0] = 0;
+
+    switch (driver_behaviour_state.print_signal_mode) {
+
+    case PRINT_SIGNAL_MODE_ENERGY:
+        sprintf(alert_str, "\r\nE=%d\r\n", driver_behaviour_state.energy);
+        break;
+    }
+
+    len = strlen(alert_str);
+
+    if (len > 0)
+        DisplayMessage(alert_str, len, false);
+
+    terminal_buffer_release();
 }
 
 void SleepCPU(bool with_memory_retention)
@@ -336,6 +366,47 @@ void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
     acc_sample->Z = z1 * 12;
 }
 
+void Calculate_Energy(void)
+{
+    AccSample *sample;
+    AccSample *dif_sample;
+    uint32_t   delta_energy;
+    int32_t    temp;
+    uint8_t    i = 0;
+
+    static AccSample prev_sample;
+
+    delta_energy = 0;
+
+    if (driver_behaviour_state.energy < 0) {
+        memcpy((unsigned char *)&prev_sample, (unsigned char *)(&acc_samples[0]), sizeof(AccSample));
+    }
+
+    delta_energy = 0;
+
+    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        sample = &acc_samples[i];
+
+        temp = (sample->X - prev_sample.X);
+        temp *= temp;
+        delta_energy += temp;
+
+        temp = (sample->Y - prev_sample.Y);
+        temp *= temp;
+        delta_energy += temp;
+
+        temp = (sample->Z - prev_sample.Z);
+        temp *= temp;
+        delta_energy += temp;
+
+        memcpy((unsigned char *)&prev_sample, (unsigned char *)(sample), sizeof(AccSample));
+    }
+
+    delta_energy = (uint32_t)sqrt(delta_energy);
+
+    driver_behaviour_state.energy = delta_energy;
+}
+
 void CalibrateAllSamples(void)
 {
     AccSample *        sample;
@@ -355,6 +426,9 @@ void ProcessDrivingState(void)
 
     DriverBehaviourState *state = &driver_behaviour_state;
     AccConvertedSample *  sample;
+
+    if (state->energy > MIN_ENERY_FOR_CONTINUE_ROUTE)
+      state->last_activity_time = xTaskGetTickCount();
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&acc_samples[i];
@@ -390,28 +464,35 @@ bool ProcessWakeupState(void)
 
     // state->movement_count = driver_behaviour_state.acc_int_counter;
 
-    for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = (AccConvertedSample *)&acc_samples[i];
-        sense  = false;
-
-        if (sample->turn_direction >= ACC_MIN_DRIVE_VALUE)
-            sense = true;
-
-        if (sample->drive_direction >= ACC_MIN_DRIVE_VALUE)
-            sense = true;
-
-        if (sense) {
-            sense1 = true;
-
-            /*
-              if (state->movement_count == 0)
-                  InitWakeupAlgorithm();
-                  */
-            state->movement_count++;
-            driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-            break;
-        }
+    if (state->energy > MIN_ENERY_FOR_START_ROUTE) {
+        state->movement_count++;
+        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
     }
+
+    /*
+        for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+            sample = (AccConvertedSample *)&acc_samples[i];
+            sense  = false;
+
+            if (sample->turn_direction >= ACC_MIN_DRIVE_VALUE)
+                sense = true;
+
+            if (sample->drive_direction >= ACC_MIN_DRIVE_VALUE)
+                sense = true;
+
+            if (sense) {
+                sense1 = true;
+
+
+                //  if (state->movement_count == 0)
+                //      InitWakeupAlgorithm();
+
+                state->movement_count++;
+                driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+                break;
+            }
+        }
+        */
 
     if (state->movement_count >= 7) {
         found = true;
@@ -577,7 +658,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
             state->accident_sample_count = 0;
             state->max_g                 = 0;
 
-            state->last_activity_time = xTaskGetTickCount();
+            //state->last_activity_time = xTaskGetTickCount();
         }
 
         break;

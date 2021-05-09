@@ -16,6 +16,9 @@
 
 #define DELAY_BETWEEN_ACCIDENTS 2000 // ~30 seconds
 
+#define MIN_ENERY_FOR_START_ROUTE 550
+#define MIN_ENERY_FOR_CONTINUE_ROUTE 650 
+
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED (10 * 60)
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED (2 * 60)
 #define SLEEP_TIMEOUT_ON_WAKEUP_BLE_CONNECTED (10 * 60)
@@ -52,6 +55,8 @@ typedef enum {
     ACCIDENT_STATE_IDENTIFIED,
     ACCIDENT_STATE_REPORTED,
 } AccidentState;
+
+#define PRINT_SIGNAL_MODE_ENERGY 9
 
 typedef struct {
     TrackingState track_state;
@@ -105,8 +110,12 @@ typedef struct {
     bool tampered;
     bool manual_delayed;
 
+    uint8_t print_signal_mode;
+
     unsigned last_ble_connected_time;
     unsigned stop_advertising_time;
+
+    signed energy;
 
 } DriverBehaviourState;
 
