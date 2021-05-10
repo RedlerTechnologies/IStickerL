@@ -2,7 +2,7 @@
 
 #include "hal/hal_data_types.h"
 
-#define NUM_OF_PARAMETERS 15
+#define NUM_OF_PARAMETERS 17
 
 #define PARAM_TYPE_STRING 0
 #define PARAM_TYPE_INTEGER 1
@@ -38,6 +38,8 @@ typedef enum {
     COMMAND_BLE,
     COMMAND_TEST_MODE,
     COMMAND_ACCIDENT_G,
+    COMMAND_SAVE,
+    COMMAND_DEFAULT_MANUFACTURE
 } ECOMMANDS;
 
 typedef struct {

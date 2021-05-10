@@ -108,7 +108,7 @@ void serial_comm_process_rx(void)
         memcpy(copy_rx_buffer, rx_buffer, UART_RX_BUFFER_SIZE);
         memset(rx_buffer, 0x00, UART_RX_BUFFER_SIZE);
         rx_ptr = 0;
-        echo = 0;
+        echo   = 0;
 
         xHigherPriorityTaskWoken = pdFALSE;
         xResult                  = xEventGroupSetBitsFromISR(event_uart_rx, 0x01, &xHigherPriorityTaskWoken);
@@ -125,6 +125,12 @@ void serial_comm_process_rx(void)
 
 void DisplayMessage(uint8_t *message, uint8_t len, bool with_lock)
 {
+    if (len == 0)
+        len = strlen(message);
+
+    if (len == 0)
+        return;
+
     if (with_lock) {
         if (!xSemaphoreTake(tx_uart_semaphore, 50))
             return;
@@ -132,9 +138,6 @@ void DisplayMessage(uint8_t *message, uint8_t len, bool with_lock)
 
     while (nrfx_uart_tx_in_progress(hal_uart)) {
     }
-
-    if (len == 0)
-        len = strlen(message);
 
     nrfx_uart_tx(hal_uart, message, len);
 
@@ -147,8 +150,14 @@ void DisplayMessageWithTime(uint8_t *message, uint8_t len, bool with_lock)
     static uint8_t time_buffer[20];
     uint8_t        len1;
 
+    if (len == 0)
+        len = strlen(message);
+
+    if (len == 0)
+        return;
+
     if (with_lock) {
-        if (!xSemaphoreTake( tx_uart_semaphore, 50))
+        if (!xSemaphoreTake(tx_uart_semaphore, 50))
             return;
     }
 
@@ -164,9 +173,6 @@ void DisplayMessageWithTime(uint8_t *message, uint8_t len, bool with_lock)
 
     while (nrfx_uart_tx_in_progress(hal_uart)) {
     }
-
-    if (len == 0)
-        len = strlen(message);
 
     nrfx_uart_tx(hal_uart, message, len);
 

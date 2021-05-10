@@ -31,9 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-EventGroupHandle_t     event_acc_sample;
-static TimerHandle_t   sample_timer_handle;
-static CalibratedValue calibrated_value __attribute__((section(".non_init")));
+EventGroupHandle_t   event_acc_sample;
+static TimerHandle_t sample_timer_handle;
+// static CalibratedValue calibrated_value __attribute__((section(".non_init")));
 
 AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
@@ -42,6 +42,7 @@ extern uint8_t             Acc_Sleep_Table[];
 extern DeviceConfiguration device_config;
 extern uint32_t            reset_count_x;
 extern ResetData           reset_data;
+extern DeviceConfiguration device_config;
 
 static uint8_t sample_buffer[7];
 
@@ -60,10 +61,6 @@ bool           ProcessWakeupState(void);
 bool           CheckNoActivity(void);
 void           Calculate_Energy(void);
 static void    terminal_print_signal_mode(void);
-
-void clear_calibration(void) { memset(&calibrated_value, 0x00, sizeof(CalibratedValue)); }
-
-void copy_calibration(void) { memcpy(&driver_behaviour_state.calibrated_value, &calibrated_value, sizeof(CalibratedValue)); }
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -101,9 +98,9 @@ void driver_behaviour_task(void *pvParameter)
 
     buzzer_train(1);
 
-    ble_services_init_0();
-
     LoadConfiguration();
+    ble_services_init_0();
+    SaveConfiguration(false);
     ble_services_init();
 
 #ifdef BLE_ADVERTISING
@@ -127,6 +124,15 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.manual_delayed        = false;
     driver_behaviour_state.energy                = -1;
     driver_behaviour_state.print_signal_mode     = 0;
+
+    // calibration value
+    if (device_config.calibrate_value.avg_value.Z == 0) {
+        driver_behaviour_state.calibrated = false;
+    } else {
+        driver_behaviour_state.calibrated = true;
+    }
+
+    driver_behaviour_state.tampered = !driver_behaviour_state.calibrated;
 
     InitWakeupAlgorithm();
 
@@ -428,7 +434,7 @@ void ProcessDrivingState(void)
     AccConvertedSample *  sample;
 
     if (state->energy > MIN_ENERY_FOR_CONTINUE_ROUTE)
-      state->last_activity_time = xTaskGetTickCount();
+        state->last_activity_time = xTaskGetTickCount();
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&acc_samples[i];
@@ -530,9 +536,9 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     float x, y, z;
     float drive_direction, turn_direction, earth_direction;
 
-    acc_sample_in->X -= state->calibrated_value.avg_value.X;
-    acc_sample_in->Y -= state->calibrated_value.avg_value.Y;
-    acc_sample_in->Z -= state->calibrated_value.avg_value.Z;
+    acc_sample_in->X -= device_config.calibrate_value.avg_value.X;
+    acc_sample_in->Y -= device_config.calibrate_value.avg_value.Y;
+    acc_sample_in->Z -= device_config.calibrate_value.avg_value.Z;
 
     x = acc_sample_in->X;
     y = acc_sample_in->Y;
@@ -542,7 +548,7 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     y /= ACC_NORMALIZATION_VALUE;
     z /= ACC_NORMALIZATION_VALUE;
 
-    switch (state->calibrated_value.axis) {
+    switch (device_config.calibrate_value.axis) {
     case 0:
         // error in calibration
         break;
@@ -621,8 +627,9 @@ void Process_Calibrate(void)
         }
 
         if (driver_behaviour_state.store_calibration) {
-            memcpy(&calibrated_value, &state->calibrated_value, sizeof(CalibratedValue));
+            memcpy(&device_config.calibrate_value, &state->calibrated_value, sizeof(CalibratedValue));
             state->tampered = false;
+            SaveConfiguration(false);
         }
 
         driver_behaviour_state.store_calibration = false;
@@ -657,8 +664,6 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         if (state->accident_state == ACCIDENT_STATE_STARTED) {
             state->accident_sample_count = 0;
             state->max_g                 = 0;
-
-            //state->last_activity_time = xTaskGetTickCount();
         }
 
         break;
@@ -681,6 +686,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
                 // accident identified //
                 /////////////////////////
 
+                state->last_activity_time               = xTaskGetTickCount();
                 state->accident_state                   = ACCIDENT_STATE_IDENTIFIED;
                 driver_behaviour_state.record_triggered = false;
 

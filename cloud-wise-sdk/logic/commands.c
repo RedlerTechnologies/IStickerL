@@ -52,6 +52,8 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"BLE", NULL},
     {"TEST_MODE", NULL},
     {"ACCIDENT_G", (uint32_t *)&device_config.AccidentG},
+    {"SAVE", NULL},
+    {"MANUF", NULL},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -372,6 +374,18 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
             memcpy(&result, (uint32_t *)p->param_address, 1);
         }
 
+        break;
+
+    case COMMAND_SAVE:
+
+        SaveConfiguration(false);
+        result = param_num;
+        break;
+
+    case COMMAND_DEFAULT_MANUFACTURE:
+
+        SetManufactureDefault();
+        SaveConfiguration(true);
         break;
 
     default:

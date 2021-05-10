@@ -137,6 +137,7 @@ void ble_services_init_0(void)
     static ble_gap_addr_t mac_address;
 
     uint32_t res;
+    uint16_t crc_before;
 
     ble_stack_init();
 

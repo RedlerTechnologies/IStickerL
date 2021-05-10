@@ -72,14 +72,14 @@ typedef struct {
     // calibration algorithm //
     ///////////////////////////
 
+    CalibratedValue calibrated_value;
+
     unsigned char calibrated;
     unsigned char store_calibration;
 
     signed int sum_x;
     signed int sum_y;
     signed int sum_z;
-
-    CalibratedValue calibrated_value;
 
     float angle1;
 

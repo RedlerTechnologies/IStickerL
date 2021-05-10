@@ -1,6 +1,7 @@
 #include "FreeRTOS.h"
 #include "app_error.h"
 #include "app_timer.h"
+#include "app_util_platform.h"
 #include "ble.h"
 #include "ble/ble_services_manager.h"
 #include "ble/ble_task.h"
@@ -8,6 +9,7 @@
 #include "event_groups.h"
 #include "hal/hal_boards.h"
 #include "logic/commands.h"
+#include "logic/configuration.h"
 #include "logic/flash_data.h"
 #include "logic/monitor.h"
 #include "logic/peripherals.h"
@@ -17,19 +19,14 @@
 #include "nrf.h"
 #include "nrf_delay.h"
 #include "nrf_drv_clock.h"
+#include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
+#include "nrf_strerror.h"
 #include "nrfx_log.h"
 #include "semphr.h"
 #include "task.h"
 #include "version.h"
-
-         
-#include "nrf_log.h"
-#include "nrf_log_ctrl.h"
-#include "app_util_platform.h"
-#include "nrf_strerror.h"
-
 
 #if defined(SOFTDEVICE_PRESENT) && SOFTDEVICE_PRESENT
 #include "nrf_sdm.h"
@@ -52,7 +49,8 @@ extern EventGroupHandle_t event_acc_sample;
 extern EventGroupHandle_t event_uart_rx;
 extern EventGroupHandle_t ble_log_event;
 
-extern ResetData reset_data;
+extern ResetData           reset_data;
+extern DeviceConfiguration device_config;
 
 static uint32_t reset_count __attribute__((section(".non_init")));
 static uint32_t test_value __attribute__((section(".non_init")));
@@ -172,31 +170,23 @@ int main(void)
 
         reset_count = 0;
         SetTimeFromString("010120", "000000");
-        clear_calibration();
-        driver_behaviour_state.calibrated = false;
+        // clear_calibration();
+        // driver_behaviour_state.calibrated = false;
         reset_data.reason = RESET_POWER_OFF;
     } else {
         reset_count++;
 
-        copy_calibration();
-
-        if (driver_behaviour_state.calibrated_value.avg_value.Z == 0) {
-            driver_behaviour_state.calibrated = false;
-        } else {
-            driver_behaviour_state.calibrated = true;
-        }
+        // copy_calibration();
     }
-
-    driver_behaviour_state.tampered = !driver_behaviour_state.calibrated;
 
     reset_count_x = reset_count;
 
-    // Start execution.
-    #if NRF_LOG_ENABLED
+// Start execution.
+#if NRF_LOG_ENABLED
     if (pdPASS != xTaskCreate(logger_thread, "NRF_LOG", 256, NULL, 1, &m_logger_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
-    #endif
+#endif
 
     // Activate deep sleep mode.
     SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
@@ -266,14 +256,12 @@ void init_tasks(void)
     watchdog_monitor_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(watchdog_monitor_semaphore);
 
-    event_acc_sample    = xEventGroupCreate();
-    event_uart_rx       = xEventGroupCreate();
-    ble_log_event       = xEventGroupCreate();
+    event_acc_sample = xEventGroupCreate();
+    event_uart_rx    = xEventGroupCreate();
+    ble_log_event    = xEventGroupCreate();
 
     init_ble_task();
 }
-
-
 
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
@@ -283,45 +271,36 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 #ifndef DEBUG
     NRF_LOG_ERROR("Fatal error");
 #else
-    switch (id)
-    {
+    switch (id) {
 #if defined(SOFTDEVICE_PRESENT) && SOFTDEVICE_PRESENT
-        case NRF_FAULT_ID_SD_ASSERT:
-            NRF_LOG_ERROR("SOFTDEVICE: ASSERTION FAILED");
-            break;
-        case NRF_FAULT_ID_APP_MEMACC:
-            NRF_LOG_ERROR("SOFTDEVICE: INVALID MEMORY ACCESS");
-            break;
+    case NRF_FAULT_ID_SD_ASSERT:
+        NRF_LOG_ERROR("SOFTDEVICE: ASSERTION FAILED");
+        break;
+    case NRF_FAULT_ID_APP_MEMACC:
+        NRF_LOG_ERROR("SOFTDEVICE: INVALID MEMORY ACCESS");
+        break;
 #endif
-        case NRF_FAULT_ID_SDK_ASSERT:
-        {
-            assert_info_t * p_info = (assert_info_t *)info;
-            NRF_LOG_ERROR("ASSERTION FAILED at %s:%u",
-                          p_info->p_file_name,
-                          p_info->line_num);
-            break;
-        }
-        case NRF_FAULT_ID_SDK_ERROR:
-        {
-            error_info_t * p_info = (error_info_t *)info;
-            NRF_LOG_ERROR("ERROR %u [%s] at %s:%u\r\nPC at: 0x%08x",
-                          p_info->err_code,
-                          nrf_strerror_get(p_info->err_code),
-                          p_info->p_file_name,
-                          p_info->line_num,
-                          pc);
-             NRF_LOG_ERROR("End of error report");
-            break;
-        }
-        default:
-            NRF_LOG_ERROR("UNKNOWN FAULT at 0x%08X", pc);
-            break;
+    case NRF_FAULT_ID_SDK_ASSERT: {
+        assert_info_t *p_info = (assert_info_t *)info;
+        NRF_LOG_ERROR("ASSERTION FAILED at %s:%u", p_info->p_file_name, p_info->line_num);
+        break;
+    }
+    case NRF_FAULT_ID_SDK_ERROR: {
+        error_info_t *p_info = (error_info_t *)info;
+        NRF_LOG_ERROR("ERROR %u [%s] at %s:%u\r\nPC at: 0x%08x", p_info->err_code, nrf_strerror_get(p_info->err_code), p_info->p_file_name,
+                      p_info->line_num, pc);
+        NRF_LOG_ERROR("End of error report");
+        break;
+    }
+    default:
+        NRF_LOG_ERROR("UNKNOWN FAULT at 0x%08X", pc);
+        break;
     }
 #endif
 
-    ActivateSoftwareReset( RESET_HARD_FAULT, id, pc, info);
+    ActivateSoftwareReset(RESET_HARD_FAULT, id, pc, info);
 
-    //NRF_BREAKPOINT_COND;
+    // NRF_BREAKPOINT_COND;
     // On assert, the system can only recover with a reset.
 
 #ifndef DEBUG
