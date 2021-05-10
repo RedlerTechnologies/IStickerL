@@ -17,7 +17,8 @@
 xSemaphoreHandle   tx_uart_semaphore;
 EventGroupHandle_t event_uart_rx;
 
-uint8_t alert_str[256 + 16];
+
+uint8_t alert_str[ALERT_BUFFER_SIZE];
 
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
@@ -50,8 +51,8 @@ static void uart_thread(void *arg)
     EventBits_t uxBits;
 
     static uint8_t data[1];
-    static uint8_t rx_ptr      = 0;
-    static char    crlf_data[] = "\r\n";
+    //static uint8_t rx_ptr      = 0;
+    //static char    crlf_data[] = "\r\n";
 
     err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
 
@@ -122,6 +123,28 @@ void serial_comm_process_rx(void)
             rx_ptr++;
     }
 }
+
+/*
+void serial_comm_process_rx(void)
+{
+    uint8_t ch;
+
+    ret_code_t err_code;
+    uint8_t    data[1];
+
+    err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
+    APP_ERROR_CHECK(err_code);
+
+    ch = data[0];
+    rx_buffer[rx_ptr] = ch;
+
+    if (rx_ptr + 1 < UART_RX_BUFFER_SIZE)
+       rx_ptr++;
+    else
+      rx_ptr = 0;
+}
+*/
+
 
 void DisplayMessage(uint8_t *message, uint8_t len, bool with_lock)
 {

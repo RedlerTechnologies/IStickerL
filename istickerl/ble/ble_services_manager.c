@@ -335,6 +335,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         xEventGroupSetBits(ble_log_event, BLE_EVENTS_DISCONNECTED);
+        driver_behaviour_state.last_activity_time      = xTaskGetTickCount();
 
         break;
 

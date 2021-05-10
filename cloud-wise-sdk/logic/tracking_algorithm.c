@@ -33,7 +33,6 @@
 
 EventGroupHandle_t   event_acc_sample;
 static TimerHandle_t sample_timer_handle;
-// static CalibratedValue calibrated_value __attribute__((section(".non_init")));
 
 AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
@@ -61,6 +60,8 @@ bool           ProcessWakeupState(void);
 bool           CheckNoActivity(void);
 void           Calculate_Energy(void);
 static void    terminal_print_signal_mode(void);
+void           send_calibration_alert(void);
+void           print_movment(void);
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -131,6 +132,8 @@ void driver_behaviour_task(void *pvParameter)
     } else {
         driver_behaviour_state.calibrated = true;
     }
+
+    driver_behaviour_state.calibratation_saved_in_flash = driver_behaviour_state.calibrated;
 
     driver_behaviour_state.tampered = !driver_behaviour_state.calibrated;
 
@@ -433,8 +436,10 @@ void ProcessDrivingState(void)
     DriverBehaviourState *state = &driver_behaviour_state;
     AccConvertedSample *  sample;
 
-    if (state->energy > MIN_ENERY_FOR_CONTINUE_ROUTE)
+    if (state->energy > MIN_ENERY_FOR_CONTINUE_ROUTE) {
         state->last_activity_time = xTaskGetTickCount();
+        print_movment();
+    }
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&acc_samples[i];
@@ -468,63 +473,15 @@ bool ProcessWakeupState(void)
     return true;
 #endif
 
-    // state->movement_count = driver_behaviour_state.acc_int_counter;
-
     if (state->energy > MIN_ENERY_FOR_START_ROUTE) {
         state->movement_count++;
         driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+        print_movment();
     }
-
-    /*
-        for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-            sample = (AccConvertedSample *)&acc_samples[i];
-            sense  = false;
-
-            if (sample->turn_direction >= ACC_MIN_DRIVE_VALUE)
-                sense = true;
-
-            if (sample->drive_direction >= ACC_MIN_DRIVE_VALUE)
-                sense = true;
-
-            if (sense) {
-                sense1 = true;
-
-
-                //  if (state->movement_count == 0)
-                //      InitWakeupAlgorithm();
-
-                state->movement_count++;
-                driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-                break;
-            }
-        }
-        */
 
     if (state->movement_count >= 7) {
         found = true;
     }
-
-    /*
-        state->movement_test_count++;
-
-        if (state->movement_test_count >= 15) // about 5 seconds
-        {
-            terminal_buffer_lock();
-            sprintf(alert_str, "\r\n\r\nmovements# %d\r\n\r\n", state->movement_count);
-            DisplayMessage(alert_str, 0, false);
-            terminal_buffer_release();
-
-            if (state->movement_count >= 3) {
-                found = true;
-            }
-            InitWakeupAlgorithm();
-        } else if (sense1) {
-            terminal_buffer_lock();
-            sprintf(alert_str, "\r\n\r\nm# %d\r\n\r\n", state->movement_count);
-            DisplayMessage(alert_str, 0, false);
-            terminal_buffer_release();
-        }
-        */
 
     return found;
 }
@@ -637,12 +594,31 @@ void Process_Calibrate(void)
         state->calibrated                        = true;
         buzzer_train(5);
 
-        // sending calibrate alert
-        terminal_buffer_lock();
-        sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", 1, -2, 0); // ???????????
-        PostBleAlert(alert_str);
-        terminal_buffer_release();
+        send_calibration_alert();
     }
+}
+
+void send_calibration_alert(void)
+{
+    AccSample *cal_value;
+    float      angle;
+    int16_t    value1;
+    int16_t    value2;
+
+    cal_value = &device_config.calibrate_value.avg_value;
+
+    angle = atan((float)(cal_value->Y) / (float)(cal_value->Z));
+    angle *= 180 / PI;
+    value1 = (int16_t)angle;
+
+    angle = atan((float)(cal_value->X) / (float)(cal_value->Z));
+    angle *= 180 / PI;
+    value2 = (int16_t)angle;
+
+    terminal_buffer_lock();
+    sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", value1, value2, driver_behaviour_state.calibrated_value.axis);
+    PostBleAlert(alert_str);
+    terminal_buffer_release();
 }
 
 void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
@@ -805,4 +781,17 @@ void set_sleep_timeout_on_ble(void)
     }
 
     set_sleep_timeout(timeout_value);
+}
+
+void print_movment(void)
+{
+    static uint32_t time = 0;
+    uint32_t      duration;
+
+    duration = timeDiff(xTaskGetTickCount(), time);
+
+    if (duration > 1000) {
+        DisplayMessage("\r\n*\r\n", 0, true);
+        time = xTaskGetTickCount();
+    }
 }

@@ -41,6 +41,7 @@ uint8_t     GetDaysInMonth(uint8_t year, uint8_t month);
 void        InitClock(void);
 void        AddSecondsToDate(Calendar *c, uint32_t seconds);
 static void BlinkStatusLeds(void);
+void        print_indicators(void);
 
 void ActivateSoftwareReset(uint8_t reason, uint32_t v1, uint32_t v2, uint32_t v3)
 {
@@ -185,7 +186,7 @@ void monitor_thread(void *arg)
 #endif
 
         if ((current_time % 8) == 0 || first) {
-                
+
             first = false;
 
             temperature = peripherals_read_temperature();
@@ -193,13 +194,15 @@ void monitor_thread(void *arg)
             vdd         = peripherals_read_vdd();
             vdd_float   = ((float)vdd) / 1000;
 
-            // duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
-            // duration = driver_behaviour_state.sleep_delay_time - duration;
+            duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
 
             terminal_buffer_lock();
-            sprintf(alert_str, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV\r\n\r\n", temperature, bat_level,
-                    driver_behaviour_state.time_to_sleep_left_in_sec, vdd_float);
+            sprintf(alert_str, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV, acc=%d\r\n", temperature, bat_level,
+                    driver_behaviour_state.time_to_sleep_left_in_sec, vdd_float, duration);
             DisplayMessageWithTime(alert_str, 0, false);
+
+            vTaskDelay(10);
+            print_indicators();
             terminal_buffer_release();
 
             if (ble_services_is_connected()) {
@@ -477,4 +480,23 @@ bool monitor_task_check(void)
     xSemaphoreGive(watchdog_monitor_semaphore);
 
     return status;
+}
+
+void print_indicators(void)
+{
+    uint8_t ind_ble;
+    uint8_t ind_route;
+    uint8_t ind_tamper;
+    uint8_t ind_calibrate;
+
+    ind_ble       = (ble_services_is_connected()) ? '1' : '0';
+    ind_route     = (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE) ? '1' : '0';
+    ind_tamper    = (driver_behaviour_state.tampered) ? '1' : '0';
+    ind_calibrate = (driver_behaviour_state.calibratation_saved_in_flash) ? '1' : '0';
+
+                  
+    memset(alert_str, 0x00, ALERT_BUFFER_SIZE);
+
+    sprintf(alert_str, "BLE=%c, ROUTE=%c, TMP=%c, CAL=%c\r\n\r\n", ind_ble, ind_route, ind_tamper, ind_calibrate);
+    DisplayMessage(alert_str, 0, false);
 }

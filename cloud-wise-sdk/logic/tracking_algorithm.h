@@ -17,7 +17,7 @@
 #define DELAY_BETWEEN_ACCIDENTS 2000 // ~30 seconds
 
 #define MIN_ENERY_FOR_START_ROUTE 550
-#define MIN_ENERY_FOR_CONTINUE_ROUTE 650 
+#define MIN_ENERY_FOR_CONTINUE_ROUTE 650
 
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED (10 * 60)
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED (2 * 60)
@@ -75,6 +75,7 @@ typedef struct {
     CalibratedValue calibrated_value;
 
     unsigned char calibrated;
+    unsigned char calibratation_saved_in_flash;
     unsigned char store_calibration;
 
     signed int sum_x;

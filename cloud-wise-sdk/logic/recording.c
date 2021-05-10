@@ -235,7 +235,7 @@ static void get_header(uint8_t *header)
     ptr = &acc_record.record_id;
     memcpy(header, ptr, 4);
 
-    /* ???????????
+    /*
         if (driver_behavior_state.calibration_state == CALIRATION_STATE_DONE) {
             header[16] = (signed char)driver_behavior_state.angle1;
             header[17] = (signed char)driver_behavior_state.angle2;

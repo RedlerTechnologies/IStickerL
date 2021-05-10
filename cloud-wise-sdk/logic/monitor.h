@@ -47,5 +47,7 @@ typedef struct {
 #define TASK_MONITOR_BIT_BLE 1
 #define TASK_MONITOR_BIT_UART_RX 2
 
+#define ALERT_BUFFER_SIZE (256+16)
+
 void monitor_task_set(uint16_t task_bit);
 bool monitor_task_check(void);
