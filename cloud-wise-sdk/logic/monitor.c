@@ -17,6 +17,7 @@
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
+#include "recording.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -207,8 +208,7 @@ void monitor_thread(void *arg)
 
             if (ble_services_is_connected()) {
 
-                // enable this line when supprting non immediate events
-                // record_scan_for_new_records(false); // ????????????
+                record_scan_for_new_records(false);
 
 #ifdef BLE_ADVERTISING
                 ble_services_update_battery_level(bat_level);

@@ -22,6 +22,7 @@
 static uint8_t              flash_buffer[300];
 extern xSemaphoreHandle     tx_uart_semaphore;
 extern DriverBehaviourState driver_behaviour_state;
+extern AccidentState        accident_state;
 
 #define NRF_LOG_MODULE_NAME recording
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -108,7 +109,7 @@ uint8_t record_scan_for_new_records(bool forced)
     uint8_t *      buffer;
     uint32_t       flash_address;
     uint32_t       record_id;
-    int16_t        index = -1;
+    int16_t        index = -9;
     uint32_t       duration;
     uint16_t       max_record_id = 0;
     uint8_t        i;
@@ -117,7 +118,9 @@ uint8_t record_scan_for_new_records(bool forced)
 
     duration = timeDiff(xTaskGetTickCount(), acc_record.last_found_record_time) / 1000;
 
-    if ((duration > 30 && ble_services_is_connected()) || forced) {
+    if (((duration > 30) && (ble_services_is_connected()) && (driver_behaviour_state.accident_state == ACCIDENT_STATE_NONE) && (!in_sending_file())) || forced) {
+        
+        index = -1;
         acc_record.last_found_record_time = xTaskGetTickCount();
 
         for (i = 0; i < MAX_RECORDS; i++) {
@@ -153,7 +156,8 @@ uint8_t record_scan_for_new_records(bool forced)
 
     if (!forced) {
         terminal_buffer_lock();
-        sprintf(alert_str, "\r\nRecords #%d\r\n", pending_counter);
+        vTaskDelay(10);
+        sprintf(alert_str, "\r\nrec=%d, idx=%d\r\n", pending_counter, index);
         DisplayMessage(alert_str, 0, false);
         terminal_buffer_release();
     }
@@ -361,9 +365,10 @@ void record_add_sample(AccConvertedSample *acc_sample)
 
             buzzer_train(3);
             terminal_buffer_lock();
-            sprintf(alert_str, "\r\nAccident Recording: %d\r\n", acc_record.record_num);
+            sprintf(alert_str, "\r\nRecord Saved: idx=%d\r\n", acc_record.record_num);
             DisplayMessageWithTime(alert_str, strlen(alert_str), false);
             terminal_buffer_release();
+            vTaskDelay(10);
 
             // CreateDebugEvent(EVENT_DEBUG_ACC_RECORD_COMPLETE, acc_record.record_id, 3, 0);
 

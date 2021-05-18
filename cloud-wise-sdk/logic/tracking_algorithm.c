@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
 #include "ble/ble_task.h"
+#include "ble_file_transfer.h"
 #include "commands.h"
 #include "configuration.h"
 #include "drivers/buzzer.h"
@@ -36,6 +37,9 @@ static TimerHandle_t sample_timer_handle;
 
 AccSample acc_samples[SAMPLE_BUFFER_SIZE];
 
+// ???????????
+uint32_t acc_samples_times[SAMPLE_BUFFER_SIZE];
+
 extern uint8_t             Acc_Table[];
 extern uint8_t             Acc_Sleep_Table[];
 extern DeviceConfiguration device_config;
@@ -62,6 +66,7 @@ void           Calculate_Energy(void);
 static void    terminal_print_signal_mode(void);
 void           send_calibration_alert(void);
 void           print_movment(void);
+void           Set_Installation_Angle(void);
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -131,6 +136,8 @@ void driver_behaviour_task(void *pvParameter)
         driver_behaviour_state.calibrated = false;
     } else {
         driver_behaviour_state.calibrated = true;
+        memcpy(&driver_behaviour_state.calibrated_value, &device_config.calibrate_value, sizeof(CalibratedValue));
+        Set_Installation_Angle();
     }
 
     driver_behaviour_state.calibratation_saved_in_flash = driver_behaviour_state.calibrated;
@@ -165,6 +172,9 @@ void driver_behaviour_task(void *pvParameter)
 
             // add the sample to a sample array
             acc_samples[count] = acc_sample;
+            // ????????
+            acc_samples_times[count] = xTaskGetTickCount();
+
             count++;
 
             if (count >= SAMPLE_BUFFER_SIZE)
@@ -191,6 +201,15 @@ void driver_behaviour_task(void *pvParameter)
         } else {
             CalibrateAllSamples();
 
+            // ??????????????
+            /*
+            terminal_print_signal_mode();
+            if (abs(driver_behaviour_state.Gx) >= 50)
+                driver_behaviour_state.Gx = 0;
+
+            continue;
+            */
+
             switch (driver_behaviour_state.track_state) {
             case TRACKING_STATE_WAKEUP:
                 if (ProcessWakeupState()) {
@@ -205,8 +224,6 @@ void driver_behaviour_task(void *pvParameter)
                     continue;
                 } else {
                     need_sleep = CheckNoActivity();
-
-                    // need_sleep = false;
 
                     if (need_sleep) {
                         CreateGeneralEvent(LOG_FALSE_WAKEUP, EVENT_TYPE_LOG, 2);
@@ -231,6 +248,8 @@ void driver_behaviour_task(void *pvParameter)
                 break;
             }
         }
+
+        //need_sleep = false; // ????????????
 
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);
@@ -269,6 +288,10 @@ static void terminal_print_signal_mode(void)
 
     case PRINT_SIGNAL_MODE_ENERGY:
         sprintf(alert_str, "\r\nE=%d\r\n", driver_behaviour_state.energy);
+        break;
+
+    case PRINT_SIGNAL_MODE_GX:
+        sprintf(alert_str, "\r\nGx=%d\r\n", driver_behaviour_state.Gx);
         break;
     }
 
@@ -418,14 +441,20 @@ void Calculate_Energy(void)
 
 void CalibrateAllSamples(void)
 {
-    AccSample *        sample;
-    AccConvertedSample sample_out;
+    AccSample *           sample;
+    AccConvertedSample    sample_out;
+    DriverBehaviourState *state = &driver_behaviour_state;
+
+    state->Gx = 0;
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = &acc_samples[i];
         ACC_CalibrateSample(sample, &sample_out);
 
         memcpy((unsigned char *)sample, (unsigned char *)(&sample_out), 6);
+
+        if (abs(sample->X) > abs(state->Gx))
+            state->Gx = sample->X;
     }
 }
 
@@ -469,6 +498,8 @@ bool ProcessWakeupState(void)
     bool                  found  = false;
     EventBits_t           uxBits;
 
+    //return true; // ?????????????????
+
 #ifdef SLEEP_DISABLE
     return true;
 #endif
@@ -493,9 +524,9 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     float x, y, z;
     float drive_direction, turn_direction, earth_direction;
 
-    acc_sample_in->X -= device_config.calibrate_value.avg_value.X;
-    acc_sample_in->Y -= device_config.calibrate_value.avg_value.Y;
-    acc_sample_in->Z -= device_config.calibrate_value.avg_value.Z;
+    acc_sample_in->X -= state->calibrated_value.avg_value.X;
+    acc_sample_in->Y -= state->calibrated_value.avg_value.Y;
+    acc_sample_in->Z -= state->calibrated_value.avg_value.Z;
 
     x = acc_sample_in->X;
     y = acc_sample_in->Y;
@@ -505,7 +536,7 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     y /= ACC_NORMALIZATION_VALUE;
     z /= ACC_NORMALIZATION_VALUE;
 
-    switch (device_config.calibrate_value.axis) {
+    switch (state->calibrated_value.axis) {
     case 0:
         // error in calibration
         break;
@@ -532,12 +563,30 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     acc_sample_out->turn_direction  = (signed short)(turn_direction * 100);
 }
 
+void Set_Installation_Angle(void)
+{
+    DriverBehaviourState *state = &driver_behaviour_state;
+    float                 x, y, z, angle1;
+
+    x = state->calibrated_value.avg_value.X;
+    y = state->calibrated_value.avg_value.Y;
+    z = state->calibrated_value.avg_value.Z;
+
+    x /= ACC_NORMALIZATION_VALUE;
+    y /= ACC_NORMALIZATION_VALUE;
+    z /= ACC_NORMALIZATION_VALUE;
+
+    angle1        = atan(y / z);
+    state->angle1 = angle1;
+}
+
 void Process_Calibrate(void)
 {
     DriverBehaviourState *state = &driver_behaviour_state;
 
     float         x, y, z;
-    float         angle1, angle2, temp;
+    float         angle1, angle2;
+    int16_t       temp1, temp2;
     AccSample *   sample;
     unsigned char i;
 
@@ -571,9 +620,12 @@ void Process_Calibrate(void)
         z /= ACC_NORMALIZATION_VALUE;
 
         angle2 = asin(x);
-        temp   = angle2 * 180 / PI;
+        temp2  = (int16_t)(angle2 * 180 / PI);
 
         angle1 = atan(y / z);
+        temp1  = (int16_t)(angle1 * 180 / PI);
+
+        state->angle1 = angle1;
 
         if (angle1 < PI * 45 / 180) {
             // y is the driving axis
@@ -594,36 +646,19 @@ void Process_Calibrate(void)
         state->calibrated                        = true;
         buzzer_train(5);
 
-        send_calibration_alert();
+        terminal_buffer_lock();
+        sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", temp1, temp2, state->calibrated_value.axis);
+        PostBleAlert(alert_str);
+        terminal_buffer_release();
     }
-}
-
-void send_calibration_alert(void)
-{
-    AccSample *cal_value;
-    float      angle;
-    int16_t    value1;
-    int16_t    value2;
-
-    cal_value = &device_config.calibrate_value.avg_value;
-
-    angle = atan((float)(cal_value->Y) / (float)(cal_value->Z));
-    angle *= 180 / PI;
-    value1 = (int16_t)angle;
-
-    angle = atan((float)(cal_value->X) / (float)(cal_value->Z));
-    angle *= 180 / PI;
-    value2 = (int16_t)angle;
-
-    terminal_buffer_lock();
-    sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", value1, value2, driver_behaviour_state.calibrated_value.axis);
-    PostBleAlert(alert_str);
-    terminal_buffer_release();
 }
 
 void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 {
     unsigned short value;
+
+    if (driver_behaviour_state.print_signal_mode)
+        return;
 
     switch (state->accident_state) {
     case ACCIDENT_STATE_NONE:
@@ -661,6 +696,8 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
                 /////////////////////////
                 // accident identified //
                 /////////////////////////
+
+                FileTransferFailed(true);
 
                 state->last_activity_time               = xTaskGetTickCount();
                 state->accident_state                   = ACCIDENT_STATE_IDENTIFIED;
@@ -786,7 +823,7 @@ void set_sleep_timeout_on_ble(void)
 void print_movment(void)
 {
     static uint32_t time = 0;
-    uint32_t      duration;
+    uint32_t        duration;
 
     duration = timeDiff(xTaskGetTickCount(), time);
 

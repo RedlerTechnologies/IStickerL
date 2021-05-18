@@ -10,7 +10,7 @@
 
 #include "ble_istickerl.h"
 
-#define RESTART_BLE_ADVERTISING_AFTER_IDLE 5 // (2*60) // ????????????????
+#define RESTART_BLE_ADVERTISING_AFTER_IDLE 5 // (2*60)
 
 
 typedef struct {

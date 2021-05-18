@@ -260,7 +260,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_RECORD:
 
         if (is_set_command) {
-            if (param_num) {
+            if (param_num > 0) {
                 param_num = record_search(param_num);
                 param_num = -param_num;
             }
@@ -299,7 +299,6 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
             case 9:
                 ble_services_disconnect();
                 set_sleep_timeout(SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED);
-                // driver_behaviour_state.request_advertising = true;
                 result = param_num;
                 break;
 
@@ -352,7 +351,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
             driver_behaviour_state.record_triggered = true;
             break;
 
-        case 9:
+        case PRINT_SIGNAL_MODE_ENERGY:
+        case PRINT_SIGNAL_MODE_GX:
             if (driver_behaviour_state.print_signal_mode == param_num)
                 driver_behaviour_state.print_signal_mode = 0;
             else
@@ -367,7 +367,9 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_ACCIDENT_G:
 
         if (is_set_command) {
-            memcpy((uint32_t *)p->param_address, &param_num, 1);
+            if (param_num >= 4) {
+                memcpy((uint32_t *)p->param_address, &param_num, 1);
+            }
 
         } else {
             memset(&result, 0x00, 4);
@@ -386,6 +388,12 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         SetManufactureDefault();
         SaveConfiguration(true);
+        break;
+
+    case COMMAND_SETTINGS:
+        if (is_set_command) {
+            result = param_num;
+        }
         break;
 
     default:
@@ -422,3 +430,8 @@ void delay_sleep(int32_t delay_in_seconds)
     xSemaphoreGive(sleep_semaphore);
 }
 */
+
+
+void print_all_parameters(void)
+{
+}

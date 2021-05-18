@@ -29,14 +29,15 @@ typedef struct {
     int32_t  next_read_address;
     int32_t  prev_packet_address;
 
-    uint16_t record_num;
-    uint8_t  offset;
-    uint8_t  state;
-    uint8_t  retries;
-    uint8_t  num_of_regions;
-    uint8_t  file_type;
+    int16_t record_num;
+    uint8_t offset;
+    uint8_t state;
+    uint8_t retries;
+    uint8_t num_of_regions;
+    uint8_t file_type;
 } BleReadingFileState;
-
 
 void BFT_start(unsigned short record_num, unsigned char is_record);
 void BFT_send_next_packet(void);
+void FileTransferFailed(bool abort);
+bool in_sending_file(void);

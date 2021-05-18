@@ -64,7 +64,7 @@ void SaveConfiguration(bool force)
 
         terminal_buffer_release();
 
-        DisplayMessage("Configuration saved...", 0, true);
+        DisplayMessage("\r\nConfiguration saved\r\n", 0, true);
     }
 }
 

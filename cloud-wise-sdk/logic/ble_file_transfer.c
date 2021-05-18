@@ -53,18 +53,24 @@ static uint32_t GetAbsoluteReadAddress(unsigned packet_index)
     return absolute_address;
 }
 
-static void FileTransferFailed(void)
+void FileTransferFailed(bool abort)
 {
-    if (ble_reading_file_state.record_num >= 0)
-        record_write_status(ble_reading_file_state.record_num, RECORD_SENT_IND, 1 /* error status>0 */);
+    if (ble_services_is_connected() & !abort) {
+        if (ble_reading_file_state.record_num >= 0)
+            record_write_status(ble_reading_file_state.record_num, RECORD_SENT_IND, 1 /* error status>0 */);
+    }
 
     ble_reading_file_state.next_read_address = 0x0FFFFFFF;
     ble_reading_file_state.state             = 0xFF;
-    ble_reading_file_state.record_num        = -1;
 
-    DisplayMessage("\r\nFile transfer aborted\r\n", 0, true);
+    if (ble_reading_file_state.record_num >= 0)
+        DisplayMessage("\r\nFile transfer aborted\r\n", 0, true);
     // CreateLogEvent(LOG_BLE_READ_FILE_ABORTED, 2);
+
+    ble_reading_file_state.record_num = -1;
 }
+
+bool in_sending_file(void) { return (ble_reading_file_state.state != 0xFF); }
 
 static void FileTransferSucceed(void)
 {
@@ -137,7 +143,7 @@ void BFT_send_next_packet(void)
             return;
         } else {
             if (ble_reading_file_state.retries > 0) {
-                FileTransferFailed();
+                FileTransferFailed(false);
             } else {
                 FileTransferSucceed();
             }
@@ -235,7 +241,7 @@ void BFT_send_next_packet(void)
                 ble_reading_file_state.state             = 0;
 
                 if (ble_reading_file_state.retries >= 5) {
-                    FileTransferFailed();
+                    FileTransferFailed(false);
                 }
 
                 if (driver_behaviour_state.new_transfer_protocol) {

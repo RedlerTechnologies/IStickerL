@@ -3,8 +3,8 @@
 #include "boards.h"
 
 #define APP_MAJOR_VERSION   1
-#define APP_MINOR_VERSION   1
-#define APP_BUILD           9
+#define APP_MINOR_VERSION   2
+#define APP_BUILD           0
 
 #define HAL_UICR_DEVICE_SERIAL_NUMBER 0
 

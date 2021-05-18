@@ -3,6 +3,7 @@
 #include "hal/hal_data_types.h"
 
 #define TIMER_PERIOD 10 // 10ms 100hz acc sampling rate
+//#define TIMER_PERIOD 5 
 
 #define SAMPLE_BUFFER_SIZE 32
 #define ACC_MIN_ACCIDENT_VALUE 25
@@ -57,6 +58,7 @@ typedef enum {
 } AccidentState;
 
 #define PRINT_SIGNAL_MODE_ENERGY 9
+#define PRINT_SIGNAL_MODE_GX 11
 
 typedef struct {
     TrackingState track_state;
@@ -117,6 +119,7 @@ typedef struct {
     unsigned stop_advertising_time;
 
     signed energy;
+    signed short Gx;
 
 } DriverBehaviourState;
 
