@@ -34,26 +34,28 @@ xSemaphoreHandle command_semaphore;
 
 IStickerErrorBits error_bits;
 
+void print_all_parameters(void);
 void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command, uint8_t source);
 
 ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
-    {"BEEP", NULL},
-    {"CALIBRATE", NULL},
-    {"SLPD", NULL},
-    {"SW_VERSION", NULL},
-    {"SW_BUILD", NULL},
-    {"DEVID", (uint32_t *)device_config.DeviceID},
-    {"BLEID", (uint32_t *)device_config.DeviceName},
-    {"TIME", NULL},
-    {"RESET", NULL},
-    {"MEM_CLEAR", NULL},
-    {"RECORD", NULL},
-    {"FILE", NULL},
-    {"BLE", NULL},
-    {"TEST_MODE", NULL},
-    {"ACCIDENT_G", (uint32_t *)&device_config.AccidentG},
-    {"SAVE", NULL},
-    {"MANUF", NULL},
+    {"BEEP", NULL, PARAM_COMMAND},
+    {"CALIBRATE", NULL, PARAM_COMMAND},
+    {"SLPD", NULL, PARAM_COMMAND},
+    {"SW_VERSION", NULL, PARAM_COMMAND},
+    {"SW_BUILD", NULL, PARAM_COMMAND},
+    {"DEVID", (uint32_t *)device_config.DeviceID, PARAM_STRING},
+    {"BLEID", (uint32_t *)device_config.DeviceName, PARAM_STRING},
+    {"TIME", NULL, PARAM_COMMAND},
+    {"RESET", NULL, PARAM_COMMAND},
+    {"MEM_CLEAR", NULL, PARAM_COMMAND},
+    {"RECORD", NULL, PARAM_COMMAND},
+    {"FILE", NULL, PARAM_COMMAND},
+    {"BLE", NULL, PARAM_COMMAND},
+    {"TEST_MODE", NULL, PARAM_COMMAND},
+    {"ACCIDENT_G", (uint32_t *)&device_config.AccidentG, PARAM_NUMERIC},
+    {"SAVE", NULL, PARAM_COMMAND},
+    {"MANUF", NULL, PARAM_COMMAND},
+    {"SETTINGS", NULL, PARAM_COMMAND},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -392,6 +394,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_SETTINGS:
         if (is_set_command) {
+            print_all_parameters();
             result = param_num;
         }
         break;
@@ -431,7 +434,33 @@ void delay_sleep(int32_t delay_in_seconds)
 }
 */
 
-
 void print_all_parameters(void)
 {
+    ConfigParameter *param;
+    uint8_t          i;
+
+    terminal_buffer_lock();
+
+    for (i = 0; i < NUM_OF_PARAMETERS; i++) {
+        param = &parameter_list[i];
+
+        switch (param->param_type) {
+        case PARAM_COMMAND:
+            sprintf(alert_str, "%s\r\n", param->param_name);
+            break;
+
+        case PARAM_STRING:
+            sprintf(alert_str, "%s: %s\r\n", param->param_name, param->param_address);
+            break;
+
+        case PARAM_NUMERIC:
+            sprintf(alert_str, "%: %d\r\n", param->param_name, (int32_t)(*param->param_address));
+            break;
+        }
+
+        DisplayMessage(alert_str, 0, false);
+        vTaskDelay(10);
+    }
+
+    terminal_buffer_release();
 }

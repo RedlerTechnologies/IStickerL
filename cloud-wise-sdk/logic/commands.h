@@ -2,24 +2,28 @@
 
 #include "hal/hal_data_types.h"
 
-#define NUM_OF_PARAMETERS 18
+#define NUM_OF_PARAMETERS 19
 
 #define PARAM_TYPE_STRING 0
 #define PARAM_TYPE_INTEGER 1
 #define PARAM_TYPE_REAL 3
 
+#define PARAM_COMMAND 0
+#define PARAM_STRING 1
+#define PARAM_NUMERIC 2
 
 typedef struct {
     uint8_t   param_name[16];
     uint32_t *param_address;
+    uint8_t   param_type;
 
-/*
-    uint16_t param_id;
-    uint8_t  max_size;
-    uint8_t  param_type;
-    uint8_t  counter_id;
-    uint8_t  read_only;
-    */
+    /*
+        uint16_t param_id;
+        uint8_t  max_size;
+        uint8_t  param_type;
+        uint8_t  counter_id;
+        uint8_t  read_only;
+        */
 } ConfigParameter;
 
 typedef enum {
@@ -60,5 +64,5 @@ typedef struct {
     uint32_t Reserved : 20;
 } IStickerErrorBits;
 
-bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t* result_buffer, uint8_t source);
-//void delay_sleep(int32_t delay_in_seconds);
+bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source);
+// void delay_sleep(int32_t delay_in_seconds);
