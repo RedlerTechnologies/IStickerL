@@ -3,7 +3,6 @@
 #include "hal/hal_data_types.h"
 
 #define TIMER_PERIOD 10 // 10ms 100hz acc sampling rate
-//#define TIMER_PERIOD 5 
 
 #define SAMPLE_BUFFER_SIZE 32
 #define ACC_MIN_ACCIDENT_VALUE 25
@@ -57,8 +56,17 @@ typedef enum {
     ACCIDENT_STATE_REPORTED,
 } AccidentState;
 
+#define TEST_MODE_TRIGGER_ACCIDENT 8
 #define PRINT_SIGNAL_MODE_ENERGY 9
+#define TEST_MODE_PRINT_SENT_EVENT 
+
 #define PRINT_SIGNAL_MODE_GX 11
+#define PRINT_SIGNAL_MODE_GY 12
+#define TEST_MODE_PRINT_ALL_EVENTS 20
+#define TEST_MODE_PRINT_ALL_EVENTS_AND_DATA 21
+#define TEST_MODE_PRINT_SENT_EVENT_MODE 30
+#define TEST_MODE_DROP_NEW_EVENTS 31
+#define TEST_MODE_FILL_EVENT_FLASH 32
 
 typedef struct {
     TrackingState track_state;
@@ -112,14 +120,20 @@ typedef struct {
     bool record_triggered;
     bool tampered;
     bool manual_delayed;
+    bool print_event_data;
+    bool print_sent_event_id_mode;
+    bool in_event_transfer_process;
+    bool block_new_events;
+    bool fill_event_flash;
 
     uint8_t print_signal_mode;
 
     unsigned last_ble_connected_time;
     unsigned stop_advertising_time;
 
-    signed energy;
+    signed       energy;
     signed short Gx;
+    signed short Gy;
 
 } DriverBehaviourState;
 

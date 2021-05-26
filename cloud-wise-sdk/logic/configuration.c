@@ -45,14 +45,13 @@ void LoadConfiguration(void)
 
 void SaveConfiguration(bool force)
 {
-    uint16_t old_sector;
-    uint16_t new_sector;
+    uint16_t crc;
 
-    new_sector = CRC16_Calc((uint8_t *)&device_config, 254, 0);
+    crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
 
-    if (force || new_sector != device_config.crc) {
+    if (force || crc != device_config.crc) {
 
-        device_config.crc = new_sector;
+        device_config.crc = crc;
 
         flash_erase_sector(CONFIGURATION_ADDRESS);
 

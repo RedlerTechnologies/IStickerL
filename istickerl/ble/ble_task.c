@@ -7,6 +7,7 @@
 #include "hal/hal_boards.h"
 #include "logic/ble_file_transfer.h"
 #include "logic/commands.h"
+#include "logic/events.h"
 #include "logic/monitor.h"
 #include "logic/serial_comm.h"
 #include "logic/tracking_algorithm.h"
@@ -117,6 +118,18 @@ void PostBleAlert(uint8_t *command_str)
 #endif
 }
 
+uint8_t get_bit(uint32_t value)
+{
+    uint8_t index = 0;
+
+    while (value > 0) {
+        value = value >> 1;
+        index++;
+    }
+
+    return index;
+}
+
 static void check_ble_events(void)
 {
     EventBits_t uxBits;
@@ -143,6 +156,8 @@ static void check_ble_events(void)
         case BLE_EVENTS_CONNECTED:
             DisplayMessage("\r\nBLE connected\r\n", 0, true);
             set_sleep_timeout_on_ble();
+
+            CreateGeneralEvent(LOG_BLE_CONNECTED, EVENT_TYPE_LOG, 2);
             break;
 
         case BLE_EVENTS_DISCONNECTED:
@@ -155,6 +170,8 @@ static void check_ble_events(void)
             DisplayMessage("\r\nBLE timeout\r\n", 0, true);
             break;
         }
+
+        CreateDebugEvent(EVENT_DEBUG_BLE_STATUS_CHANGE , get_bit(uxBits), false);
     }
 }
 

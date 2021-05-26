@@ -54,7 +54,7 @@ NRF_LOG_MODULE_REGISTER();
 // Number of attempts before giving up the connection parameter negotiation
 #define MAX_CONN_PARAMS_UPDATE_COUNT 3
 
-#define APP_ADV_FAST_INTERVAL 100     // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
+#define APP_ADV_FAST_INTERVAL 100                  // The advertising interval (in units of 0.625 ms. This value corresponds to 250 ms)
 #define APP_ADV_FAST_TIMEOUT_IN_SECONDS (60 * 100) // The Fast advertising duration in units of 10 milliseconds
 
 #define APP_ADV_SLOW_INTERVAL 1800                 // The advertising interval (in units of 0.625 ms. This value corresponds to 562.5 ms)
@@ -139,6 +139,10 @@ void ble_services_init_0(void)
     uint32_t res;
     uint16_t crc_before;
 
+    #ifndef BLE_ADVERTISING
+      return;
+    #endif 
+
     ble_stack_init();
 
     res = sd_ble_gap_addr_get(&mac_address);
@@ -151,6 +155,10 @@ void ble_services_init_0(void)
 
 void ble_services_init(void)
 {
+    #ifndef BLE_ADVERTISING
+      return;
+    #endif 
+
     gap_params_init();
     gatt_init();
 
@@ -335,7 +343,7 @@ static void ble_evt_handler(ble_evt_t const *p_ble_evt, void *p_context)
 
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
         xEventGroupSetBits(ble_log_event, BLE_EVENTS_DISCONNECTED);
-        driver_behaviour_state.last_activity_time      = xTaskGetTickCount();
+        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
 
         break;
 
@@ -652,6 +660,16 @@ static void istickerl_evt_handler(ble_istickerl_evt_t *p_evt, void *p_context)
         // TODO
         break;
 
+    case BLE_ISTICKERL_EVENT_TRANSFER_NOTIFICATION_STARTED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_TRANSFER_NOTIFICATION_STARTED", __func__);
+        // TODO
+        break;
+
+    case BLE_ISTICKERL_EVENT_TRANSFER_NOTIFICATION_STOPPED:
+        NRFX_LOG_INFO("%s BLE_ISTICKERL_EVENT_TRANSFER_NOTIFICATION_STOPPED", __func__);
+        // TODO
+        break;
+
     default:
         NRFX_LOG_WARNING("%s other (0x%x)", __func__, p_evt->type);
         break;
@@ -808,6 +826,27 @@ bool ble_services_notify_file_transfer(uint8_t *const data, size_t length)
     return (err_code == NRF_SUCCESS);
 }
 
+bool ble_services_notify_event_transfer(uint8_t *const data, size_t length)
+{
+    // if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+    //    NRFX_LOG_WARNING("%s Data drop (%u bytes)", __func__, length);
+    //    return false;
+    //}
+
+    ret_code_t err_code;
+
+#ifdef BLE_ISTICKERL_DATA_HEXDUMP
+    NRFX_LOG_INFO("%s tx_data  size: %u", __func__, length);
+    if (length > 0)
+        NRFX_LOG_HEXDUMP_INFO(data, length);
+    NRF_LOG_FLUSH();
+#endif
+
+    err_code = ble_istickerl_notify_event_transfer(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
+
 bool ble_services_update_acc(uint8_t *const data, size_t length)
 {
     ret_code_t err_code;
@@ -847,6 +886,15 @@ bool ble_services_update_file_transfer(uint8_t *const data, size_t length)
     err_code = ble_istickerl_update_file_transfer(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
 }
+
+bool ble_services_update_event_transfer(uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = ble_istickerl_update_event_transfer(&m_istickerl, data, length);
+    return (err_code == NRF_SUCCESS);
+}
+
 
 void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address)
 {

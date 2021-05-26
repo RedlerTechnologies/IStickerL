@@ -39,15 +39,20 @@ typedef struct {
 #define RESET_HARD_FAULT 3
 #define RESET_AFTER_SLEEP 4
 #define RESET_POWER_OFF 5
+#define RESET_AFTER_FLASH_CLEAR 6
+#define RESET_STACK_OVERFLOW 7
+#define RESET_AFTER_CHANGING_RX_PTR 8
 
 #define MONITOR_TEST_TIME 30
 
-#define TASK_MONITOR_NUM 3
+#define TASK_MONITOR_NUM 4
 #define TASK_MONITOR_BIT_TRACKING 0
 #define TASK_MONITOR_BIT_BLE 1
 #define TASK_MONITOR_BIT_UART_RX 2
+#define TASK_MONITOR_BIT_TRANSFER 3
 
 #define ALERT_BUFFER_SIZE (256+16)
 
 void monitor_task_set(uint16_t task_bit);
+void monitor_task_set_all(void);
 bool monitor_task_check(void);

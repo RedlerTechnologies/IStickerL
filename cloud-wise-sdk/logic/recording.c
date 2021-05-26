@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
 #include "ble_file_transfer.h"
+#include "decoder.h"
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
 #include "events.h"
@@ -23,6 +24,7 @@ static uint8_t              flash_buffer[300];
 extern xSemaphoreHandle     tx_uart_semaphore;
 extern DriverBehaviourState driver_behaviour_state;
 extern AccidentState        accident_state;
+extern ScanResult           scan_result;
 
 #define NRF_LOG_MODULE_NAME recording
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -118,9 +120,11 @@ uint8_t record_scan_for_new_records(bool forced)
 
     duration = timeDiff(xTaskGetTickCount(), acc_record.last_found_record_time) / 1000;
 
-    if (((duration > 30) && (ble_services_is_connected()) && (driver_behaviour_state.accident_state == ACCIDENT_STATE_NONE) && (!in_sending_file())) || forced) {
-        
-        index = -1;
+    if (((duration > 30) && (ble_services_is_connected()) && (driver_behaviour_state.accident_state == ACCIDENT_STATE_NONE) &&
+         (!in_sending_file())) ||
+        forced) {
+
+        index                             = -1;
         acc_record.last_found_record_time = xTaskGetTickCount();
 
         for (i = 0; i < MAX_RECORDS; i++) {
@@ -148,10 +152,10 @@ uint8_t record_scan_for_new_records(bool forced)
             }
         }
     }
+
     if (index >= 0 && ble_services_is_connected()) {
         // SendRecordBleAlert(record_id);
         SendRecordAlert(record_id);
-        // ??????????? DelaySleep(180, 0);
     }
 
     if (!forced) {
@@ -194,13 +198,11 @@ void record_trigger(uint8_t reason)
 {
     static uint32_t record_id = 0;
 
-    // ????????? DelaySleep(30, 0);
-
     acc_record.state         = ACC_RECORD_IDENTIFIED;
     acc_record.record_reason = reason;
 
-    // ????????? acc_record.record_id     = scan_result.write_marker.event_id;
-    record_id            = GetRandomNumber();
+    acc_record.record_id = scan_result.write_marker.event_id;
+    // record_id            = GetRandomNumber();
     acc_record.record_id = record_id;
 }
 
@@ -438,6 +440,7 @@ void record_print(unsigned char record_num)
     while (i < RECORD_SIZE) {
         memset(flash_buffer, 0x00, 260);
         flash_read_buffer(flash_buffer, (flash_address + i), 256);
+        monitor_task_set_all();
 
         j = 0;
 
@@ -468,6 +471,7 @@ void record_print(unsigned char record_num)
     while ((i + 6) < (RECORD_SIZE - RECORD_TERMINATOR_SIZE)) {
         memset(flash_buffer, 0x00, 10);
         flash_read_buffer(flash_buffer, (flash_address + i), 6);
+        monitor_task_set_all();
 
         memcpy(&sample, buffer, 6);
 

@@ -16,6 +16,7 @@
 #include "logic/serial_comm.h"
 #include "logic/state_machine.h"
 #include "logic/tracking_algorithm.h"
+#include "logic/transfer_task.h"
 #include "nrf.h"
 #include "nrf_delay.h"
 #include "nrf_drv_clock.h"
@@ -44,10 +45,13 @@ extern xSemaphoreHandle event_semaphore;
 extern xSemaphoreHandle flash_semaphore;
 extern xSemaphoreHandle terminal_buff_semaphore;
 extern xSemaphoreHandle watchdog_monitor_semaphore;
+extern xSemaphoreHandle flash_counter_semaphore;
 
 extern EventGroupHandle_t event_acc_sample;
 extern EventGroupHandle_t event_uart_rx;
 extern EventGroupHandle_t ble_log_event;
+extern EventGroupHandle_t transfer_event;
+extern EventGroupHandle_t transfer_confirm_event;
 
 extern ResetData           reset_data;
 extern DeviceConfiguration device_config;
@@ -61,7 +65,9 @@ uint32_t reset_count_x;
 static TaskHandle_t m_logger_thread; // Logger thread
 #endif
 
-TaskHandle_t                driver_behaviour_task_handle;
+TaskHandle_t driver_behaviour_task_handle;
+TaskHandle_t transfer_task_handle;
+
 extern DriverBehaviourState driver_behaviour_state;
 
 void init_tasks(void);
@@ -141,6 +147,10 @@ static void logger_thread(void *arg)
  */
 void vApplicationIdleHook(void)
 {
+// ???????
+  int x= 0;
+  x++;
+
 #if NRF_LOG_ENABLED
     vTaskResume(m_logger_thread);
 #endif
@@ -208,7 +218,9 @@ int main(void)
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    UNUSED_VARIABLE(xTaskCreate(driver_behaviour_task, "Tracking", configMINIMAL_STACK_SIZE + 200, NULL, 2, &driver_behaviour_task_handle));
+    UNUSED_VARIABLE(xTaskCreate(driver_behaviour_task, "Route", configMINIMAL_STACK_SIZE + 200, NULL, 2, &driver_behaviour_task_handle));
+
+    UNUSED_VARIABLE(xTaskCreate(transfer_task, "Transfer", configMINIMAL_STACK_SIZE + 100, NULL, 2, &transfer_task_handle));
 
     init_tasks();
 
@@ -256,9 +268,14 @@ void init_tasks(void)
     watchdog_monitor_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(watchdog_monitor_semaphore);
 
-    event_acc_sample = xEventGroupCreate();
-    event_uart_rx    = xEventGroupCreate();
-    ble_log_event    = xEventGroupCreate();
+    flash_counter_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(flash_counter_semaphore);
+
+    event_acc_sample       = xEventGroupCreate();
+    event_uart_rx          = xEventGroupCreate();
+    ble_log_event          = xEventGroupCreate();
+    transfer_event         = xEventGroupCreate();
+    transfer_confirm_event = xEventGroupCreate();
 
     init_ble_task();
 }
@@ -310,3 +327,5 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
     app_error_save_and_stop(id, pc, info);
 #endif // DEBUG
 }
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) { ActivateSoftwareReset(RESET_STACK_OVERFLOW, 0, 0, 0); }

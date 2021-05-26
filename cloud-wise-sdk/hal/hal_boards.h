@@ -6,6 +6,8 @@
 #define APP_MINOR_VERSION   2
 #define APP_BUILD           1
 
+#define HARDWARE_TYPE       11
+
 #define HAL_UICR_DEVICE_SERIAL_NUMBER 0
 
 #if defined(BOARD_PCA10040)

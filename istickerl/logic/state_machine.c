@@ -38,7 +38,9 @@ static void init_wdt(void)
     err_code = nrfx_wdt_channel_alloc(&m_wdt_channel_id);
     APP_ERROR_CHECK(err_code);
 
+#ifndef DISABLE_WATCHDOG
     nrfx_wdt_enable();
+#endif
 }
 
 static void init_rtc(void)

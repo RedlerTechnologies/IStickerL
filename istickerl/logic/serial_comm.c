@@ -17,7 +17,6 @@
 xSemaphoreHandle   tx_uart_semaphore;
 EventGroupHandle_t event_uart_rx;
 
-
 uint8_t alert_str[ALERT_BUFFER_SIZE];
 
 #include "nrfx_log.h"
@@ -51,8 +50,8 @@ static void uart_thread(void *arg)
     EventBits_t uxBits;
 
     static uint8_t data[1];
-    //static uint8_t rx_ptr      = 0;
-    //static char    crlf_data[] = "\r\n";
+    // static uint8_t rx_ptr      = 0;
+    // static char    crlf_data[] = "\r\n";
 
     err_code = nrfx_uart_rx(hal_uart, data, sizeof(data));
 
@@ -145,7 +144,6 @@ void serial_comm_process_rx(void)
 }
 */
 
-
 void DisplayMessage(uint8_t *message, uint8_t len, bool with_lock)
 {
     if (len == 0)
@@ -166,6 +164,8 @@ void DisplayMessage(uint8_t *message, uint8_t len, bool with_lock)
 
     if (with_lock)
         xSemaphoreGive(tx_uart_semaphore);
+
+    vTaskDelay(10);
 }
 
 void DisplayMessageWithTime(uint8_t *message, uint8_t len, bool with_lock)
@@ -187,7 +187,9 @@ void DisplayMessageWithTime(uint8_t *message, uint8_t len, bool with_lock)
     while (nrfx_uart_tx_in_progress(hal_uart)) {
     }
 
-    SetClockString(time_buffer);
+    time_buffer[0] = 0x0D;
+    time_buffer[1] = 0x0A;
+    SetClockString(time_buffer + 2);
     len1 = strlen(time_buffer);
     nrfx_uart_tx(hal_uart, time_buffer, len1);
 

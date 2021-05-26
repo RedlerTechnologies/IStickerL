@@ -17,6 +17,7 @@ NRF_LOG_MODULE_REGISTER();
 #define BLE_UUID_MEASUREMENT_CHARACTERISTIC 0xDE44
 #define BLE_UUID_EVENT_CHARACTERISTIC 0xDBCE
 #define BLE_UUID_FILE_TRANSFER_CHARACTERISTIC 0xED73
+#define BLE_UUID_EVENT_TRANSFER_CHARACTERISTIC 0xEDB2
 
 // Cloud-Wise IStickerL 128-bit base UUID B94D0000-F943-11E7-8C3F-9A214CF093AE
 #define ISTICKERL_BASE_UUID                                                                                                                \
@@ -31,6 +32,7 @@ typedef struct {
     bool status;
     bool event;
     bool file_transfer;
+    bool event_transfer;
 } ble_istickerl_notify_t;
 
 volatile static ble_istickerl_notify_t m_notify;
@@ -215,6 +217,24 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->file_transfer_handle);
     VERIFY_SUCCESS(err_code);
 
+    // Add the event transfer Characteristic //
+    memset(&add_char_params, 0, sizeof(add_char_params));
+    add_char_params.uuid              = BLE_UUID_EVENT_TRANSFER_CHARACTERISTIC;
+    add_char_params.uuid_type         = p_istickerl->uuid_type;
+    add_char_params.max_len           = 64;
+    add_char_params.is_var_len        = true;
+    add_char_params.p_init_value      = p_istickerl_init->p_data_init_value;
+    add_char_params.init_len          = p_istickerl_init->data_init_len;
+    add_char_params.char_props.read   = 1;
+    add_char_params.char_props.notify = 1;
+
+    add_char_params.read_access       = SEC_OPEN;
+    add_char_params.cccd_write_access = SEC_OPEN;
+
+    err_code = characteristic_add(p_istickerl->service_handle, &add_char_params, &p_istickerl->event_transfer_handle);
+    VERIFY_SUCCESS(err_code);
+
+
     return NRF_SUCCESS;
 }
 
@@ -351,6 +371,10 @@ static void on_write(ble_istickerl_t *p_istickerl, ble_evt_t const *p_ble_evt)
     } else if ((p_evt_write->handle == p_istickerl->file_transfer_handle.cccd_handle) && (p_evt_write->len == 2)) {
         on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_FILE_TRANSFER_NOTIFICATION_STARTED,
                                        BLE_ISTICKERL_FILE_TRANSFER_NOTIFICATION_STOPPED, &m_notify.file_transfer);
+        // INFO Handle CCCD write (subscribe) for file_transfer_handle
+    } else if ((p_evt_write->handle == p_istickerl->event_transfer_handle.cccd_handle) && (p_evt_write->len == 2)) {
+        on_generic_sessions_cccd_write(p_istickerl, p_evt_write, BLE_ISTICKERL_EVENT_TRANSFER_NOTIFICATION_STARTED,
+                                       BLE_ISTICKERL_EVENT_TRANSFER_NOTIFICATION_STOPPED, &m_notify.event_transfer);
     } else {
         NRFX_LOG_WARNING("%s unkown CCCD (0x%x) Length: %u", __func__, p_evt_write->handle, p_evt_write->len);
     }
@@ -434,6 +458,20 @@ ret_code_t ble_istickerl_notify_file_transfer(ble_istickerl_t *p_istickerl, uint
     return err_code;
 }
 
+ret_code_t ble_istickerl_notify_event_transfer(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    ret_code_t err_code;
+
+    err_code = value_update(data, length, p_istickerl->event_transfer_handle.value_handle);
+
+    if (m_notify.event_transfer && p_istickerl->conn_handle != BLE_CONN_HANDLE_INVALID) {
+        err_code = value_notify(p_istickerl, data, length, p_istickerl->event_transfer_handle.value_handle);
+    }
+
+    return err_code;
+}
+
+
 ret_code_t ble_istickerl_update_acc(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
 {
     return value_update(data, length, p_istickerl->acc_handle.value_handle);
@@ -457,4 +495,10 @@ ret_code_t ble_istickerl_update_event(ble_istickerl_t *p_istickerl, uint8_t *con
 ret_code_t ble_istickerl_update_file_transfer(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
 {
     return value_update(data, length, p_istickerl->file_transfer_handle.value_handle);
+}
+
+
+ret_code_t ble_istickerl_update_event_transfer(ble_istickerl_t *p_istickerl, uint8_t *const data, size_t length)
+{
+    return value_update(data, length, p_istickerl->event_transfer_handle.value_handle);
 }

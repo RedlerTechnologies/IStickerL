@@ -4,7 +4,9 @@
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
 #include "ble_file_transfer.h"
+#include "decoder.h"
 #include "drivers/buzzer.h"
+#include "event_groups.h"
 #include "events.h"
 #include "flash_data.h"
 #include "hal/hal_boards.h"
@@ -15,6 +17,7 @@
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
+#include "transfer_task.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +28,8 @@
 extern DriverBehaviourState driver_behaviour_state;
 extern DeviceConfiguration  device_config;
 extern xSemaphoreHandle     clock_semaphore;
+extern EventGroupHandle_t   transfer_event;
+extern EventGroupHandle_t   transfer_confirm_event;
 
 extern Calendar            absolute_time;
 extern BleReadingFileState ble_reading_file_state;
@@ -56,6 +61,7 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"SAVE", NULL, PARAM_COMMAND},
     {"MANUF", NULL, PARAM_COMMAND},
     {"SETTINGS", NULL, PARAM_COMMAND},
+    {"DATATX", NULL, PARAM_COMMAND},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -227,6 +233,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
         if (is_set_command) {
             // static Calendar calendar;
 
+            CreateDebugEvent(EVENT_DEBUG_SYNC_TIME, (SYNC_TIME_BY_COMMAND | SYNC_TIME_BEFORE), false);
+
             xSemaphoreTake(clock_semaphore, portMAX_DELAY);
 
             SetTimeFromString(param, param + 7);
@@ -235,7 +243,9 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             xSemaphoreGive(clock_semaphore);
 
-            CreateGeneralEvent(result, EVENT_TYPE_TIME_SET, 4);
+            CreateDebugEvent(EVENT_DEBUG_SYNC_TIME, (SYNC_TIME_BY_COMMAND | SYNC_TIME_AFTER), false);
+
+            //CreateGeneralEvent(result, EVENT_TYPE_TIME_SET, 4);
         }
         break;
 
@@ -249,6 +259,13 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
         if (is_set_command) {
 
             switch (param_num) {
+
+            case 0:
+                flash_erase_sectors_in_range(FLASH_COUNTER_START_ADDRESS, END_OF_FLASH);
+                result = param_num;
+
+                ActivateSoftwareReset(RESET_AFTER_FLASH_CLEAR, 0, 0, 0);
+                break;
 
             case 1:
                 flash_erase_sectors_in_range(FLASH_RECORDS_START_ADDRESS, END_OF_FLASH);
@@ -297,6 +314,38 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     case COMMAND_BLE:
         if (is_set_command) {
             switch (param_num) {
+
+            case 2:
+                // request events
+
+                if (!driver_behaviour_state.in_event_transfer_process) {
+                    xEventGroupSetBits(transfer_event, EVENT_BLE_CONNECTION);
+                    result = param_num;
+                }
+                break;
+
+            case 3:
+                // confirm sent events
+                xEventGroupSetBits(transfer_confirm_event, EVENT_BLE_TRANSFER_SUCCESS);
+                result = param_num;
+                break;
+
+            case 4:
+                // reject last sent events
+                xEventGroupSetBits(transfer_confirm_event, EVENT_BLE_TRANSFER_ERROR);
+                result = param_num;
+                break;
+
+            case 6:
+                // abort last sent events
+                xEventGroupSetBits(transfer_confirm_event, EVENT_BLE_TRANSFER_ABORT);
+                result = param_num;
+                break;
+
+            case 11:
+                xEventGroupSetBits(transfer_confirm_event, EVENT_BLE_BLOCK_CONFIRM_AND_EXIT);
+                result = param_num;
+                break;
 
             case 9:
                 ble_services_disconnect();
@@ -349,7 +398,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         switch (param_num) {
 
-        case 8:
+        case TEST_MODE_TRIGGER_ACCIDENT:
             driver_behaviour_state.record_triggered = true;
             break;
 
@@ -359,6 +408,29 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
                 driver_behaviour_state.print_signal_mode = 0;
             else
                 driver_behaviour_state.print_signal_mode = param_num;
+            break;
+
+        case TEST_MODE_PRINT_ALL_EVENTS:
+            PrintAllEventData();
+            break;
+
+        case TEST_MODE_PRINT_ALL_EVENTS_AND_DATA:
+            driver_behaviour_state.print_event_data = true;
+            PrintAllEventData();
+            driver_behaviour_state.print_event_data = false;
+
+            break;
+
+        case TEST_MODE_PRINT_SENT_EVENT_MODE:
+            driver_behaviour_state.print_sent_event_id_mode = !driver_behaviour_state.print_sent_event_id_mode;
+            break;
+
+        case TEST_MODE_DROP_NEW_EVENTS:
+            driver_behaviour_state.block_new_events = !driver_behaviour_state.block_new_events;
+            break;
+
+        case TEST_MODE_FILL_EVENT_FLASH:
+            driver_behaviour_state.fill_event_flash = !driver_behaviour_state.fill_event_flash;
             break;
         }
 
@@ -396,6 +468,12 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
         if (is_set_command) {
             print_all_parameters();
             result = param_num;
+        }
+        break;
+
+    case COMMAND_DATATX:
+        if (is_set_command) {
+            ActivateSoftwareReset(RESET_AFTER_CHANGING_RX_PTR, param_num, 0, 0);
         }
         break;
 

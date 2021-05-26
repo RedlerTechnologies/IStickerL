@@ -6,11 +6,13 @@
 #include "ble_file_transfer.h"
 #include "commands.h"
 #include "configuration.h"
+#include "decoder.h"
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
 #include "drivers/lis3dh.h"
 #include "event_groups.h"
 #include "events.h"
+#include "flash_data.h"
 #include "float.h"
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
@@ -46,8 +48,10 @@ extern DeviceConfiguration device_config;
 extern uint32_t            reset_count_x;
 extern ResetData           reset_data;
 extern DeviceConfiguration device_config;
+extern ScanResult          scan_result;
 
 static uint8_t sample_buffer[7];
+ResetData reset_data_copy;
 
 DriverBehaviourState driver_behaviour_state;
 
@@ -99,7 +103,8 @@ void driver_behaviour_task(void *pvParameter)
 {
     static unsigned  duration;
     static AccSample acc_sample;
-    uint8_t          count = 0;
+    static uint32_t  search_id = 0;
+    uint8_t          count     = 0;
     bool             need_sleep;
 
     buzzer_train(1);
@@ -121,15 +126,19 @@ void driver_behaviour_task(void *pvParameter)
 
     // init glabal state variables //
 
-    driver_behaviour_state.time_synced           = false;
-    driver_behaviour_state.record_triggered      = false;
-    driver_behaviour_state.track_state           = TRACKING_STATE_WAKEUP;
-    driver_behaviour_state.stop_advertising_time = 0;
-    driver_behaviour_state.store_calibration     = false;
-    driver_behaviour_state.acc_int_counter       = 0;
-    driver_behaviour_state.manual_delayed        = false;
-    driver_behaviour_state.energy                = -1;
-    driver_behaviour_state.print_signal_mode     = 0;
+    driver_behaviour_state.time_synced               = false;
+    driver_behaviour_state.record_triggered          = false;
+    driver_behaviour_state.track_state               = TRACKING_STATE_WAKEUP;
+    driver_behaviour_state.stop_advertising_time     = 0;
+    driver_behaviour_state.store_calibration         = false;
+    driver_behaviour_state.acc_int_counter           = 0;
+    driver_behaviour_state.manual_delayed            = false;
+    driver_behaviour_state.energy                    = -1;
+    driver_behaviour_state.print_signal_mode         = 0;
+    driver_behaviour_state.print_sent_event_id_mode  = false;
+    driver_behaviour_state.in_event_transfer_process = false;
+    driver_behaviour_state.block_new_events          = false;
+    driver_behaviour_state.fill_event_flash          = false;
 
     // calibration value
     if (device_config.calibrate_value.avg_value.Z == 0) {
@@ -148,19 +157,40 @@ void driver_behaviour_task(void *pvParameter)
 
     driver_behaviour_state.sleep_delay_time = 40;
 
+    if (reset_data.reason == RESET_AFTER_CHANGING_RX_PTR) {
+        search_id = reset_data.v1;
+    }
+
     terminal_buffer_lock();
     sprintf(alert_str, "\r\n\r\nISticker-L version: %d.%d.%d - reset=%d reason=%d,%x,%x,%x\r\n\r\n", APP_MAJOR_VERSION, APP_MINOR_VERSION,
             APP_BUILD, reset_count_x, reset_data.reason, reset_data.v1, reset_data.v2, reset_data.v3);
     DisplayMessage(alert_str, 0, false);
     terminal_buffer_release();
-    memset(&reset_data, 0x00, sizeof(ResetData));
 
+    /* ???????????
+    memcpy( &reset_data_copy, &reset_data, sizeof(ResetData) );  
+    memset(&reset_data, 0x00, sizeof(ResetData));
+    */
+
+/* ??????????
     // test external flash
     uint16_t flash_id = flash_read_manufacture_id();
     NRFX_LOG_INFO("%s Flash ID 0x%04X", __func__, flash_id);
+*/
 
     record_init();
     set_sleep_timeout_on_ble();
+
+    // init counter
+    flash_counter_read(FLASH_COUNTER_IDX_LAST_SENT_EVENT_ID, (uint8_t *)&scan_result.read_marker.event_id, 4);
+    flash_counter_read(FLASH_COUNTER_IDX_LAST_SENT_EVENT_ADDRESS, (uint8_t *)&scan_result.read_marker.event_id, 4);
+
+    InitEventFlashStructure(search_id);
+
+/* ?????????
+    CreateVersionEvent(false);
+    CreateResetInfoEvent();
+*/
 
     while (1) {
 
@@ -201,15 +231,6 @@ void driver_behaviour_task(void *pvParameter)
         } else {
             CalibrateAllSamples();
 
-            // ??????????????
-            /*
-            terminal_print_signal_mode();
-            if (abs(driver_behaviour_state.Gx) >= 50)
-                driver_behaviour_state.Gx = 0;
-
-            continue;
-            */
-
             switch (driver_behaviour_state.track_state) {
             case TRACKING_STATE_WAKEUP:
                 if (ProcessWakeupState()) {
@@ -248,8 +269,6 @@ void driver_behaviour_task(void *pvParameter)
                 break;
             }
         }
-
-        //need_sleep = false; // ????????????
 
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);
@@ -292,6 +311,10 @@ static void terminal_print_signal_mode(void)
 
     case PRINT_SIGNAL_MODE_GX:
         sprintf(alert_str, "\r\nGx=%d\r\n", driver_behaviour_state.Gx);
+        break;
+
+    case PRINT_SIGNAL_MODE_GY:
+        sprintf(alert_str, "\r\nGy=%d\r\n", driver_behaviour_state.Gy);
         break;
     }
 
@@ -446,6 +469,7 @@ void CalibrateAllSamples(void)
     DriverBehaviourState *state = &driver_behaviour_state;
 
     state->Gx = 0;
+    state->Gy = 0;
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = &acc_samples[i];
@@ -455,6 +479,9 @@ void CalibrateAllSamples(void)
 
         if (abs(sample->X) > abs(state->Gx))
             state->Gx = sample->X;
+
+        if (abs(sample->Y) > abs(state->Gy))
+            state->Gy = sample->Y;
     }
 }
 
@@ -497,8 +524,6 @@ bool ProcessWakeupState(void)
     bool                  sense1 = false;
     bool                  found  = false;
     EventBits_t           uxBits;
-
-    //return true; // ?????????????????
 
 #ifdef SLEEP_DISABLE
     return true;

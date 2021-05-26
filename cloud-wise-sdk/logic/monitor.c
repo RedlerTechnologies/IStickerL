@@ -14,10 +14,10 @@
 #include "logic/peripherals.h"
 #include "logic/serial_comm.h"
 #include "logic/state_machine.h"
+#include "recording.h"
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
-#include "recording.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -162,7 +162,6 @@ void monitor_thread(void *arg)
         // ..
         AddSecondsToDate(&absolute_time, dt);
 
-        // state_machine_feed_watchdog();
         monitor_task_check();
 
 #if (FLASH_TEST_ENABLE)
@@ -186,6 +185,9 @@ void monitor_thread(void *arg)
 
 #endif
 
+        if (driver_behaviour_state.fill_event_flash)
+            CreateVersionEvent(false);
+
         if ((current_time % 8) == 0 || first) {
 
             first = false;
@@ -201,6 +203,11 @@ void monitor_thread(void *arg)
             sprintf(alert_str, " - Status: T=%dC, Bat=%d%%, Sleep=%d, VDD=%.2fV, acc=%d\r\n", temperature, bat_level,
                     driver_behaviour_state.time_to_sleep_left_in_sec, vdd_float, duration);
             DisplayMessageWithTime(alert_str, 0, false);
+
+            if ((current_time % 32)) {
+                CreateVersionEvent(true);
+                CreateMeasurementEvent(vdd_float, (float)(temperature));
+            }
 
             vTaskDelay(10);
             print_indicators();
@@ -433,6 +440,15 @@ void monitor_task_set(uint16_t task_bit)
     xSemaphoreGive(watchdog_monitor_semaphore);
 }
 
+void monitor_task_set_all(void)
+{
+    xSemaphoreTake(watchdog_monitor_semaphore, portMAX_DELAY);
+
+    monitor_state.task_bits |= 0xFFFF;
+
+    xSemaphoreGive(watchdog_monitor_semaphore);
+}
+
 bool monitor_task_check(void)
 {
     uint32_t duration;
@@ -441,7 +457,7 @@ bool monitor_task_check(void)
     uint8_t  task_id;
 
 #ifdef DISABLE_WATCHDOG
-    state_machine_feed_watchdog();
+    // state_machine_feed_watchdog();
     return true;
 #endif
 
@@ -468,7 +484,6 @@ bool monitor_task_check(void)
         if (!status) {
             // force reset on stucked task
             DisplayMessage("\r\nTask is stucked\r\n", 0, true);
-            // reset event here .. // ???????????
             vTaskDelay(200);
 
             ActivateSoftwareReset(RESET_WATCHDOG, task_id, 0, 0);
@@ -494,7 +509,6 @@ void print_indicators(void)
     ind_tamper    = (driver_behaviour_state.tampered) ? '1' : '0';
     ind_calibrate = (driver_behaviour_state.calibratation_saved_in_flash) ? '1' : '0';
 
-                  
     memset(alert_str, 0x00, ALERT_BUFFER_SIZE);
 
     sprintf(alert_str, "BLE=%c, ROUTE=%c, TMP=%c, CAL=%c\r\n\r\n", ind_ble, ind_route, ind_tamper, ind_calibrate);

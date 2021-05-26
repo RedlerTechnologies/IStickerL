@@ -286,8 +286,6 @@ void BFT_send_next_packet(void)
                 (ble_reading_file_state.prev_packet_address + BLE_READ_BUFFER_FILE_SIZE), ble_reading_file_state.file_length);
         DisplayMessage(alert_str, 0, false);
         terminal_buffer_release();
-
-        // ???????????? DelaySleep(10, 1);
     }
 
     packet_index++;

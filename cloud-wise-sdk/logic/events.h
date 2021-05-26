@@ -9,14 +9,22 @@ typedef struct {
     uint8_t *data;
 
     bool immediate_event;
+    bool save_in_flash;
 } IStickerEvent;
 
 typedef enum {
     EVENT_TYPE_TIME_SET    = 3,
     EVENT_TYPE_START_ROUTE = 11,
     EVENT_TYPE_END_ROUTE   = 12,
+    EVENT_TYPE_MEASURE     = 14,
     EVENT_TYPE_ACCIDENT    = 16,
     EVENT_TYPE_LOG         = 22,
+    EVENT_TYPE_DEBUG       = 23,
+    EVENT_TYPE_VERSION     = 25,
+    EVENT_TYPE_DEBUG_EXT   = 36,
+    EVENT_TYPE_KEEP_ALIVE  = 37,
+    EVENT_TYPE_RESET_INFO  = 40,
+
 } EventType;
 
 /////////////////////
@@ -100,9 +108,57 @@ typedef enum {
 #define LOG_MODEM_FAILED_NO_SEARCH 74
 #define LOG_MODEM_FAILED_SETTING_SECURITY_PARAMS 75
 
+// DEBUG CODES
+
+#define EVENT_DEBUG_FIX_TIME 0
+#define EVENT_DEBUG_GSM_TRANSMIT_REASON 1
+#define EVENT_DEBUG_AVERAGE_SNR 2    // unused
+#define EVENT_DEBUG_FOUND_NETWORKS 3 // unused
+#define EVENT_DEBUG_CALIBRATED_ANGLE_1 4
+#define EVENT_DEBUG_CALIBRATED_ANGLE_2 5
+#define EVENT_DEBUG_ONLINE_TIME 6 // unused
+#define EVENT_DEBUG_MODEM_REGISTER_MODE 7
+#define EVENT_DEBUG_CLOSE_ROUTE_REASON 8
+#define EVENT_DEBUG_BLE_DISCO_REASON 9
+#define EVENT_DEBUG_ROLLBACK_REASONS 10
+#define EVENT_DEBUG_UPGRADE_FILE_COMM_CRC 11
+#define EVENT_DEBUG_UPGRADE_FILE_FLASH_CRC 12
+#define EVENT_DEBUG_GPS_SAMPLE_TIME 13
+#define EVENT_DEBUG_STAY_IN_GEOFENCE_REASON 14
+#define EVENT_DEBUG_BATTERY_LEVEL_CHANGE 15
+#define EVENT_DEBUG_SYNC_TIME 16
+#define EVENT_DEBUG_HW_RESET_REASON 17
+#define EVENT_DEBUG_FLASH_SCAN_RESULT 18
+#define EVENT_DEBUG_FALSE_WAKEUP_COUNT 19
+#define EVENT_DEBUG_RESET_BEFORE_SLEEP 21
+/*
+#define EVENT_DEBUG_USED_SECTORS			22
+#define EVENT_DEBUG_ERROR_SECTORS			23
+#define EVENT_DEBUG_READ_ERROR_SECTORS                  24
+#define EVENT_DEBUG_SKIP_SECTORS			25
+*/
+#define EVENT_DEBUG_READ_ID 26
+#define EVENT_DEBUG_WRITE_ID 27
+#define EVENT_DEBUG_MEMORY_LOG_TIME 28
+#define EVENT_DEBUG_RECEPTION_LEVEL 29
+#define EVENT_DEBUG_MISSING_EVENT_ID 30
+#define EVENT_DEBUG_ACC_RECORD_COMPLETE 31
+#define EVENT_DEBUG_BLE_STATUS_CHANGE 32
+
+// sync time reasons
+#define SYNC_TIME_BEFORE 0x0000
+#define SYNC_TIME_AFTER 0x8000
+
+#define SYNC_TIME_BY_COMMAND 1
+#define SYNC_TIME_BY_GPS 2
+
 bool CreateEvent(IStickerEvent *event);
 void CreateAccidentEvent(void);
 void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size);
 void CreateEndRouteEvent(void);
+void CreateVersionEvent(bool is_immediate);
 
 uint16_t CRC16_Calc(uint8_t *ptrPct, uint16_t pctLen, uint16_t crc16);
+void     CreateDebugEvent(uint16_t value_type, int32_t value, bool extened);
+void     CreateResetInfoEvent(void);
+void     CreateMeasurementEvent(float bat_voltage, float temperature);
