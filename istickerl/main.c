@@ -147,10 +147,6 @@ static void logger_thread(void *arg)
  */
 void vApplicationIdleHook(void)
 {
-// ???????
-  int x= 0;
-  x++;
-
 #if NRF_LOG_ENABLED
     vTaskResume(m_logger_thread);
 #endif
@@ -214,6 +210,7 @@ int main(void)
     if (pdPASS != xTaskCreate(monitor_thread, "Monitor", 256, NULL, 1, &m_monitor_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
+
     if (pdPASS != xTaskCreate(ble_thread, "BLE", 256, NULL, 1, &m_ble_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }

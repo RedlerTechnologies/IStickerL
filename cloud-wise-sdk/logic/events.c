@@ -118,7 +118,7 @@ bool CreateEvent(IStickerEvent *event)
     bool           semaphore_taken = false;
     bool           save_in_flash   = true;
 
-    return true; // ?????????
+    // return true;
 
     if (driver_behaviour_state.block_new_events)
         drop = true;
@@ -140,9 +140,12 @@ bool CreateEvent(IStickerEvent *event)
         return false;
     }
 
-    if (!event->immediate_event) {
-        eid = scan_result.write_marker.event_id;
+    if (event->immediate_event) {
+        save_in_flash = event->save_in_flash;
     }
+
+    if (save_in_flash)
+        eid = scan_result.write_marker.event_id;
 
     memset(ble_buffer, 0x00, 64);
 
@@ -188,13 +191,15 @@ bool CreateEvent(IStickerEvent *event)
     memcpy(ble_buffer + ptr, (uint8_t *)&crc, 2);
     ptr += 2;
 
-    if (event->immediate_event) {
-        save_in_flash = event->save_in_flash;
-    }
-
     // write to flash here
     if (save_in_flash)
         result = flash_save_event(ble_buffer, eid, event->event_type, ptr - 4);
+    else {
+        terminal_buffer_lock();
+        sprintf(alert_str, "immediate event: type=%d\r\n", event->event_type);
+        DisplayMessage(alert_str, 0, false);
+        terminal_buffer_release();
+    }
 
     if (event->immediate_event) {
         ble_buffer[2] = 0x80;
@@ -312,8 +317,9 @@ void CreateVersionEvent(bool is_immediate)
     buffer[2] = APP_MINOR_VERSION;
     buffer[3] = APP_BUILD;
 
-    event.data_len = 4;
-    event.data     = buffer;
+    event.data_len        = 4;
+    event.data            = buffer;
+    event.immediate_event = is_immediate;
 
     if (is_immediate) {
         event.event_type = EVENT_TYPE_KEEP_ALIVE;
@@ -346,18 +352,20 @@ void CreateResetInfoEvent(void)
 void CreateMeasurementEvent(float bat_voltage, float temperature)
 {
     static uint8_t  buffer[25];
-    static uint32_t duration = 0;
+    static uint32_t time     = 0;
+    uint32_t        duration = 0;
     IStickerEvent   event;
 
     init_event(&event);
 
-    duration = timeDiff(xTaskGetTickCount(), duration) / 1000;
+    duration = timeDiff(xTaskGetTickCount(), time) / 1000;
 
     event.immediate_event = true;
 
     if (duration > (10 * 60)) {
         event.save_in_flash = true;
-    } 
+        time                = xTaskGetTickCount();
+    }
 
     memset(buffer, 0x00, 25);
 

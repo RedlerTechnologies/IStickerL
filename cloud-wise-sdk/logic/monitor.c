@@ -204,14 +204,14 @@ void monitor_thread(void *arg)
                     driver_behaviour_state.time_to_sleep_left_in_sec, vdd_float, duration);
             DisplayMessageWithTime(alert_str, 0, false);
 
+            vTaskDelay(10);
+            print_indicators();
+            terminal_buffer_release();
+
             if ((current_time % 32)) {
                 CreateVersionEvent(true);
                 CreateMeasurementEvent(vdd_float, (float)(temperature));
             }
-
-            vTaskDelay(10);
-            print_indicators();
-            terminal_buffer_release();
 
             if (ble_services_is_connected()) {
 

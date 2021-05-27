@@ -139,11 +139,11 @@ void ble_services_init_0(void)
     uint32_t res;
     uint16_t crc_before;
 
-    #ifndef BLE_ADVERTISING
-      return;
-    #endif 
-
     ble_stack_init();
+
+#ifndef BLE_ADVERTISING
+    return;
+#endif
 
     res = sd_ble_gap_addr_get(&mac_address);
 
@@ -155,9 +155,9 @@ void ble_services_init_0(void)
 
 void ble_services_init(void)
 {
-    #ifndef BLE_ADVERTISING
-      return;
-    #endif 
+#ifndef BLE_ADVERTISING
+    return;
+#endif
 
     gap_params_init();
     gatt_init();
@@ -846,7 +846,6 @@ bool ble_services_notify_event_transfer(uint8_t *const data, size_t length)
     return (err_code == NRF_SUCCESS);
 }
 
-
 bool ble_services_update_acc(uint8_t *const data, size_t length)
 {
     ret_code_t err_code;
@@ -894,7 +893,6 @@ bool ble_services_update_event_transfer(uint8_t *const data, size_t length)
     err_code = ble_istickerl_update_event_transfer(&m_istickerl, data, length);
     return (err_code == NRF_SUCCESS);
 }
-
 
 void SetDeviceIDFromMacAddress(ble_gap_addr_t *mac_address)
 {

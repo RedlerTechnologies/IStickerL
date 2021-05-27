@@ -196,14 +196,11 @@ int16_t record_search(uint32_t record_id)
 
 void record_trigger(uint8_t reason)
 {
-    static uint32_t record_id = 0;
-
     acc_record.state         = ACC_RECORD_IDENTIFIED;
     acc_record.record_reason = reason;
 
     acc_record.record_id = scan_result.write_marker.event_id;
-    // record_id            = GetRandomNumber();
-    acc_record.record_id = record_id;
+    // acc_record.record_id            = GetRandomNumber();
 }
 
 bool record_is_active(void)

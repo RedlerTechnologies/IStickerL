@@ -51,7 +51,7 @@ extern DeviceConfiguration device_config;
 extern ScanResult          scan_result;
 
 static uint8_t sample_buffer[7];
-ResetData reset_data_copy;
+ResetData      reset_data_copy;
 
 DriverBehaviourState driver_behaviour_state;
 
@@ -167,16 +167,12 @@ void driver_behaviour_task(void *pvParameter)
     DisplayMessage(alert_str, 0, false);
     terminal_buffer_release();
 
-    /* ???????????
-    memcpy( &reset_data_copy, &reset_data, sizeof(ResetData) );  
+    memcpy(&reset_data_copy, &reset_data, sizeof(ResetData));
     memset(&reset_data, 0x00, sizeof(ResetData));
-    */
 
-/* ??????????
     // test external flash
     uint16_t flash_id = flash_read_manufacture_id();
     NRFX_LOG_INFO("%s Flash ID 0x%04X", __func__, flash_id);
-*/
 
     record_init();
     set_sleep_timeout_on_ble();
@@ -187,10 +183,8 @@ void driver_behaviour_task(void *pvParameter)
 
     InitEventFlashStructure(search_id);
 
-/* ?????????
     CreateVersionEvent(false);
     CreateResetInfoEvent();
-*/
 
     while (1) {
 

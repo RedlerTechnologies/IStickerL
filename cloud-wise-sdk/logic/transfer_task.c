@@ -57,7 +57,6 @@ void transfer_task(void *pvParameter)
         result                        = xEventGroupWaitBits(transfer_event, EVENT_BLE_CONNECTION, pdTRUE, pdFALSE, (TickType_t)1000);
 
         monitor_task_set(TASK_MONITOR_BIT_TRANSFER);
-        continue; // ???????????????
 
         if (result & EVENT_BLE_CONNECTION) {
             xEventGroupClearBits(transfer_event, EVENT_BLE_CONNECTION);
@@ -121,10 +120,12 @@ uint8_t SendingEventData(unsigned char ble_mode)
 
     xEventGroupClearBits(transfer_confirm_event, 0xFF);
 
-    tx_msg_len = Build_R2_Packet(COMMAND_CONNECT_SEND_EVENTS, 0, transfer_buffer + 4, 0, 0, 15);
-    AddBLEHeader(transfer_buffer, 0);
+    tx_msg_len = Build_R2_Packet(COMMAND_CONNECT_SEND_EVENTS, 0, transfer_buffer + 2, 0, 0, 15);
+    // AddBLEHeader(transfer_buffer, 0);
     // BLE_TriggerPacketSending(transfer_buffer, (tx_msg_len + 4));
-    ret_ble_error = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 4);
+    transfer_buffer[0] = 0x80;
+    transfer_buffer[1] = tx_msg_len;
+    ret_ble_error      = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 2);
 
     // validate the connection response message
     // ..
@@ -174,7 +175,7 @@ uint8_t SendingEventData(unsigned char ble_mode)
                 flags |= MARKER_OPT_PRINT_ID;
 
             if (xSemaphoreTake(event_semaphore, (portTickType)500) == pdTRUE) {
-                InitMarker(&temp_marker, transfer_buffer + 4, temp_marker.flash_address, tx_buffer_size - 4, 0, flags); // ??????????
+                InitMarker(&temp_marker, transfer_buffer + 2, temp_marker.flash_address, tx_buffer_size - 2, 0, flags); // ??????????
 
                 temp_marker.limit_address = before_write_marker.flash_address;
 
@@ -190,9 +191,12 @@ uint8_t SendingEventData(unsigned char ble_mode)
                     last_valid_marker.flash_address = temp_marker.flash_address - temp_marker.event_size;
                     last_valid_marker.event_id      = temp_marker.event_id;
 
-                    AddBLEHeader(transfer_buffer, packet_count);
+                    // AddBLEHeader(transfer_buffer, packet_count);
                     // BLE_TriggerPacketSending(transfer_buffer, (temp_marker.offset + 4));
-                    ret_ble_error = !ble_services_notify_event_transfer(transfer_buffer, temp_marker.offset + 4);
+
+                    transfer_buffer[0] = (packet_count & 0x7F) | 0x80;
+                    transfer_buffer[1] = temp_marker.offset;
+                    ret_ble_error      = !ble_services_notify_event_transfer(transfer_buffer, temp_marker.offset + 2);
 
                     packet_to_send_count++;
 
@@ -278,10 +282,12 @@ uint8_t SendingEventData(unsigned char ble_mode)
 
             flags = 0;
 
-            tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 4, (int)event_count, crc, 15);
-            AddBLEHeader(transfer_buffer, packet_count);
+            tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 2, (int)event_count, crc, 15);
+            //AddBLEHeader(transfer_buffer, packet_count);
             // BLE_TriggerPacketSending(transfer_buffer, (tx_msg_len + 4));
-            ret_ble_error = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 4);
+            transfer_buffer[0] = 0x80;
+            transfer_buffer[1] = tx_msg_len;
+            ret_ble_error      = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 2);
 
             end_session_sent = 1;
 
@@ -356,13 +362,16 @@ uint8_t SendingEventData(unsigned char ble_mode)
 
     if (!end_session_sent) {
         xEventGroupClearBits(transfer_event, 0xFF);
-        tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 4, 0, crc, 15);
-        AddBLEHeader(transfer_buffer, 0);
+        tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 2, 0, crc, 15);
+        // AddBLEHeader(transfer_buffer, 0);
         // BLE_TriggerPacketSending(transfer_buffer, (tx_msg_len + 4));
-        ret_ble_error = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 4);
+        transfer_buffer[0] = 0x80;
+        transfer_buffer[1] = tx_msg_len;
+
+        ret_ble_error = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 2);
     }
 
-    // ???????????? CreateLastSentEvent(3);
+    // CreateLastSentEvent(3);
 
     ///////////////
 

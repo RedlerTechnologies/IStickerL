@@ -752,7 +752,7 @@ void PrintAllEventData(void)
     DisplayMessage("\r\n--- Print All Events ---\r\n", 0, true);
 
     while (1) {
-        // ??????????? SetMonitor(TRACKING_TASK_ID);
+        monitor_task_set_all();
 
         InitMarker(&marker, Flash_buffer, marker.flash_address, MAX_FLASH_BUFFER, 0,
                    (MARKER_OPT_GET_CONTINUE | MARKER_OPT_PRINT | MARKER_OPT_IGNORE_CRC_ERROR));
