@@ -40,6 +40,7 @@ extern DriverBehaviourState driver_behaviour_state;
 
 uint8_t  SendingEventData(unsigned char ble_mode);
 uint16_t Build_R2_Packet(uint8_t cmd, uint8_t flags, uint8_t *sending_buffer, uint32_t value, uint16_t crc, uint8_t device_len);
+bool     send_data(uint8_t *data, uint8_t len);
 
 static uint8_t transfer_buffer[256 + 16];
 
@@ -48,22 +49,16 @@ static void AddBLEHeader(uint8_t *buffer, uint32_t packet_count) { memcpy(buffer
 void transfer_task(void *pvParameter)
 {
     EventBits_t result;
-    uint8_t     event_data_tarnsfer_triggered;
-    uint8_t     error;
+    uint8_t error;
 
     while (1) {
 
-        event_data_tarnsfer_triggered = 0;
-        result                        = xEventGroupWaitBits(transfer_event, EVENT_BLE_CONNECTION, pdTRUE, pdFALSE, (TickType_t)1000);
+        xEventGroupClearBits(transfer_event, 0xFF);
+        result = xEventGroupWaitBits(transfer_event, EVENT_BLE_CONNECTION, pdTRUE, pdFALSE, (TickType_t)1000);
 
         monitor_task_set(TASK_MONITOR_BIT_TRANSFER);
 
         if (result & EVENT_BLE_CONNECTION) {
-            xEventGroupClearBits(transfer_event, EVENT_BLE_CONNECTION);
-            event_data_tarnsfer_triggered = 1;
-        }
-
-        if (event_data_tarnsfer_triggered) {
 
             driver_behaviour_state.in_event_transfer_process = true;
 
@@ -110,7 +105,10 @@ uint8_t SendingEventData(unsigned char ble_mode)
     uint8_t     flags;
     bool        ret_ble_error;
 
-    tx_buffer_size = 256;
+    // tx_buffer_size = 256;
+    // tx_buffer_size = 196;
+    tx_buffer_size = 112;
+    packet_count   = 0;
 
     ///////////////////////////////////////
     // sending the R2 connection message //
@@ -119,13 +117,13 @@ uint8_t SendingEventData(unsigned char ble_mode)
     memset(transfer_buffer, 0, tx_buffer_size);
 
     xEventGroupClearBits(transfer_confirm_event, 0xFF);
+    xEventGroupClearBits(transfer_event, 0xFF);
 
-    tx_msg_len = Build_R2_Packet(COMMAND_CONNECT_SEND_EVENTS, 0, transfer_buffer + 2, 0, 0, 15);
-    // AddBLEHeader(transfer_buffer, 0);
-    // BLE_TriggerPacketSending(transfer_buffer, (tx_msg_len + 4));
+    tx_msg_len = Build_R2_Packet(COMMAND_CONNECT_SEND_EVENTS, 0, transfer_buffer + 6, 0, 0, 15);
     transfer_buffer[0] = 0x80;
-    transfer_buffer[1] = tx_msg_len;
-    ret_ble_error      = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 2);
+    transfer_buffer[1] = tx_msg_len + 4;
+    memcpy(transfer_buffer + 2, &packet_count, 4);
+    send_data(transfer_buffer, tx_msg_len + 6);
 
     // validate the connection response message
     // ..
@@ -133,7 +131,6 @@ uint8_t SendingEventData(unsigned char ble_mode)
     // save markers, in case where event data transfer fails //
 
     if (xSemaphoreTake(event_semaphore, (portTickType)500)) {
-        packet_count = 1;
 
         before_write_marker.event_id      = scan_result.write_marker.event_id;
         before_write_marker.flash_address = scan_result.write_marker.flash_address;
@@ -175,7 +172,7 @@ uint8_t SendingEventData(unsigned char ble_mode)
                 flags |= MARKER_OPT_PRINT_ID;
 
             if (xSemaphoreTake(event_semaphore, (portTickType)500) == pdTRUE) {
-                InitMarker(&temp_marker, transfer_buffer + 2, temp_marker.flash_address, tx_buffer_size - 2, 0, flags); // ??????????
+                InitMarker(&temp_marker, transfer_buffer + 6, temp_marker.flash_address, tx_buffer_size - 6, 0, flags);
 
                 temp_marker.limit_address = before_write_marker.flash_address;
 
@@ -191,12 +188,12 @@ uint8_t SendingEventData(unsigned char ble_mode)
                     last_valid_marker.flash_address = temp_marker.flash_address - temp_marker.event_size;
                     last_valid_marker.event_id      = temp_marker.event_id;
 
-                    // AddBLEHeader(transfer_buffer, packet_count);
-                    // BLE_TriggerPacketSending(transfer_buffer, (temp_marker.offset + 4));
+                    transfer_buffer[0] = 0x80; // (packet_count & 0x7F); // | 0x80;
+                    transfer_buffer[1] = temp_marker.offset + 4;
+                    memcpy(transfer_buffer + 2, &packet_count, 4);
+                    send_data(transfer_buffer, temp_marker.offset + 6);
 
-                    transfer_buffer[0] = (packet_count & 0x7F) | 0x80;
-                    transfer_buffer[1] = temp_marker.offset;
-                    ret_ble_error      = !ble_services_notify_event_transfer(transfer_buffer, temp_marker.offset + 2);
+                    vTaskDelay(50);
 
                     packet_to_send_count++;
 
@@ -237,14 +234,12 @@ uint8_t SendingEventData(unsigned char ble_mode)
                 ble_transfer_confirmation = xEventGroupWaitBits(transfer_event, EVENT_BLE_TRANSFER_ABORT, pdFALSE, pdFALSE, (TickType_t)1);
 
                 if (ble_transfer_confirmation & EVENT_BLE_TRANSFER_ABORT) {
-                    xEventGroupClearBits(transfer_event, 0xFF);
                     DisplayMessage("BLE transfer aborted by application", 0, true);
                     error = DATA_UPLOAD_ERROR_ABORTED_BY_APP;
                     break;
                 }
 
                 if (ble_transfer_confirmation & EVENT_BLE_BLOCK_CONFIRM_AND_EXIT) {
-                    xEventGroupClearBits(transfer_event, 0xFF);
                     completed = 1;
                 }
 
@@ -253,7 +248,7 @@ uint8_t SendingEventData(unsigned char ble_mode)
                 }
 
                 if (ble_mode) {
-                    if (packet_to_send_count >= 100)
+                    if (packet_to_send_count >= 150 /* 100*/ )
                         completed = 1;
                 }
             } else {
@@ -278,16 +273,13 @@ uint8_t SendingEventData(unsigned char ble_mode)
 
             // send the disconnection message
 
-            xEventGroupClearBits(transfer_event, 0xFF);
-
             flags = 0;
 
-            tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 2, (int)event_count, crc, 15);
-            //AddBLEHeader(transfer_buffer, packet_count);
-            // BLE_TriggerPacketSending(transfer_buffer, (tx_msg_len + 4));
+            tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 6, (int)event_count, crc, 15);
             transfer_buffer[0] = 0x80;
-            transfer_buffer[1] = tx_msg_len;
-            ret_ble_error      = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 2);
+            transfer_buffer[1] = tx_msg_len + 4;
+            memcpy(transfer_buffer + 2, &packet_count, 4);
+            send_data(transfer_buffer, tx_msg_len + 6);
 
             end_session_sent = 1;
 
@@ -304,8 +296,6 @@ uint8_t SendingEventData(unsigned char ble_mode)
                 error = DATA_UPLOAD_ERROR_DISCONNECTION_MSG;
             else
                 error = DATA_UPLOAD_ERROR_CONNECTION_TIMEOUT;
-
-            xEventGroupClearBits(transfer_event, 0xFF);
         }
 
         // update markers (roll-back or commit)
@@ -358,17 +348,12 @@ uint8_t SendingEventData(unsigned char ble_mode)
         vTaskDelay(3000);
     }
 
-    // DelaySleep(10,0);
-
     if (!end_session_sent) {
-        xEventGroupClearBits(transfer_event, 0xFF);
-        tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 2, 0, crc, 15);
-        // AddBLEHeader(transfer_buffer, 0);
-        // BLE_TriggerPacketSending(transfer_buffer, (tx_msg_len + 4));
+        tx_msg_len = Build_R2_Packet(COMMAND_SEND_CRC, 0, transfer_buffer + 6, 0, crc, 15);
         transfer_buffer[0] = 0x80;
-        transfer_buffer[1] = tx_msg_len;
-
-        ret_ble_error = !ble_services_notify_event_transfer(transfer_buffer, tx_msg_len + 2);
+        transfer_buffer[1] = tx_msg_len + 4;
+        memcpy(transfer_buffer + 2, &packet_count, 4);
+        send_data(transfer_buffer, tx_msg_len + 6);
     }
 
     // CreateLastSentEvent(3);
@@ -449,4 +434,20 @@ uint16_t Build_R2_Packet(uint8_t cmd, uint8_t flags, uint8_t *sending_buffer, ui
     sending_buffer[R2BufLen - 1] = (uint8_t)((crc & 0XFF00) >> 8);
 
     return R2BufLen;
+}
+
+bool send_data(uint8_t *data, uint8_t len)
+{
+    bool ret_ble_error;
+
+    if (driver_behaviour_state.print_sent_event_data_mode) {
+        terminal_buffer_lock();
+        DisplayMessage("\r\n", 2, false);
+        ConvertDataToHexString(data, alert_str, len / 3);
+        DisplayMessage(alert_str, 0, false);
+        DisplayMessage("\r\n", 2, false);
+        terminal_buffer_release();
+    }
+
+    ret_ble_error = !ble_services_notify_event_transfer(transfer_buffer, len);
 }

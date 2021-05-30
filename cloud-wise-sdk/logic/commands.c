@@ -245,7 +245,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             CreateDebugEvent(EVENT_DEBUG_SYNC_TIME, (SYNC_TIME_BY_COMMAND | SYNC_TIME_AFTER), false);
 
-            //CreateGeneralEvent(result, EVENT_TYPE_TIME_SET, 4);
+            // CreateGeneralEvent(result, EVENT_TYPE_TIME_SET, 4);
         }
         break;
 
@@ -338,12 +338,12 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             case 6:
                 // abort last sent events
-                xEventGroupSetBits(transfer_confirm_event, EVENT_BLE_TRANSFER_ABORT);
+                xEventGroupSetBits(transfer_event, EVENT_BLE_TRANSFER_ABORT);
                 result = param_num;
                 break;
 
             case 11:
-                xEventGroupSetBits(transfer_confirm_event, EVENT_BLE_BLOCK_CONFIRM_AND_EXIT);
+                xEventGroupSetBits(transfer_event, EVENT_BLE_BLOCK_CONFIRM_AND_EXIT);
                 result = param_num;
                 break;
 
@@ -431,6 +431,10 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         case TEST_MODE_FILL_EVENT_FLASH:
             driver_behaviour_state.fill_event_flash = !driver_behaviour_state.fill_event_flash;
+            break;
+
+        case TEST_MODE_PRINT_SENT_DATA_MODE:
+            driver_behaviour_state.print_sent_event_data_mode = !driver_behaviour_state.print_sent_event_data_mode;
             break;
         }
 

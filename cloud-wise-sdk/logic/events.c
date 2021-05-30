@@ -118,7 +118,7 @@ bool CreateEvent(IStickerEvent *event)
     bool           semaphore_taken = false;
     bool           save_in_flash   = true;
 
-    // return true;
+    // return true; 
 
     if (driver_behaviour_state.block_new_events)
         drop = true;

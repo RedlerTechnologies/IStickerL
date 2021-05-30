@@ -200,7 +200,7 @@ void record_trigger(uint8_t reason)
     acc_record.record_reason = reason;
 
     acc_record.record_id = scan_result.write_marker.event_id;
-    // acc_record.record_id            = GetRandomNumber();
+    //acc_record.record_id            = GetRandomNumber();
 }
 
 bool record_is_active(void)

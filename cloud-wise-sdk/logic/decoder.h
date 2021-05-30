@@ -90,7 +90,8 @@ typedef struct {
 } ScanResult;
 
 unsigned short InitEventFlashStructure(unsigned int search_event_id);
-void PrintAllEventData(void);
+void           PrintAllEventData(void);
 void InitMarker(FlashMarker *marker, unsigned char *buffer, unsigned flash_address, unsigned short buffer_size, unsigned short offset,
                 unsigned char options);
 void ReadEventsToMarker(FlashMarker *marker);
+void ConvertDataToHexString(uint8_t *data, uint8_t *converted_data, uint8_t len);

@@ -126,19 +126,20 @@ void driver_behaviour_task(void *pvParameter)
 
     // init glabal state variables //
 
-    driver_behaviour_state.time_synced               = false;
-    driver_behaviour_state.record_triggered          = false;
-    driver_behaviour_state.track_state               = TRACKING_STATE_WAKEUP;
-    driver_behaviour_state.stop_advertising_time     = 0;
-    driver_behaviour_state.store_calibration         = false;
-    driver_behaviour_state.acc_int_counter           = 0;
-    driver_behaviour_state.manual_delayed            = false;
-    driver_behaviour_state.energy                    = -1;
-    driver_behaviour_state.print_signal_mode         = 0;
-    driver_behaviour_state.print_sent_event_id_mode  = false;
-    driver_behaviour_state.in_event_transfer_process = false;
-    driver_behaviour_state.block_new_events          = false;
-    driver_behaviour_state.fill_event_flash          = false;
+    driver_behaviour_state.time_synced                = false;
+    driver_behaviour_state.record_triggered           = false;
+    driver_behaviour_state.track_state                = TRACKING_STATE_WAKEUP;
+    driver_behaviour_state.stop_advertising_time      = 0;
+    driver_behaviour_state.store_calibration          = false;
+    driver_behaviour_state.acc_int_counter            = 0;
+    driver_behaviour_state.manual_delayed             = false;
+    driver_behaviour_state.energy                     = -1;
+    driver_behaviour_state.print_signal_mode          = 0;
+    driver_behaviour_state.print_sent_event_id_mode   = false;
+    driver_behaviour_state.in_event_transfer_process  = false;
+    driver_behaviour_state.block_new_events           = false;
+    driver_behaviour_state.fill_event_flash           = false;
+    driver_behaviour_state.print_sent_event_data_mode = false;
 
     // calibration value
     if (device_config.calibrate_value.avg_value.Z == 0) {

@@ -221,7 +221,7 @@ uint32_t ble_istickerl_init(ble_istickerl_t *p_istickerl, ble_istickerl_init_t *
     memset(&add_char_params, 0, sizeof(add_char_params));
     add_char_params.uuid              = BLE_UUID_EVENT_TRANSFER_CHARACTERISTIC;
     add_char_params.uuid_type         = p_istickerl->uuid_type;
-    add_char_params.max_len           = 64;
+    add_char_params.max_len           = 128;
     add_char_params.is_var_len        = true;
     add_char_params.p_init_value      = p_istickerl_init->p_data_init_value;
     add_char_params.init_len          = p_istickerl_init->data_init_len;

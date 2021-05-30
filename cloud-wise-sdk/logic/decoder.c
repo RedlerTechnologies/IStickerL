@@ -135,7 +135,7 @@ void ReadEventsToMarker(FlashMarker *marker)
 
         while (!completed) {
 
-            // patch: avoid infinite loop ????????????
+            // patch: avoid infinite loop
             loop_count++;
             if (loop_count >= FLASH_SECTOR_SIZE) {
                 error     = 1;
@@ -719,19 +719,8 @@ void PrintEvent(unsigned char *buffer, unsigned address, unsigned char error)
     memset(alert_str, 0x00, ALERT_BUFFER_SIZE);
 
     if (driver_behaviour_state.print_event_data) {
-        while (i < record_len) {
 
-            tmp = ((buffer[i] >> 4) & 0x0F);
-            tmp += (tmp < 10) ? '0' : ('A' - 10);
-            alert_str[2 * i] = tmp;
-
-            tmp = (buffer[i] & 0x0F);
-            tmp += (tmp < 10) ? '0' : ('A' - 10);
-            alert_str[2 * i + 1] = tmp;
-
-            i++;
-        }
-
+        ConvertDataToHexString(buffer, alert_str, record_len);
         DisplayMessage(alert_str, 0, false);
     }
 
@@ -790,4 +779,20 @@ void PrintAllEventData(void)
     }
 
     xSemaphoreGive(event_semaphore);
+}
+
+void ConvertDataToHexString(uint8_t *data, uint8_t *converted_data, uint8_t len)
+{
+    uint8_t i;
+    uint8_t tmp;
+
+    for (i = 0; i < len; i++) {
+        tmp = ((data[i] >> 4) & 0x0F);
+        tmp += (tmp < 10) ? '0' : ('A' - 10);
+        converted_data[2 * i] = tmp;
+
+        tmp = (data[i] & 0x0F);
+        tmp += (tmp < 10) ? '0' : ('A' - 10);
+        converted_data[2 * i + 1] = tmp;
+    }
 }

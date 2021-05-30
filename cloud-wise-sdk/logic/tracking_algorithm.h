@@ -58,7 +58,7 @@ typedef enum {
 
 #define TEST_MODE_TRIGGER_ACCIDENT 8
 #define PRINT_SIGNAL_MODE_ENERGY 9
-#define TEST_MODE_PRINT_SENT_EVENT 
+#define TEST_MODE_PRINT_SENT_EVENT
 
 #define PRINT_SIGNAL_MODE_GX 11
 #define PRINT_SIGNAL_MODE_GY 12
@@ -67,6 +67,7 @@ typedef enum {
 #define TEST_MODE_PRINT_SENT_EVENT_MODE 30
 #define TEST_MODE_DROP_NEW_EVENTS 31
 #define TEST_MODE_FILL_EVENT_FLASH 32
+#define TEST_MODE_PRINT_SENT_DATA_MODE 33
 
 typedef struct {
     TrackingState track_state;
@@ -125,6 +126,7 @@ typedef struct {
     bool in_event_transfer_process;
     bool block_new_events;
     bool fill_event_flash;
+    bool print_sent_event_data_mode;
 
     uint8_t print_signal_mode;
 
