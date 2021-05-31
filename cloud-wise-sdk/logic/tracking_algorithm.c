@@ -71,6 +71,7 @@ static void    terminal_print_signal_mode(void);
 void           send_calibration_alert(void);
 void           print_movment(void);
 void           Set_Installation_Angle(void);
+uint16_t       get_current_state_timeout(void);
 
 void sample_timer_toggle_timer_callback(void *pvParameter)
 {
@@ -487,8 +488,10 @@ void ProcessDrivingState(void)
     DriverBehaviourState *state = &driver_behaviour_state;
     AccConvertedSample *  sample;
 
-    if (state->energy > MIN_ENERY_FOR_CONTINUE_ROUTE) {
-        state->last_activity_time = xTaskGetTickCount();
+    if (state->energy > MIN_ENERGY_FOR_CONTINUE_ROUTE) {
+
+        if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout()) // ?????????
+            state->last_activity_time = xTaskGetTickCount();
         print_movment();
     }
 
@@ -524,9 +527,12 @@ bool ProcessWakeupState(void)
     return true;
 #endif
 
-    if (state->energy > MIN_ENERY_FOR_START_ROUTE) {
+    if (state->energy > MIN_ENERGY_FOR_START_ROUTE) {
         state->movement_count++;
-        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+
+        // ??????????
+        if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout()) // ?????????
+            driver_behaviour_state.last_activity_time = xTaskGetTickCount();
         print_movment();
     }
 
@@ -820,7 +826,7 @@ void set_sleep_timeout(uint16_t value)
         driver_behaviour_state.sleep_delay_time = value;
 }
 
-void set_sleep_timeout_on_ble(void)
+uint16_t get_current_state_timeout(void)
 {
     uint16_t timeout_value;
 
@@ -836,6 +842,28 @@ void set_sleep_timeout_on_ble(void)
         else
             timeout_value = SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED;
     }
+
+    return timeout_value;
+}
+
+void set_sleep_timeout_on_ble(void)
+{
+    uint16_t timeout_value = get_current_state_timeout();
+
+    /*
+        if (ble_services_is_connected()) {
+            if (driver_behaviour_state.track_state == TRACKING_STATE_WAKEUP)
+                timeout_value = SLEEP_TIMEOUT_ON_WAKEUP_BLE_CONNECTED;
+            else
+                timeout_value = SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED;
+
+        } else {
+            if (driver_behaviour_state.track_state == TRACKING_STATE_WAKEUP)
+                timeout_value = SLEEP_TIMEOUT_ON_WAKEUP_BLE_DISCONNECTED;
+            else
+                timeout_value = SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED;
+        }
+        */
 
     set_sleep_timeout(timeout_value);
 }

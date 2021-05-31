@@ -11,10 +11,22 @@ NRF_LOG_MODULE_REGISTER();
 
 #define LIS3DH_WHO_AM_I_ADDR 0x0F
 
+#ifdef ACC_SAMPLE_FREQ_100HZ
+  #define ACC_REG_20H   0x57
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_200HZ
+  #define ACC_REG_20H   0x67
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_400HZ
+  #define ACC_REG_20H   0x77
+#endif
+
 
 unsigned char Acc_Table[ ACC_TABLE_DRIVER_SIZE* 2] =
 {
-  0x20, 0x57,
+  0x20, ACC_REG_20H,
   0x21, 0x00,
   0x22, 0x40,
   //0x23, 0xB0, 

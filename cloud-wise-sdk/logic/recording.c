@@ -31,6 +31,25 @@ extern ScanResult           scan_result;
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
 
+/* ?????????????
+#ifdef ACC_SAMPLE_FREQ_100HZ
+  #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_100HZ
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_200HZ
+  #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_200HZ
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_400HZ
+  #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_400HZ
+#endif
+*/
+
+// ?????????????? 
+// bug in Back office. It read correctly only of the hz code is 50hz
+// unremark the aboce section when the bug is fixed
+#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_50HZ
+
 static void record_create_new(void);
 static void SendRecordAlert(uint32_t record_id);
 
@@ -200,7 +219,7 @@ void record_trigger(uint8_t reason)
     acc_record.record_reason = reason;
 
     acc_record.record_id = scan_result.write_marker.event_id;
-    //acc_record.record_id            = GetRandomNumber();
+    // acc_record.record_id            = GetRandomNumber();
 }
 
 bool record_is_active(void)
@@ -229,7 +248,7 @@ static void get_header(uint8_t *header)
     header[8] = c.month;
     header[9] = c.year;
 
-    header[13] = RECORD_SAMPLE_FREQ_50HZ;
+    header[13] = RECORD_SAMPLE_FREQ_CODE;
     header[14] = acc_record.record_reason;
 
     param_enabled1 = (REACORD_PARAM_ACC_X | REACORD_PARAM_ACC_Y | REACORD_PARAM_ACC_Z);

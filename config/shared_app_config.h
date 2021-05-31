@@ -1,11 +1,13 @@
 #pragma once
 
 #define BLE_ADVERTISING
-#define FLASH_TEST_ENABLE   0
+#define FLASH_TEST_ENABLE 0
 //#define SLEEP_DISABLE
 //#define DISABLE_WATCHDOG
 
-
+//#define ACC_SAMPLE_FREQ_100HZ
+//#define ACC_SAMPLE_FREQ_200HZ
+#define ACC_SAMPLE_FREQ_400HZ
 
 #define NRFX_LOG_LEVEL_OFF 0
 #define NRFX_LOG_LEVEL_ERROR 1
@@ -44,7 +46,6 @@
 #endif
 
 #endif
-
 
 //===============================================
 

@@ -171,7 +171,7 @@ static void check_ble_events(void)
             break;
         }
 
-        CreateDebugEvent(EVENT_DEBUG_BLE_STATUS_CHANGE , get_bit(uxBits), false);
+        // ??????????? CreateDebugEvent(EVENT_DEBUG_BLE_STATUS_CHANGE , get_bit(uxBits), false);
     }
 }
 

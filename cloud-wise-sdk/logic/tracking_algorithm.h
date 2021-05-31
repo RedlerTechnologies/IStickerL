@@ -2,11 +2,23 @@
 
 #include "hal/hal_data_types.h"
 
-#define TIMER_PERIOD 10 // 10ms 100hz acc sampling rate
+#ifdef ACC_SAMPLE_FREQ_100HZ
+  #define TIMER_PERIOD 10 // 10ms sample rate
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_200HZ
+  #define TIMER_PERIOD 5 // 10ms sample rate
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_400HZ
+  #define TIMER_PERIOD 2 // 10ms sample rate
+#endif
 
 #define SAMPLE_BUFFER_SIZE 32
 #define ACC_MIN_ACCIDENT_VALUE 25
 #define MIN_G_FOR_ACCIDENT_EVENT 14 // 25 // ???????????
+
+
 
 #define MIN_SAMPLES_FOR_ACCIDENT 3
 
@@ -16,8 +28,8 @@
 
 #define DELAY_BETWEEN_ACCIDENTS 2000 // ~30 seconds
 
-#define MIN_ENERY_FOR_START_ROUTE 550
-#define MIN_ENERY_FOR_CONTINUE_ROUTE 650
+#define MIN_ENERGY_FOR_START_ROUTE 550
+#define MIN_ENERGY_FOR_CONTINUE_ROUTE 650
 
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED (10 * 60)
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED (2 * 60)
