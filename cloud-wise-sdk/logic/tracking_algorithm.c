@@ -266,6 +266,10 @@ void driver_behaviour_task(void *pvParameter)
             }
         }
 
+// ???????????
+        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+        need_sleep = false; // ?????????
+
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);
 

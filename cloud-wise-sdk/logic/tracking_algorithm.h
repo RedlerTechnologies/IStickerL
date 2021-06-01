@@ -20,7 +20,7 @@
 
 
 
-#define MIN_SAMPLES_FOR_ACCIDENT 3
+#define MIN_SAMPLES_FOR_ACCIDENT 30 // ??????????? 3
 
 #define ACC_NORMALIZATION_VALUE 1024
 
