@@ -6,6 +6,8 @@
 #include "decoder.h"
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
+#include "drivers/lis3dh.h"
+#include "event_groups.h"
 #include "events.h"
 #include "flash_data.h"
 #include "hal/hal_boards.h"
@@ -20,32 +22,41 @@
 #include <string.h>
 #include <time.h>
 
-static uint8_t              flash_buffer[300];
+static uint8_t              flash_buffer[260]; // ?????????????
 extern xSemaphoreHandle     tx_uart_semaphore;
 extern DriverBehaviourState driver_behaviour_state;
 extern AccidentState        accident_state;
 extern ScanResult           scan_result;
+
+xSemaphoreHandle acc_recording_semaphore;
+
+static AccSample acc_samples[SAMPLE_BUFFER_SIZE];
+
+EventGroupHandle_t event_save_recording;
+EventGroupHandle_t event_acc_process_sample;
+TimerHandle_t      sample_timer_handle;
 
 #define NRF_LOG_MODULE_NAME recording
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
 
-/* ?????????????
+EventGroupHandle_t event_sample_timer;
+static uint8_t     sample_buffer[7];
+
 #ifdef ACC_SAMPLE_FREQ_100HZ
-  #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_100HZ
+// #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_100HZ
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
-  #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_200HZ
+//#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_200HZ
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
-  #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_400HZ
+//#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_400HZ
 #endif
-*/
 
-// ?????????????? 
+// ??????????????
 // bug in Back office. It read correctly only of the hz code is 50hz
 // unremark the aboce section when the bug is fixed
 #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_50HZ
@@ -54,6 +65,173 @@ static void record_create_new(void);
 static void SendRecordAlert(uint32_t record_id);
 
 AccRecord acc_record;
+
+void sample_timer_toggle_timer_callback(void *pvParameter)
+{
+    BaseType_t xHigherPriorityTaskWoken, xResult;
+
+    UNUSED_PARAMETER(pvParameter);
+
+    xHigherPriorityTaskWoken = pdFALSE;
+
+    xResult = xEventGroupSetBitsFromISR(event_sample_timer, 0x01, &xHigherPriorityTaskWoken);
+
+    if (xResult != pdFAIL) {
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
+{
+    signed short   x, y, z;
+    signed short   x1, y1, z1;
+    unsigned short mask = 0x8000;
+    ret_code_t     err_code;
+
+    x = 0;
+    y = 0;
+    z = 0;
+
+    x |= (buffer[1] & 0xFF);
+    x |= ((buffer[2] & 0xFF) << 8);
+
+    y |= (buffer[3] & 0xFF);
+    y |= ((buffer[4] & 0xFF) << 8);
+
+    z |= (buffer[5] & 0xFF);
+    z |= ((buffer[6] & 0xFF) << 8);
+
+    x1 = ((x & 0xFFF0) >> 4);
+    if (x & mask)
+        x1 |= 0xF000;
+    else
+        x1 &= 0x0FFF;
+
+    y1 = ((y & 0xFFF0) >> 4);
+    if (y & mask)
+        y1 |= 0xF000;
+    else
+        y1 &= 0x0FFF;
+
+    z1 = ((z & 0xFFF0) >> 4);
+    if (z & mask)
+        z1 |= 0xF000;
+    else
+        z1 &= 0x0FFF;
+
+    acc_sample->X = -x1 * 12;
+    acc_sample->Y = -y1 * 12;
+    acc_sample->Z = z1 * 12;
+}
+
+void sampler_task(void *pvParameter)
+{
+    static AccSample acc_sample;
+    static uint16_t  block_length;
+
+    AccSample *acc_sample_array;
+
+    EventBits_t uxBits;
+    uint16_t    index  = 0;
+    uint8_t     count  = 0;
+    uint8_t     status = 0;
+
+    block_length = sizeof(AccSample) * SAMPLE_BUFFER_SIZE;
+
+    sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, (TimerCallbackFunction_t)sample_timer_toggle_timer_callback);
+    UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
+
+    vTaskDelay(3000);
+
+    while (1) {
+
+        monitor_task_set(TASK_MONITOR_BIT_TRACKING);
+
+        uxBits = xEventGroupWaitBits(event_sample_timer, 0x01, pdTRUE, pdFALSE, 100);
+
+        if (uxBits) {
+            lis3dh_read_buffer(sample_buffer, 7, (0x27 | 0x80));
+
+            status = sample_buffer[0];
+
+            if (!acc_record.accident_saving) {
+                if (status & 0xF0) {
+                    acc_record.acc_overrrun_count++;
+                }
+            }
+
+            if (status & 0x08) {
+            } else {
+                continue;
+            }
+
+            calculate_sample(&acc_sample, sample_buffer);
+            acc_samples[count] = acc_sample;
+
+            count++;
+
+            if (count >= SAMPLE_BUFFER_SIZE) {
+                count = 0;
+
+                xSemaphoreTake(acc_recording_semaphore, portMAX_DELAY);
+
+                memcpy(driver_behaviour_state.current_samples, acc_samples, block_length);
+                xEventGroupSetBits(event_acc_process_sample, 0x01);
+
+                if (!acc_record.accident_saving) {
+                    index = acc_record.sample_index;
+
+                    if (acc_record.accident_stage) {
+                        acc_sample_array = &acc_record.samples_after_event[index][0];
+
+                    } else {
+                        acc_sample_array = &acc_record.samples_before_event[index][0];
+                    }
+
+                    memcpy(acc_sample_array, acc_samples, block_length);
+                    index++;
+
+                    if (acc_record.accident_stage) {
+
+                        if (index >= RECORD_TIME_AFTER_EVENT) {
+                            // complete recording
+                            // ..
+
+                            acc_record.accident_stage      = false;
+                            acc_record.accident_identified = false;
+                            acc_record.accident_saving     = true;
+
+                            xEventGroupSetBits(event_save_recording, 0x01);
+
+                            index = 0;
+                        }
+
+                    } else {
+                        if (acc_record.sample_size_before < RECORD_TIME_BEFORE_EVENT)
+                            acc_record.sample_size_before++;
+
+                        acc_record.last_sample_index = index;
+
+                        if (index >= RECORD_TIME_BEFORE_EVENT)
+                            index = 0;
+
+                        if (acc_record.accident_identified) {
+                            acc_record.accident_stage = true;
+                            index                     = 0;
+                        }
+                    }
+
+                    acc_record.sample_index = index;
+                }
+
+                xSemaphoreGive(acc_recording_semaphore);
+            }
+
+        } else {
+            // failure in interrupt
+        }
+    }
+}
 
 void record_init(void)
 {
@@ -88,8 +266,16 @@ void record_init(void)
         }
     }
 
+    xSemaphoreTake(acc_recording_semaphore, portMAX_DELAY);
+
     // point to the oldest record date here
     acc_record.record_num = min_id;
+
+    acc_record.accident_stage      = false;
+    acc_record.accident_identified = false;
+    acc_record.accident_saving     = false;
+
+    xSemaphoreGive(acc_recording_semaphore);
 
     record_create_new();
 }
@@ -100,18 +286,23 @@ static void record_create_new(void)
     uint8_t  i;
     uint8_t  ratio;
 
-    memset(acc_record.samples1, 0x0, RECORD_BUFFER_SAMPLE_SIZE * 6);
+    xSemaphoreTake(acc_recording_semaphore, portMAX_DELAY);
 
-    acc_record.sample_index  = 0;
+    memset(acc_record.samples_before_event, 0x0, SAMPLE_BUFFER_SIZE * RECORD_TIME_BEFORE_EVENT * sizeof(AccSample));
+    memset(acc_record.samples_after_event, 0x0, SAMPLE_BUFFER_SIZE * RECORD_TIME_AFTER_EVENT * sizeof(AccSample));
+
     acc_record.flash_address = 0;
-    acc_record.state         = ACC_RECORD_START;
-    acc_record.buffer_stage  = 0;
     acc_record.record_id     = 0;
     acc_record.file_crc      = 0;
+
+    acc_record.sample_size_before = 0;
+    acc_record.accident_saving    = false;
 
     acc_record.record_num++;
     if (acc_record.record_num >= MAX_RECORDS)
         acc_record.record_num = 0;
+
+    xSemaphoreGive(acc_recording_semaphore);
 
     // delete region (sector) here
 
@@ -173,14 +364,13 @@ uint8_t record_scan_for_new_records(bool forced)
     }
 
     if (index >= 0 && ble_services_is_connected()) {
-        // SendRecordBleAlert(record_id);
         SendRecordAlert(record_id);
     }
 
     if (!forced) {
         terminal_buffer_lock();
         vTaskDelay(10);
-        sprintf(alert_str, "\r\nrec=%d, idx=%d\r\n", pending_counter, index);
+        sprintf(alert_str, "\r\npend rec=%d, idx=%d\r\n", pending_counter, index);
         DisplayMessage(alert_str, 0, false);
         terminal_buffer_release();
     }
@@ -199,8 +389,6 @@ int16_t record_search(uint32_t record_id)
     for (i = 0; i < MAX_RECORDS; i++) {
         flash_address = FLASH_RECORDS_START_ADDRESS + i * RECORD_SIZE;
 
-        // SetMonitorAll();
-
         flash_read_buffer(buffer, flash_address, 4);
         memcpy((uint8_t *)&value, buffer + 4, 4);
 
@@ -215,18 +403,24 @@ int16_t record_search(uint32_t record_id)
 
 void record_trigger(uint8_t reason)
 {
-    acc_record.state         = ACC_RECORD_IDENTIFIED;
+    xSemaphoreTake(acc_recording_semaphore, portMAX_DELAY);
+
     acc_record.record_reason = reason;
 
     acc_record.record_id = scan_result.write_marker.event_id;
     // acc_record.record_id            = GetRandomNumber();
+
+    acc_record.acc_overrrun_count  = 0;
+    acc_record.accident_identified = true;
+
+    xSemaphoreGive(acc_recording_semaphore);
 }
 
 bool record_is_active(void)
 {
     bool res;
 
-    res = (acc_record.state != ACC_RECORD_START);
+    // ?????????? res = (acc_record.state != ACC_RECORD_START);
 
     return res;
 }
@@ -271,6 +465,81 @@ static void get_header(uint8_t *header)
     header[15] = RECORD_RESOLUTION;
 }
 
+void close_recording(void)
+{
+    uint32_t flash_address;
+    uint16_t len;
+    int16_t  i;
+    int16_t  j;
+
+    if (xEventGroupWaitBits(event_save_recording, 0x01, pdTRUE, pdFALSE, 1) == 0)
+        return;
+
+    len = SAMPLE_BUFFER_SIZE * sizeof(AccSample);
+
+    flash_address = FLASH_RECORDS_START_ADDRESS + (acc_record.record_num) * RECORD_SIZE;
+
+    get_header(flash_buffer + 4);
+    flash_write_buffer(flash_buffer, flash_address, RECORD_HEADER_SIZE);
+    flash_address += RECORD_HEADER_SIZE;
+
+    for (i = acc_record.sample_size_before - 1; i >= 0; i--) {
+        j = (acc_record.last_sample_index - i - 1);
+
+        if (j < 0)
+            j += RECORD_TIME_BEFORE_EVENT;
+
+        memcpy(flash_buffer + 4, &acc_record.samples_before_event[j][0], len);
+        flash_write_buffer(flash_buffer, flash_address, len);
+
+        flash_address += len;
+    }
+
+    for (i = 0; i < RECORD_TIME_AFTER_EVENT; i++) {
+
+        memcpy(flash_buffer + 4, &acc_record.samples_after_event[i][0], len);
+        flash_write_buffer(flash_buffer, flash_address, len);
+
+        flash_address += len;
+    }
+
+    // CreateDebugEvent(EVENT_DEBUG_ACC_RECORD_COMPLETE, acc_record.record_id, 3, 0);
+
+    SendRecordAlert(acc_record.record_id);
+
+    record_write_status(acc_record.record_num, RECORD_CLOSE_IND, 0);
+
+    flash_address = FLASH_RECORDS_START_ADDRESS + (acc_record.record_num + 1) * RECORD_SIZE - RECORD_TERMINATOR_SIZE;
+    flash_address += 2;
+
+    memcpy(flash_buffer + 4, (unsigned char *)(&acc_record.file_crc), 2);
+    flash_write_buffer(flash_buffer, flash_address, 2);
+
+    flash_address += 2;
+    memcpy(flash_buffer + 4, (unsigned char *)(&acc_record.sample_count), 2);
+    flash_write_buffer(flash_buffer, flash_address, 2);
+
+    buzzer_train(3);
+    terminal_buffer_lock();
+    sprintf(alert_str, "\r\nRecord Saved: idx=%d\r\n", acc_record.record_num);
+    DisplayMessageWithTime(alert_str, strlen(alert_str), false);
+    terminal_buffer_release();
+    vTaskDelay(10);
+
+    terminal_buffer_lock();
+
+    if (acc_record.acc_overrrun_count) {
+        sprintf(alert_str, "\r\nmissed samples=%d\r\n", acc_record.acc_overrrun_count);
+        DisplayMessage(alert_str, strlen(alert_str), false);
+    } else {
+        DisplayMessage("No missed samples", 0, false);
+    }
+
+    terminal_buffer_release();
+
+    record_create_new();
+}
+
 void record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t value)
 {
     uint8_t buffer[8];
@@ -284,135 +553,6 @@ void record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t val
     // status = Program_Flash((unsigned char *)(&value), 1, flash_address);
     memcpy(buffer + 4, (uint8_t *)&value, 1);
     status = flash_write_buffer(buffer, flash_address, 1);
-}
-
-void record_add_sample(AccConvertedSample *acc_sample)
-{
-    uint8_t *ptr;
-    uint8_t *ptr2;
-    uint32_t flash_address;
-    int16_t  sample_value;
-    uint16_t sample_index;
-    uint16_t len;
-    uint8_t  end_of_buffer = 0;
-    bool     save          = false;
-
-    if (acc_record.buffer_stage) {
-        ptr  = (unsigned char *)acc_record.samples2;
-        ptr2 = (unsigned char *)acc_record.samples1;
-    } else {
-        ptr  = (unsigned char *)acc_record.samples1;
-        ptr2 = (unsigned char *)acc_record.samples2;
-    }
-
-    sample_index = acc_record.sample_index * 6;
-
-    sample_value = (short)(acc_sample->drive_direction);
-    memcpy(ptr + sample_index, (unsigned char *)(&sample_value), 2);
-    sample_index += 2;
-
-    sample_value = (short)(acc_sample->turn_direction);
-    memcpy(ptr + sample_index, (unsigned char *)(&sample_value), 2);
-    sample_index += 2;
-
-    sample_value = (short)(acc_sample->earth_direction);
-    memcpy(ptr + sample_index, (unsigned char *)(&sample_value), 2);
-
-    acc_record.sample_index++;
-
-    if (acc_record.sample_index >= RECORD_BUFFER_SAMPLE_SIZE)
-        end_of_buffer = 1;
-
-    switch (acc_record.state) {
-    case ACC_RECORD_START:
-        break;
-
-    case ACC_RECORD_IDENTIFIED:
-        // copy buffer sample 1 to sample 2
-
-        len = RECORD_BUFFER_SAMPLE_SIZE * 6 + RECORD_HEADER_SIZE;
-        memset(ptr2, 0x0, len);
-
-        acc_record.sample_count = RECORD_BUFFER_SAMPLE_SIZE;
-
-        get_header(ptr2);
-        ptr2 += RECORD_HEADER_SIZE;
-
-        memcpy(ptr2, ptr + acc_record.sample_index * 6, (RECORD_BUFFER_SAMPLE_SIZE - acc_record.sample_index) * 6);
-        memcpy(ptr2 + (RECORD_BUFFER_SAMPLE_SIZE - acc_record.sample_index) * 6, ptr, acc_record.sample_index * 6);
-
-        ptr2 -= RECORD_HEADER_SIZE;
-
-        end_of_buffer           = 1;
-        save                    = 1;
-        acc_record.state        = ACC_RECORD_CONTINUE;
-        acc_record.buffer_stage = 1;
-
-        break;
-
-    case ACC_RECORD_CONTINUE:
-
-        acc_record.sample_count++;
-
-        if (end_of_buffer) {
-            len = RECORD_BUFFER_SAMPLE_SIZE * 6;
-            memcpy(ptr2, ptr, len);
-            save = 1;
-        }
-        break;
-    }
-
-    if (end_of_buffer)
-        acc_record.sample_index = 0;
-
-    if (save) {
-        acc_record.buffer_stage = !acc_record.buffer_stage;
-
-        // copy ptr to the flash.
-        // TO DO IN FUTURE: copy ptr2 in parallel
-        flash_address = FLASH_RECORDS_START_ADDRESS + acc_record.record_num * RECORD_SIZE + acc_record.flash_address;
-
-        acc_record.file_crc = CRC16_Calc(ptr2, len, acc_record.file_crc);
-
-        memcpy(flash_buffer + 4, ptr2, len);
-        flash_write_buffer(flash_buffer, flash_address, len);
-
-        acc_record.flash_address += len;
-
-        if ((acc_record.flash_address + RECORD_BUFFER_SAMPLE_SIZE * 6) >= (RECORD_SIZE - RECORD_TERMINATOR_SIZE)) {
-
-            buzzer_train(3);
-            terminal_buffer_lock();
-            sprintf(alert_str, "\r\nRecord Saved: idx=%d\r\n", acc_record.record_num);
-            DisplayMessageWithTime(alert_str, strlen(alert_str), false);
-            terminal_buffer_release();
-            vTaskDelay(10);
-
-            // CreateDebugEvent(EVENT_DEBUG_ACC_RECORD_COMPLETE, acc_record.record_id, 3, 0);
-
-            // SendRecordBleAlert(acc_record.record_id);
-            SendRecordAlert(acc_record.record_id);
-
-            record_write_status(acc_record.record_num, RECORD_CLOSE_IND, 0);
-
-            flash_address = FLASH_RECORDS_START_ADDRESS + (acc_record.record_num + 1) * RECORD_SIZE - RECORD_TERMINATOR_SIZE;
-            flash_address += 2;
-
-            // Program_Flash((unsigned char *)(&acc_record.file_crc), 2, flash_address);
-            memcpy(flash_buffer + 4, (unsigned char *)(&acc_record.file_crc), 2);
-            flash_write_buffer(flash_buffer, flash_address, 2);
-
-            flash_address += 2;
-            // Program_Flash((unsigned char *)(&acc_record.sample_count), 2, flash_address);
-            memcpy(flash_buffer + 4, (unsigned char *)(&acc_record.sample_count), 2);
-            flash_write_buffer(flash_buffer, flash_address, 2);
-
-            record_create_new();
-            // SetCpuClockSpeed(FAST_CLOCK_REQ_SRC_FLASH, 0);
-        } else {
-            // do nothing
-        }
-    }
 }
 
 void record_print(unsigned char record_num)

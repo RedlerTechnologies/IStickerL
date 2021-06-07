@@ -2,11 +2,13 @@
 
 #include "boards.h"
 
-#define APP_MAJOR_VERSION   1
-#define APP_MINOR_VERSION   2
-#define APP_BUILD           102// ??????????? 2
+#define APP_MAJOR_VERSION 1
+#define APP_MINOR_VERSION 2
+#define APP_BUILD 102 // ??????????? 2
 
-#define HARDWARE_TYPE       11
+#define HARDWARE_TYPE 11
+
+#define SAMPLE_BUFFER_SIZE 32
 
 #define HAL_UICR_DEVICE_SERIAL_NUMBER 0
 
@@ -46,7 +48,7 @@
 
 #define HAL_ADC_VBATT NRF_SAADC_INPUT_VDD
 
-#define timeDiff(a,b)    ( (int32_t)(a) - (int32_t)(b) )
+#define timeDiff(a, b) ((int32_t)(a) - (int32_t)(b))
 
 #else
 

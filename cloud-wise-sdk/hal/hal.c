@@ -163,6 +163,8 @@ static void init_spi(nrfx_spi_evt_handler_t handler)
 
     nrfx_spi_config_t spi_config = NRFX_SPI_DEFAULT_CONFIG;
 
+    spi_config.frequency = NRF_SPI_FREQ_8M; // ????????
+
     spi_config.sck_pin  = HAL_SPI1_CLK;
     spi_config.ss_pin   = HAL_SPI1_SS;
     spi_config.mosi_pin = HAL_SPI1_MOSI;

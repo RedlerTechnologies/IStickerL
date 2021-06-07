@@ -164,6 +164,8 @@ void monitor_thread(void *arg)
 
         monitor_task_check();
 
+        close_recording();
+
 #if (FLASH_TEST_ENABLE)
 
         static uint32_t flash_address = 0x0000;

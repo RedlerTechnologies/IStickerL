@@ -1,26 +1,26 @@
 #pragma once
 
 #include "hal/hal_data_types.h"
+#include "hal/hal_boards.h"
 
 #ifdef ACC_SAMPLE_FREQ_100HZ
-  #define TIMER_PERIOD 10 // 10ms sample rate
+  #define TIMER_PERIOD 7 // <10ms sample rate
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
-  #define TIMER_PERIOD 5 // 10ms sample rate
+  #define TIMER_PERIOD 3 // 5ms sample rate
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
-  #define TIMER_PERIOD 2 // 10ms sample rate
+  #define TIMER_PERIOD 2 // 2.5ms sample rate
 #endif
 
-#define SAMPLE_BUFFER_SIZE 32
 #define ACC_MIN_ACCIDENT_VALUE 25
 #define MIN_G_FOR_ACCIDENT_EVENT 14 // 25 // ???????????
 
 
 
-#define MIN_SAMPLES_FOR_ACCIDENT 30 // ??????????? 3
+#define MIN_SAMPLES_FOR_ACCIDENT 1 // 30 // ??????????? 3
 
 #define ACC_NORMALIZATION_VALUE 1024
 
@@ -83,6 +83,9 @@ typedef enum {
 
 typedef struct {
     TrackingState track_state;
+
+    //AccSample prev_samples[SAMPLE_BUFFER_SIZE];
+    AccSample current_samples[SAMPLE_BUFFER_SIZE];
 
     /////////////////////
     // start algorithm //
@@ -152,6 +155,7 @@ typedef struct {
 } DriverBehaviourState;
 
 void driver_behaviour_task(void *pvParameter);
+void sampler_task(void *pvParameter);
 void SleepCPU(bool with_memory_retention);
 void clear_calibration(void);
 void copy_calibration(void);

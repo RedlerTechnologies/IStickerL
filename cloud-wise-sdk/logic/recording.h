@@ -1,9 +1,31 @@
 #pragma once
 
+#include "tracking_algorithm.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "tracking_algorithm.h"
+#ifdef ACC_SAMPLE_FREQ_100HZ
+#define ACC_SAMPLE_FREQ 100
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_200HZ
+#define ACC_SAMPLE_FREQ 200
+#endif
+
+#ifdef ACC_SAMPLE_FREQ_400HZ
+#define ACC_SAMPLE_FREQ 400
+#endif
+
+#define RECORD_TIME_BEFORE_EVENT 7 // in tenths of seconds
+#define RECORD_TIME_AFTER_EVENT 27 // in tenths of seconds
+#define RECORD_TIME (RECORD_TIME_BEFORE_EVENT + RECORD_TIME_AFTER_EVENT)
+
+#define NUM_SAMPLE_BLOCK_BEFORE_EVENT (ACC_SAMPLE_FREQ * RECORD_TIME_BEFORE_EVENT / 10 / SAMPLE_BUFFER_SIZE)
+#define NUM_SAMPLE_BLOCK_AFTER_EVENT (ACC_SAMPLE_FREQ * RECORD_TIME_AFTER_EVENT / 10 / SAMPLE_BUFFER_SIZE)
+#define NUM_SAMPLE_BLOCK_IN_MEMORY (NUM_SAMPLE_BLOCK_BEFORE_EVENT + NUM_SAMPLE_BLOCK_AFTER_EVENT)
+
+#define SAMPLE_MEMORY_SIZE (SAMPLE_BUFFER_SIZE * NUM_SAMPLE_BLOCK_IN_MEMORY * 2 * 3)
 
 #define RECORD_SIZE (FLASH_SECTOR_SIZE)
 #define MAX_RECORDS 64
@@ -31,38 +53,50 @@
 #define RECORD_CLOSE_IND 0
 #define RECORD_SENT_IND 1
 
+/* ????????
 typedef enum {
     ACC_RECORD_START = 0,
     ACC_RECORD_IDENTIFIED,
     ACC_RECORD_CONTINUE,
 } AccRecordState;
+*/
 
 typedef struct {
-    uint8_t samples1[3 * 2 * RECORD_BUFFER_SAMPLE_SIZE];
-    uint8_t samples2[RECORD_HEADER_SIZE + 3 * 2 * RECORD_BUFFER_SAMPLE_SIZE];
+
+    AccSample samples_before_event[RECORD_TIME_BEFORE_EVENT][SAMPLE_BUFFER_SIZE];
+    AccSample samples_after_event[RECORD_TIME_AFTER_EVENT][SAMPLE_BUFFER_SIZE];
+
+    uint16_t sample_index;
+    uint16_t last_sample_index;
+    uint16_t sample_size_before;
 
     int32_t  record_id;
     uint32_t last_found_record_time;
     uint32_t file_crc;
 
-    uint16_t sample_index;
     uint16_t flash_address;
     uint16_t sample_count;
 
+    uint16_t acc_overrrun_count;
+
     int16_t record_num;
-    uint8_t buffer_stage;
-    uint8_t state;
     uint8_t record_reason;
+
+    bool accident_stage;
+    bool accident_identified;
+    bool accident_saving;
 
 } AccRecord;
 
-
-void record_init(void);
+void    record_init(void);
 uint8_t record_scan_for_new_records(bool forced);
-void record_trigger(uint8_t reason);
-bool record_is_active(void);
-void record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t value);
-void record_add_sample(AccConvertedSample *acc_sample);
-void record_print(unsigned char record_num);
-int16_t record_search(uint32_t record_id);
+void    record_trigger(uint8_t reason);
+bool    record_is_active(void);
+void    record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t value);
+// void     record_add_sample(AccConvertedSample *acc_sample);
+void     record_print(unsigned char record_num);
+int16_t  record_search(uint32_t record_id);
 uint32_t GetRandomNumber(void);
+
+void recorder_task(void *pvParameter);
+void close_recording(void);

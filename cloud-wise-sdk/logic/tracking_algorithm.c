@@ -8,7 +8,6 @@
 #include "configuration.h"
 #include "decoder.h"
 #include "drivers/buzzer.h"
-#include "drivers/flash.h"
 #include "drivers/lis3dh.h"
 #include "event_groups.h"
 #include "events.h"
@@ -34,14 +33,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-EventGroupHandle_t   event_acc_sample;
-static TimerHandle_t sample_timer_handle;
-
-AccSample acc_samples[SAMPLE_BUFFER_SIZE];
-
-// ???????????
-uint32_t acc_samples_times[SAMPLE_BUFFER_SIZE];
-
 extern uint8_t             Acc_Table[];
 extern uint8_t             Acc_Sleep_Table[];
 extern DeviceConfiguration device_config;
@@ -49,9 +40,13 @@ extern uint32_t            reset_count_x;
 extern ResetData           reset_data;
 extern DeviceConfiguration device_config;
 extern ScanResult          scan_result;
+extern EventGroupHandle_t  event_acc_process_sample;
 
-static uint8_t sample_buffer[7];
-ResetData      reset_data_copy;
+extern AccSample acc_samples1[SAMPLE_BUFFER_SIZE];
+
+AccSample *incoming_sample_ptr;
+
+ResetData reset_data_copy;
 
 DriverBehaviourState driver_behaviour_state;
 
@@ -73,32 +68,7 @@ void           print_movment(void);
 void           Set_Installation_Angle(void);
 uint16_t       get_current_state_timeout(void);
 
-void sample_timer_toggle_timer_callback(void *pvParameter)
-{
-    BaseType_t xHigherPriorityTaskWoken, xResult;
-
-    UNUSED_PARAMETER(pvParameter);
-
-    xHigherPriorityTaskWoken = pdFALSE;
-
-    xResult = xEventGroupSetBitsFromISR(event_acc_sample, 0x01, &xHigherPriorityTaskWoken);
-
-    if (xResult != pdFAIL) {
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
-}
-
-unsigned char wait_for_sample(void)
-{
-    EventBits_t uxBits;
-
-    uxBits = xEventGroupWaitBits(event_acc_sample, 0x01, pdTRUE, pdFALSE, 100);
-
-    if (event_acc_sample)
-        return 1;
-    else
-        return 0;
-}
+extern AccSample *incoming_sample_ptr;
 
 void driver_behaviour_task(void *pvParameter)
 {
@@ -106,9 +76,15 @@ void driver_behaviour_task(void *pvParameter)
     static AccSample acc_sample;
     static uint32_t  search_id = 0;
     uint8_t          count     = 0;
+    EventBits_t      uxBits;
     bool             need_sleep;
 
     buzzer_train(1);
+
+    if ((RECORD_SIZE - RECORD_HEADER_SIZE - RECORD_TERMINATOR_SIZE) < SAMPLE_MEMORY_SIZE) {
+        DisplayMessage("error in memory size", 0, true);
+        ActivateSoftwareReset(RESET_OUT_OF_MEMORY, 0, 0, 0);
+    }
 
     LoadConfiguration();
     ble_services_init_0();
@@ -119,11 +95,7 @@ void driver_behaviour_task(void *pvParameter)
     ble_services_advertising_start();
 #endif
 
-    sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, (TimerCallbackFunction_t)sample_timer_toggle_timer_callback);
-    UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
-
     configure_acc(Acc_Table, ACC_TABLE_DRIVER_SIZE);
-    // configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
 
     // init glabal state variables //
 
@@ -172,9 +144,11 @@ void driver_behaviour_task(void *pvParameter)
     memcpy(&reset_data_copy, &reset_data, sizeof(ResetData));
     memset(&reset_data, 0x00, sizeof(ResetData));
 
+    /*
     // test external flash
     uint16_t flash_id = flash_read_manufacture_id();
     NRFX_LOG_INFO("%s Flash ID 0x%04X", __func__, flash_id);
+    */
 
     record_init();
     set_sleep_timeout_on_ble();
@@ -192,25 +166,12 @@ void driver_behaviour_task(void *pvParameter)
 
         monitor_task_set(TASK_MONITOR_BIT_TRACKING);
 
-        if (wait_for_sample()) {
-            lis3dh_read_buffer(sample_buffer, 7, (0x27 | 0x80));
-            calculate_sample(&acc_sample, sample_buffer);
-
-            // add the sample to a sample array
-            acc_samples[count] = acc_sample;
-            // ????????
-            acc_samples_times[count] = xTaskGetTickCount();
-
-            count++;
-
-            if (count >= SAMPLE_BUFFER_SIZE)
-                count = 0;
-            else
-                continue;
-
-        } else {
-            // failure in interrupt
+        uxBits = xEventGroupWaitBits(event_acc_process_sample, 0x01, pdTRUE, pdFALSE, 100);
+        if (uxBits == 0) {
+            continue;
         }
+
+        incoming_sample_ptr = driver_behaviour_state.current_samples;
 
         ///////////////////////////
         // process block of data //
@@ -266,7 +227,7 @@ void driver_behaviour_task(void *pvParameter)
             }
         }
 
-// ???????????
+        // ???????????
         driver_behaviour_state.last_activity_time = xTaskGetTickCount();
         need_sleep = false; // ?????????
 
@@ -280,6 +241,8 @@ void driver_behaviour_task(void *pvParameter)
 
             DisplayMessageWithTime("Sleep\r\n", 0, true);
             buzzer_long(1200);
+
+            configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
             vTaskDelay(2000);
 
             reset_data.reason = RESET_AFTER_SLEEP;
@@ -378,49 +341,6 @@ bool CheckNoActivity(void)
     return need_sleep;
 }
 
-void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
-{
-    signed short   x, y, z;
-    signed short   x1, y1, z1;
-    unsigned short mask = 0x8000;
-    ret_code_t     err_code;
-
-    x = 0;
-    y = 0;
-    z = 0;
-
-    x |= (buffer[1] & 0xFF);
-    x |= ((buffer[2] & 0xFF) << 8);
-
-    y |= (buffer[3] & 0xFF);
-    y |= ((buffer[4] & 0xFF) << 8);
-
-    z |= (buffer[5] & 0xFF);
-    z |= ((buffer[6] & 0xFF) << 8);
-
-    x1 = ((x & 0xFFF0) >> 4);
-    if (x & mask)
-        x1 |= 0xF000;
-    else
-        x1 &= 0x0FFF;
-
-    y1 = ((y & 0xFFF0) >> 4);
-    if (y & mask)
-        y1 |= 0xF000;
-    else
-        y1 &= 0x0FFF;
-
-    z1 = ((z & 0xFFF0) >> 4);
-    if (z & mask)
-        z1 |= 0xF000;
-    else
-        z1 &= 0x0FFF;
-
-    acc_sample->X = -x1 * 12;
-    acc_sample->Y = -y1 * 12;
-    acc_sample->Z = z1 * 12;
-}
-
 void Calculate_Energy(void)
 {
     AccSample *sample;
@@ -434,13 +354,13 @@ void Calculate_Energy(void)
     delta_energy = 0;
 
     if (driver_behaviour_state.energy < 0) {
-        memcpy((unsigned char *)&prev_sample, (unsigned char *)(&acc_samples[0]), sizeof(AccSample));
+        memcpy((unsigned char *)&prev_sample, (unsigned char *)(&incoming_sample_ptr[0]), sizeof(AccSample));
     }
 
     delta_energy = 0;
 
     for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = &acc_samples[i];
+        sample = &incoming_sample_ptr[i];
 
         temp = (sample->X - prev_sample.X);
         temp *= temp;
@@ -472,7 +392,7 @@ void CalibrateAllSamples(void)
     state->Gy = 0;
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = &acc_samples[i];
+        sample = &incoming_sample_ptr[i];
         ACC_CalibrateSample(sample, &sample_out);
 
         memcpy((unsigned char *)sample, (unsigned char *)(&sample_out), 6);
@@ -500,7 +420,7 @@ void ProcessDrivingState(void)
     }
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = (AccConvertedSample *)&acc_samples[i];
+        sample = (AccConvertedSample *)&incoming_sample_ptr[i];
 
         if (i == 0) {
             memset(ble_buffer, 0x00, 16);
@@ -621,7 +541,7 @@ void Process_Calibrate(void)
     unsigned char i;
 
     for (int i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = &acc_samples[i];
+        sample = &incoming_sample_ptr[i];
 
         state->sum_x += sample->X;
         state->sum_y += sample->Y;
@@ -768,7 +688,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         break;
     }
 
-    record_add_sample(sample);
+    // ????????? record_add_sample(sample);
 }
 
 signed short calculate_accident_hit_angle(AccConvertedSample *sample)

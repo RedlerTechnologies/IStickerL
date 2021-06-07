@@ -46,12 +46,15 @@ extern xSemaphoreHandle flash_semaphore;
 extern xSemaphoreHandle terminal_buff_semaphore;
 extern xSemaphoreHandle watchdog_monitor_semaphore;
 extern xSemaphoreHandle flash_counter_semaphore;
+extern xSemaphoreHandle acc_recording_semaphore;
 
-extern EventGroupHandle_t event_acc_sample;
+extern EventGroupHandle_t event_sample_timer;
+extern EventGroupHandle_t event_save_recording;
 extern EventGroupHandle_t event_uart_rx;
 extern EventGroupHandle_t ble_log_event;
 extern EventGroupHandle_t transfer_event;
 extern EventGroupHandle_t transfer_confirm_event;
+extern EventGroupHandle_t event_acc_process_sample;
 
 extern ResetData           reset_data;
 extern DeviceConfiguration device_config;
@@ -67,6 +70,7 @@ static TaskHandle_t m_logger_thread; // Logger thread
 
 TaskHandle_t driver_behaviour_task_handle;
 TaskHandle_t transfer_task_handle;
+TaskHandle_t sanpler_task_handle;
 
 extern DriverBehaviourState driver_behaviour_state;
 
@@ -219,6 +223,8 @@ int main(void)
 
     UNUSED_VARIABLE(xTaskCreate(transfer_task, "Transfer", configMINIMAL_STACK_SIZE + 100, NULL, 2, &transfer_task_handle));
 
+    UNUSED_VARIABLE(xTaskCreate(sampler_task, "Sampler", configMINIMAL_STACK_SIZE + 100, NULL, 3, &sanpler_task_handle));
+
     init_tasks();
 
     NRFX_LOG_INFO("%s Free Heap: %u", __func__, xPortGetFreeHeapSize());
@@ -268,11 +274,16 @@ void init_tasks(void)
     flash_counter_semaphore = xSemaphoreCreateBinary();
     xSemaphoreGive(flash_counter_semaphore);
 
-    event_acc_sample       = xEventGroupCreate();
-    event_uart_rx          = xEventGroupCreate();
-    ble_log_event          = xEventGroupCreate();
-    transfer_event         = xEventGroupCreate();
-    transfer_confirm_event = xEventGroupCreate();
+    acc_recording_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(acc_recording_semaphore);
+
+    event_acc_process_sample = xEventGroupCreate();
+    event_save_recording         = xEventGroupCreate();
+    event_sample_timer       = xEventGroupCreate();
+    event_uart_rx            = xEventGroupCreate();
+    ble_log_event            = xEventGroupCreate();
+    transfer_event           = xEventGroupCreate();
+    transfer_confirm_event   = xEventGroupCreate();
 
     init_ble_task();
 }
