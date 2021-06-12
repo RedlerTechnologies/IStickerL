@@ -23,3 +23,5 @@ void ble_thread(void *pvParameters);
 void init_ble_task(void);
 bool PostBleCommand(uint8_t *command_str, uint8_t size);
 void PostBleAlert(uint8_t *command_str);
+void set_last_ble_command_time(void);
+

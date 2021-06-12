@@ -70,7 +70,11 @@ void FileTransferFailed(bool abort)
     ble_reading_file_state.record_num = -1;
 }
 
-bool in_sending_file(void) { return (ble_reading_file_state.state != 0xFF); }
+bool in_sending_file(void)
+{
+    // check is during sending file process
+    return (ble_reading_file_state.state != 0xFF);
+}
 
 static void FileTransferSucceed(void)
 {
@@ -83,7 +87,7 @@ static void FileTransferSucceed(void)
     DisplayMessage("\r\nFile transfer succeed\r\n", 0, true);
     // CreateLogEvent(LOG_BLE_READ_FILE_COMPLETED, 2);
 
-    /* ??????????
+    /*
         if (ble_reading_file_state.file_type == FILE_TYPE_PARAMS)
             error_bits.configuration_Changed = 0;
             */

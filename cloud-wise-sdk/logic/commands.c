@@ -3,6 +3,7 @@
 #include "Configuration.h"
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
+#include "ble/ble_task.h"
 #include "ble_file_transfer.h"
 #include "decoder.h"
 #include "drivers/buzzer.h"
@@ -291,6 +292,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             if (is_remote) {
                 // send record file here
+                set_last_ble_command_time();
+
                 ble_reading_file_state.file_type = FILE_TYPE_RECORD;
                 BFT_start(-param_num, 1);
                 result = param_num;
@@ -317,6 +320,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
             case 2:
                 // request events
+
+                set_last_ble_command_time();
 
                 if (!driver_behaviour_state.in_event_transfer_process) {
                     xEventGroupSetBits(transfer_event, EVENT_BLE_CONNECTION);
@@ -345,6 +350,12 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
             case 11:
                 xEventGroupSetBits(transfer_event, EVENT_BLE_BLOCK_CONFIRM_AND_EXIT);
                 result = param_num;
+                break;
+
+            case 10:
+                // keep connection active
+                // enable this line only after the app stops sending unnecessary BLE 10 commands
+                // ???????????? driver_behaviour_state.last_ble_command_time = xTaskGetTickCount();
                 break;
 
             case 9:
@@ -419,6 +430,14 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
             PrintAllEventData();
             driver_behaviour_state.print_event_data = false;
 
+            break;
+
+        case 3:
+            driver_behaviour_state.registration_mode = true;
+            break;
+
+        case 4:
+            driver_behaviour_state.registration_mode = false;
             break;
 
         case TEST_MODE_PRINT_SENT_EVENT_MODE:

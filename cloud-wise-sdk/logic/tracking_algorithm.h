@@ -1,26 +1,34 @@
 #pragma once
 
-#include "hal/hal_data_types.h"
 #include "hal/hal_boards.h"
+#include "hal/hal_data_types.h"
 
 #ifdef ACC_SAMPLE_FREQ_100HZ
-  #define TIMER_PERIOD 7 // <10ms sample rate
+#define TIMER_PERIOD 7 // <10ms sample rate
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
-  #define TIMER_PERIOD 3 // 5ms sample rate
+#define TIMER_PERIOD 3 // 5ms sample rate
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
-  #define TIMER_PERIOD 2 // 2.5ms sample rate
+#define TIMER_PERIOD 2 // 2.5ms sample rate
 #endif
 
 #define ACC_MIN_ACCIDENT_VALUE 25
-#define MIN_G_FOR_ACCIDENT_EVENT 14 // 25 // ???????????
+#define MIN_G_FOR_ACCIDENT_EVENT 14 // 25
 
+#ifdef ACC_SAMPLE_FREQ_100HZ
+#define MIN_SAMPLES_FOR_ACCIDENT 15
+#endif
 
+#ifdef ACC_SAMPLE_FREQ_200HZ
+#define MIN_SAMPLES_FOR_ACCIDENT 30
+#endif
 
-#define MIN_SAMPLES_FOR_ACCIDENT 1 // 30 // ??????????? 3
+#ifdef ACC_SAMPLE_FREQ_400HZ
+#define MIN_SAMPLES_FOR_ACCIDENT 60
+#endif
 
 #define ACC_NORMALIZATION_VALUE 1024
 
@@ -28,8 +36,8 @@
 
 #define DELAY_BETWEEN_ACCIDENTS 2000 // ~30 seconds
 
-#define MIN_ENERGY_FOR_START_ROUTE 550
-#define MIN_ENERGY_FOR_CONTINUE_ROUTE 650
+#define MIN_ENERGY_FOR_START_ROUTE 100
+#define MIN_ENERGY_FOR_CONTINUE_ROUTE 150
 
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED (10 * 60)
 #define SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED (2 * 60)
@@ -84,8 +92,7 @@ typedef enum {
 typedef struct {
     TrackingState track_state;
 
-    //AccSample prev_samples[SAMPLE_BUFFER_SIZE];
-    AccSample current_samples[SAMPLE_BUFFER_SIZE];
+    AccConvertedSample current_samples[SAMPLE_BUFFER_SIZE];
 
     /////////////////////
     // start algorithm //
@@ -122,6 +129,7 @@ typedef struct {
     unsigned short accident_sample_count;
     signed short   hit_angle;
     unsigned short time_to_sleep_left_in_sec;
+    unsigned       sum_g_accident;
     AccidentState  accident_state;
 
     // on_driving
@@ -142,10 +150,12 @@ typedef struct {
     bool block_new_events;
     bool fill_event_flash;
     bool print_sent_event_data_mode;
+    bool registration_mode;
 
     uint8_t print_signal_mode;
 
     unsigned last_ble_connected_time;
+    unsigned last_ble_command_time;
     unsigned stop_advertising_time;
 
     signed       energy;

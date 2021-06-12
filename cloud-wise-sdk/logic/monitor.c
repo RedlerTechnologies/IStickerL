@@ -24,6 +24,7 @@
 
 extern DriverBehaviourState driver_behaviour_state;
 extern IStickerErrorBits    error_bits;
+extern AccRecord            acc_record;
 
 APP_TIMER_DEF(m_clock_timer);
 
@@ -190,6 +191,11 @@ void monitor_thread(void *arg)
         if (driver_behaviour_state.fill_event_flash)
             CreateVersionEvent(false);
 
+        if ((current_time % 4) == 0) {
+            if (driver_behaviour_state.registration_mode)
+                buzzer_train(3);
+        }
+
         if ((current_time % 8) == 0 || first) {
 
             first = false;
@@ -210,14 +216,19 @@ void monitor_thread(void *arg)
             print_indicators();
             terminal_buffer_release();
 
-            if ((current_time % 32)) {
+            // version & measurement as immediate events every ~2 minutes
+            if ((current_time % 128) == 0) {
                 CreateVersionEvent(true);
                 CreateMeasurementEvent(vdd_float, (float)(temperature));
             }
 
-            if (ble_services_is_connected()) {
-
+            // search for pending recording files
+            duration = timeDiff(xTaskGetTickCount(), acc_record.last_found_record_time) / 1000;
+            if (duration >= 30) {
                 record_scan_for_new_records(false);
+            }
+
+            if (ble_services_is_connected()) {
 
 #ifdef BLE_ADVERTISING
                 ble_services_update_battery_level(bat_level);

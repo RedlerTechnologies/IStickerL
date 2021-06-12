@@ -56,7 +56,9 @@ bool PostBleCommand(uint8_t *command_str, uint8_t size)
 void ble_thread(void *pvParameters)
 {
     static uint8_t result_buffer[COMMAND_CHAR_MAX_LEN];
-    BleMessage *   p;
+
+    uint32_t    duration;
+    BleMessage *p;
 
     ble_reading_file_state.state = 0xFF;
 
@@ -96,8 +98,23 @@ void ble_thread(void *pvParameters)
         CheckBleAdvertising();
 
         if (!ble_services_is_connected()) {
+        } else {
+            duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_ble_command_time) / 1000;
+
+            if (duration > (3 * 60)) {
+                DisplayMessage("\r\nForce Disconnection\r\n", 0, true);
+                ble_services_disconnect();
+                set_sleep_timeout(SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED);
+                set_last_ble_command_time();
+            }
         }
     }
+}
+
+void set_last_ble_command_time(void)
+{
+    // update command time
+    driver_behaviour_state.last_ble_command_time = xTaskGetTickCount();
 }
 
 void PostBleAlert(uint8_t *command_str)

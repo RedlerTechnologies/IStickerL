@@ -211,7 +211,7 @@ int main(void)
 
     NRF_LOG_FLUSH();
 
-    if (pdPASS != xTaskCreate(monitor_thread, "Monitor", 256, NULL, 1, &m_monitor_thread)) {
+    if (pdPASS != xTaskCreate(monitor_thread, "Monitor", 512, NULL, 1, &m_monitor_thread)) {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
@@ -336,4 +336,7 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 #endif // DEBUG
 }
 
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) { ActivateSoftwareReset(RESET_STACK_OVERFLOW, 0, 0, 0); }
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) 
+{ 
+  ActivateSoftwareReset(RESET_STACK_OVERFLOW, 0, 0, 0); 
+}

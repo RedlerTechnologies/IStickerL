@@ -7,18 +7,22 @@
 
 #ifdef ACC_SAMPLE_FREQ_100HZ
 #define ACC_SAMPLE_FREQ 100
+#define RECORD_TIME_BEFORE_EVENT 12 // in tenths of seconds
+#define RECORD_TIME_AFTER_EVENT 35  // in tenths of seconds
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
 #define ACC_SAMPLE_FREQ 200
+#define RECORD_TIME_BEFORE_EVENT 7 // in tenths of seconds
+#define RECORD_TIME_AFTER_EVENT 27 // in tenths of seconds
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
 #define ACC_SAMPLE_FREQ 400
+#define RECORD_TIME_BEFORE_EVENT 5 // in tenths of seconds
+#define RECORD_TIME_AFTER_EVENT 12 // in tenths of seconds
 #endif
 
-#define RECORD_TIME_BEFORE_EVENT 7 // in tenths of seconds
-#define RECORD_TIME_AFTER_EVENT 27 // in tenths of seconds
 #define RECORD_TIME (RECORD_TIME_BEFORE_EVENT + RECORD_TIME_AFTER_EVENT)
 
 #define NUM_SAMPLE_BLOCK_BEFORE_EVENT (ACC_SAMPLE_FREQ * RECORD_TIME_BEFORE_EVENT / 10 / SAMPLE_BUFFER_SIZE)
@@ -53,18 +57,10 @@
 #define RECORD_CLOSE_IND 0
 #define RECORD_SENT_IND 1
 
-/* ????????
-typedef enum {
-    ACC_RECORD_START = 0,
-    ACC_RECORD_IDENTIFIED,
-    ACC_RECORD_CONTINUE,
-} AccRecordState;
-*/
-
 typedef struct {
 
-    AccSample samples_before_event[RECORD_TIME_BEFORE_EVENT][SAMPLE_BUFFER_SIZE];
-    AccSample samples_after_event[RECORD_TIME_AFTER_EVENT][SAMPLE_BUFFER_SIZE];
+    AccConvertedSample samples_before_event[NUM_SAMPLE_BLOCK_BEFORE_EVENT][SAMPLE_BUFFER_SIZE];
+    AccConvertedSample samples_after_event[NUM_SAMPLE_BLOCK_AFTER_EVENT][SAMPLE_BUFFER_SIZE];
 
     uint16_t sample_index;
     uint16_t last_sample_index;
@@ -91,9 +87,7 @@ typedef struct {
 void    record_init(void);
 uint8_t record_scan_for_new_records(bool forced);
 void    record_trigger(uint8_t reason);
-bool    record_is_active(void);
 void    record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t value);
-// void     record_add_sample(AccConvertedSample *acc_sample);
 void     record_print(unsigned char record_num);
 int16_t  record_search(uint32_t record_id);
 uint32_t GetRandomNumber(void);

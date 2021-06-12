@@ -44,7 +44,7 @@ extern EventGroupHandle_t  event_acc_process_sample;
 
 extern AccSample acc_samples1[SAMPLE_BUFFER_SIZE];
 
-AccSample *incoming_sample_ptr;
+AccConvertedSample *incoming_sample_ptr;
 
 ResetData reset_data_copy;
 
@@ -52,23 +52,23 @@ DriverBehaviourState driver_behaviour_state;
 
 void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
-void           CalibrateAllSamples(void);
-void           ProcessDrivingState(void);
-void           ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
-void           Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
-void           Process_Calibrate(void);
-void           InitWakeupAlgorithm(void);
-signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
-bool           ProcessWakeupState(void);
-bool           CheckNoActivity(void);
-void           Calculate_Energy(void);
-static void    terminal_print_signal_mode(void);
-void           send_calibration_alert(void);
-void           print_movment(void);
-void           Set_Installation_Angle(void);
-uint16_t       get_current_state_timeout(void);
+// void           CalibrateAllSamples(void);
+void         ProcessDrivingState(void);
+void         ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
+void         Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
+void         Process_Calibrate(void);
+void         InitWakeupAlgorithm(void);
+signed short calculate_accident_hit_angle(AccConvertedSample *sample);
+bool         ProcessWakeupState(void);
+bool         CheckNoActivity(void);
+void         Calculate_Energy(void);
+static void  terminal_print_signal_mode(void);
+void         send_calibration_alert(void);
+void         print_movment(void);
+void         Set_Installation_Angle(void);
+uint16_t     get_current_state_timeout(void);
 
-extern AccSample *incoming_sample_ptr;
+extern AccConvertedSample *incoming_sample_ptr;
 
 void driver_behaviour_task(void *pvParameter)
 {
@@ -113,6 +113,7 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.block_new_events           = false;
     driver_behaviour_state.fill_event_flash           = false;
     driver_behaviour_state.print_sent_event_data_mode = false;
+    driver_behaviour_state.registration_mode          = false;
 
     // calibration value
     if (device_config.calibrate_value.avg_value.Z == 0) {
@@ -186,7 +187,7 @@ void driver_behaviour_task(void *pvParameter)
         if (!driver_behaviour_state.calibrated) {
             Process_Calibrate();
         } else {
-            CalibrateAllSamples();
+            // CalibrateAllSamples();
 
             switch (driver_behaviour_state.track_state) {
             case TRACKING_STATE_WAKEUP:
@@ -227,9 +228,11 @@ void driver_behaviour_task(void *pvParameter)
             }
         }
 
+        /*
         // ???????????
         driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-        need_sleep = false; // ?????????
+        need_sleep                                = false;
+        */
 
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);
@@ -360,7 +363,7 @@ void Calculate_Energy(void)
     delta_energy = 0;
 
     for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = &incoming_sample_ptr[i];
+        sample = (AccSample *)&incoming_sample_ptr[i];
 
         temp = (sample->X - prev_sample.X);
         temp *= temp;
@@ -382,29 +385,6 @@ void Calculate_Energy(void)
     driver_behaviour_state.energy = delta_energy;
 }
 
-void CalibrateAllSamples(void)
-{
-    AccSample *           sample;
-    AccConvertedSample    sample_out;
-    DriverBehaviourState *state = &driver_behaviour_state;
-
-    state->Gx = 0;
-    state->Gy = 0;
-
-    for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = &incoming_sample_ptr[i];
-        ACC_CalibrateSample(sample, &sample_out);
-
-        memcpy((unsigned char *)sample, (unsigned char *)(&sample_out), 6);
-
-        if (abs(sample->X) > abs(state->Gx))
-            state->Gx = sample->X;
-
-        if (abs(sample->Y) > abs(state->Gy))
-            state->Gy = sample->Y;
-    }
-}
-
 void ProcessDrivingState(void)
 {
     static uint8_t ble_buffer[16];
@@ -414,7 +394,7 @@ void ProcessDrivingState(void)
 
     if (state->energy > MIN_ENERGY_FOR_CONTINUE_ROUTE) {
 
-        if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout()) // ?????????
+        if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout())
             state->last_activity_time = xTaskGetTickCount();
         print_movment();
     }
@@ -454,8 +434,7 @@ bool ProcessWakeupState(void)
     if (state->energy > MIN_ENERGY_FOR_START_ROUTE) {
         state->movement_count++;
 
-        // ??????????
-        if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout()) // ?????????
+        if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout())
             driver_behaviour_state.last_activity_time = xTaskGetTickCount();
         print_movment();
     }
@@ -465,52 +444,6 @@ bool ProcessWakeupState(void)
     }
 
     return found;
-}
-
-void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out)
-{
-    DriverBehaviourState *state = &driver_behaviour_state;
-
-    float x, y, z;
-    float drive_direction, turn_direction, earth_direction;
-
-    acc_sample_in->X -= state->calibrated_value.avg_value.X;
-    acc_sample_in->Y -= state->calibrated_value.avg_value.Y;
-    acc_sample_in->Z -= state->calibrated_value.avg_value.Z;
-
-    x = acc_sample_in->X;
-    y = acc_sample_in->Y;
-    z = acc_sample_in->Z;
-
-    x /= ACC_NORMALIZATION_VALUE;
-    y /= ACC_NORMALIZATION_VALUE;
-    z /= ACC_NORMALIZATION_VALUE;
-
-    switch (state->calibrated_value.axis) {
-    case 0:
-        // error in calibration
-        break;
-
-    case 1:
-        // error right now...
-        break;
-
-    case 2:
-        drive_direction = y * cos(state->angle1);
-        turn_direction  = x;
-        earth_direction = z * sin(state->angle1);
-        break;
-
-    case 3:
-        drive_direction = z * sin(state->angle1);
-        turn_direction  = x;
-        earth_direction = y * cos(state->angle1);
-        break;
-    }
-
-    acc_sample_out->drive_direction = (signed short)(drive_direction * 100);
-    acc_sample_out->earth_direction = (signed short)(earth_direction * 100);
-    acc_sample_out->turn_direction  = (signed short)(turn_direction * 100);
 }
 
 void Set_Installation_Angle(void)
@@ -541,7 +474,7 @@ void Process_Calibrate(void)
     unsigned char i;
 
     for (int i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = &incoming_sample_ptr[i];
+        sample = (AccSample *)&incoming_sample_ptr[i];
 
         state->sum_x += sample->X;
         state->sum_y += sample->Y;
@@ -589,6 +522,7 @@ void Process_Calibrate(void)
             memcpy(&device_config.calibrate_value, &state->calibrated_value, sizeof(CalibratedValue));
             state->tampered = false;
             SaveConfiguration(false);
+            driver_behaviour_state.registration_mode = false;
         }
 
         driver_behaviour_state.store_calibration = false;
@@ -610,6 +544,9 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
     if (driver_behaviour_state.print_signal_mode)
         return;
 
+    if (driver_behaviour_state.registration_mode)
+        return;
+
     switch (state->accident_state) {
     case ACCIDENT_STATE_NONE:
 
@@ -619,12 +556,19 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         if (abs(sample->drive_direction) >= ACC_MIN_ACCIDENT_VALUE)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
+        if (driver_behaviour_state.calibrated) {
+            if (abs(sample->earth_direction) >= ACC_MIN_ACCIDENT_VALUE)
+                state->accident_state = ACCIDENT_STATE_STARTED;
+        }
+
         if (driver_behaviour_state.record_triggered)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
         if (state->accident_state == ACCIDENT_STATE_STARTED) {
-            state->accident_sample_count = 0;
-            state->max_g                 = 0;
+            state->accident_sample_count = 1;
+            state->max_g                 = GetGValue(sample);
+            state->sum_g_accident        = state->max_g;
+            state->hit_angle             = calculate_accident_hit_angle(sample);
         }
 
         break;
@@ -633,6 +577,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
         state->accident_sample_count++;
         value = GetGValue(sample);
+        state->sum_g_accident += value;
 
         if (value > state->max_g) {
             state->max_g                     = value;
@@ -665,12 +610,12 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
         if (state->accident_sample_count == MIN_SAMPLES_FOR_ACCIDENT) {
             // sending calibrate alert
+
             terminal_buffer_lock();
+            // sprintf(alert_str + 2, "@?X,%d,%d,%d\r\n", state->max_g, state->hit_angle, state->sum_g_accident);
             sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
             PostBleAlert(alert_str);
             terminal_buffer_release();
-
-            CreateAccidentEvent();
 
             // beep a buzzer
             buzzer_long(4000);
@@ -682,13 +627,12 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
 
         // ~30 seconds delay between accident
         if (state->accident_sample_count >= DELAY_BETWEEN_ACCIDENTS) {
+
             state->accident_state = ACCIDENT_STATE_NONE;
             DisplayMessage("\r\nListen to accident on\r\n", 0, true);
         }
         break;
     }
-
-    // ????????? record_add_sample(sample);
 }
 
 signed short calculate_accident_hit_angle(AccConvertedSample *sample)
@@ -727,6 +671,7 @@ unsigned short GetGValue(AccConvertedSample *sample)
 
     value = sample->drive_direction * sample->drive_direction;
     value += sample->turn_direction * sample->turn_direction;
+    value += sample->earth_direction * sample->earth_direction;
 
     value = sqrt(value);
     return value;

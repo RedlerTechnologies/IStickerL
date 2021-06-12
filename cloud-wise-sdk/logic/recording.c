@@ -18,6 +18,7 @@
 #include "timers.h"
 #include "tracking_algorithm.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -30,7 +31,7 @@ extern ScanResult           scan_result;
 
 xSemaphoreHandle acc_recording_semaphore;
 
-static AccSample acc_samples[SAMPLE_BUFFER_SIZE];
+static AccConvertedSample acc_samples[SAMPLE_BUFFER_SIZE];
 
 EventGroupHandle_t event_save_recording;
 EventGroupHandle_t event_acc_process_sample;
@@ -124,19 +125,66 @@ void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
     acc_sample->Z = z1 * 12;
 }
 
+void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out)
+{
+    DriverBehaviourState *state = &driver_behaviour_state;
+
+    float x, y, z;
+    float drive_direction, turn_direction, earth_direction;
+
+    acc_sample_in->X -= state->calibrated_value.avg_value.X;
+    acc_sample_in->Y -= state->calibrated_value.avg_value.Y;
+    acc_sample_in->Z -= state->calibrated_value.avg_value.Z;
+
+    x = acc_sample_in->X;
+    y = acc_sample_in->Y;
+    z = acc_sample_in->Z;
+
+    x /= ACC_NORMALIZATION_VALUE;
+    y /= ACC_NORMALIZATION_VALUE;
+    z /= ACC_NORMALIZATION_VALUE;
+
+    switch (state->calibrated_value.axis) {
+    case 0:
+        // error in calibration
+        break;
+
+    case 1:
+        // error right now...
+        break;
+
+    case 2:
+        drive_direction = y * cos(state->angle1);
+        turn_direction  = x;
+        earth_direction = z * sin(state->angle1);
+        break;
+
+    case 3:
+        drive_direction = z * sin(state->angle1);
+        turn_direction  = x;
+        earth_direction = y * cos(state->angle1);
+        break;
+    }
+
+    acc_sample_out->drive_direction = (signed short)(drive_direction * 100);
+    acc_sample_out->earth_direction = (signed short)(earth_direction * 100);
+    acc_sample_out->turn_direction  = (signed short)(turn_direction * 100);
+}
+
 void sampler_task(void *pvParameter)
 {
-    static AccSample acc_sample;
-    static uint16_t  block_length;
+    static AccSample          acc_sample;
+    static AccConvertedSample acc_sample1;
+    static uint16_t           block_length;
 
-    AccSample *acc_sample_array;
+    AccConvertedSample *acc_sample_array;
 
     EventBits_t uxBits;
     uint16_t    index  = 0;
     uint8_t     count  = 0;
     uint8_t     status = 0;
 
-    block_length = sizeof(AccSample) * SAMPLE_BUFFER_SIZE;
+    block_length = sizeof(AccConvertedSample) * SAMPLE_BUFFER_SIZE;
 
     sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, (TimerCallbackFunction_t)sample_timer_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
@@ -166,7 +214,14 @@ void sampler_task(void *pvParameter)
             }
 
             calculate_sample(&acc_sample, sample_buffer);
-            acc_samples[count] = acc_sample;
+
+            if (driver_behaviour_state.calibrated) {
+                ACC_CalibrateSample(&acc_sample, &acc_sample1);
+            } else {
+                memcpy(&acc_sample1, &acc_sample, sizeof(AccSample));
+            }
+
+            acc_samples[count] = acc_sample1;
 
             count++;
 
@@ -193,7 +248,7 @@ void sampler_task(void *pvParameter)
 
                     if (acc_record.accident_stage) {
 
-                        if (index >= RECORD_TIME_AFTER_EVENT) {
+                        if (index >= NUM_SAMPLE_BLOCK_AFTER_EVENT) {
                             // complete recording
                             // ..
 
@@ -207,12 +262,12 @@ void sampler_task(void *pvParameter)
                         }
 
                     } else {
-                        if (acc_record.sample_size_before < RECORD_TIME_BEFORE_EVENT)
+                        if (acc_record.sample_size_before < NUM_SAMPLE_BLOCK_BEFORE_EVENT)
                             acc_record.sample_size_before++;
 
                         acc_record.last_sample_index = index;
 
-                        if (index >= RECORD_TIME_BEFORE_EVENT)
+                        if (index >= NUM_SAMPLE_BLOCK_BEFORE_EVENT)
                             index = 0;
 
                         if (acc_record.accident_identified) {
@@ -288,8 +343,8 @@ static void record_create_new(void)
 
     xSemaphoreTake(acc_recording_semaphore, portMAX_DELAY);
 
-    memset(acc_record.samples_before_event, 0x0, SAMPLE_BUFFER_SIZE * RECORD_TIME_BEFORE_EVENT * sizeof(AccSample));
-    memset(acc_record.samples_after_event, 0x0, SAMPLE_BUFFER_SIZE * RECORD_TIME_AFTER_EVENT * sizeof(AccSample));
+    memset(acc_record.samples_before_event, 0x0, SAMPLE_BUFFER_SIZE * NUM_SAMPLE_BLOCK_BEFORE_EVENT * sizeof(AccConvertedSample));
+    memset(acc_record.samples_after_event, 0x0, SAMPLE_BUFFER_SIZE * NUM_SAMPLE_BLOCK_AFTER_EVENT * sizeof(AccConvertedSample));
 
     acc_record.flash_address = 0;
     acc_record.record_id     = 0;
@@ -315,6 +370,14 @@ static void record_create_new(void)
     }
 }
 
+void print_record(uint32_t rec, uint16_t index)
+{
+    terminal_buffer_lock();
+    sprintf(alert_str, "\r\nrec=%d, idx=%d\r\n", rec, index);
+    DisplayMessage(alert_str, 0, false);
+    terminal_buffer_release();
+}
+
 uint8_t record_scan_for_new_records(bool forced)
 {
     static uint8_t read_buffer[12];
@@ -328,51 +391,63 @@ uint8_t record_scan_for_new_records(bool forced)
     uint8_t        pending_counter = 0;
     bool           flag;
 
-    duration = timeDiff(xTaskGetTickCount(), acc_record.last_found_record_time) / 1000;
+    index = -1;
 
-    if (((duration > 30) && (ble_services_is_connected()) && (driver_behaviour_state.accident_state == ACCIDENT_STATE_NONE) &&
-         (!in_sending_file())) ||
-        forced) {
+    acc_record.last_found_record_time = xTaskGetTickCount();
 
-        index                             = -1;
-        acc_record.last_found_record_time = xTaskGetTickCount();
+    for (i = 0; i < MAX_RECORDS; i++) {
+        flash_address = FLASH_RECORDS_START_ADDRESS + (i + 1) * RECORD_SIZE - RECORD_TERMINATOR_SIZE;
 
-        for (i = 0; i < MAX_RECORDS; i++) {
-            flash_address = FLASH_RECORDS_START_ADDRESS + (i + 1) * RECORD_SIZE - RECORD_TERMINATOR_SIZE;
+        flag = flash_read_buffer(read_buffer, flash_address, 8);
+        if (flag) {
+            buffer = read_buffer + 4;
+            // if record is completed but not sent
+            if (buffer[0] == 0 && buffer[1] == 0xFF) {
+                pending_counter++;
+                flash_address = FLASH_RECORDS_START_ADDRESS + i * RECORD_SIZE;
 
-            flag = flash_read_buffer(read_buffer, flash_address, 8);
-            if (flag) {
-                buffer = read_buffer + 4;
-                // if record is completed but not sent
-                if (buffer[0] == 0 && buffer[1] == 0xFF) {
-                    pending_counter++;
-                    flash_address = FLASH_RECORDS_START_ADDRESS + i * RECORD_SIZE;
+                flag = flash_read_buffer(read_buffer, flash_address, 4);
 
-                    flag = flash_read_buffer(read_buffer, flash_address, 4);
+                if (flag) {
+                    memcpy((uint8_t *)&record_id, read_buffer + 4, 4);
 
-                    if (flag) {
-                        memcpy((uint8_t *)&record_id, read_buffer + 4, 4);
+                    if (forced) {
+                        print_record(record_id, i);
 
-                        if (record_id > max_record_id) {
-                            index         = i;
-                            max_record_id = record_id;
-                        }
+                        /*
+                            terminal_buffer_lock();
+                            sprintf(alert_str, "\r\npending=%d, idx=%d\r\n", record_id, i);
+                            DisplayMessage(alert_str, 0, false);
+                            terminal_buffer_release();*/
+                    }
+
+                    if (record_id > max_record_id) {
+                        index         = i;
+                        max_record_id = record_id;
                     }
                 }
             }
         }
     }
 
-    if (index >= 0 && ble_services_is_connected()) {
-        SendRecordAlert(record_id);
+    if (index >= 0) {
+
+        if (((ble_services_is_connected()) && (driver_behaviour_state.accident_state != ACCIDENT_STATE_IDENTIFIED) && (!in_sending_file())) ||
+            forced) {
+            SendRecordAlert(record_id);
+        }
     }
 
     if (!forced) {
-        terminal_buffer_lock();
-        vTaskDelay(10);
-        sprintf(alert_str, "\r\npend rec=%d, idx=%d\r\n", pending_counter, index);
-        DisplayMessage(alert_str, 0, false);
-        terminal_buffer_release();
+
+        /*
+            terminal_buffer_lock();
+            vTaskDelay(10);
+            sprintf(alert_str, "\r\pending count=%d, idx=%d\r\n", pending_counter, index);
+            DisplayMessage(alert_str, 0, false);
+            terminal_buffer_release();
+            */
+        print_record(pending_counter, index);
     }
 
     return pending_counter;
@@ -414,15 +489,6 @@ void record_trigger(uint8_t reason)
     acc_record.accident_identified = true;
 
     xSemaphoreGive(acc_recording_semaphore);
-}
-
-bool record_is_active(void)
-{
-    bool res;
-
-    // ?????????? res = (acc_record.state != ACC_RECORD_START);
-
-    return res;
 }
 
 static void get_header(uint8_t *header)
@@ -475,7 +541,7 @@ void close_recording(void)
     if (xEventGroupWaitBits(event_save_recording, 0x01, pdTRUE, pdFALSE, 1) == 0)
         return;
 
-    len = SAMPLE_BUFFER_SIZE * sizeof(AccSample);
+    len = SAMPLE_BUFFER_SIZE * sizeof(AccConvertedSample);
 
     flash_address = FLASH_RECORDS_START_ADDRESS + (acc_record.record_num) * RECORD_SIZE;
 
@@ -487,7 +553,7 @@ void close_recording(void)
         j = (acc_record.last_sample_index - i - 1);
 
         if (j < 0)
-            j += RECORD_TIME_BEFORE_EVENT;
+            j += NUM_SAMPLE_BLOCK_BEFORE_EVENT;
 
         memcpy(flash_buffer + 4, &acc_record.samples_before_event[j][0], len);
         flash_write_buffer(flash_buffer, flash_address, len);
@@ -495,7 +561,7 @@ void close_recording(void)
         flash_address += len;
     }
 
-    for (i = 0; i < RECORD_TIME_AFTER_EVENT; i++) {
+    for (i = 0; i < NUM_SAMPLE_BLOCK_AFTER_EVENT; i++) {
 
         memcpy(flash_buffer + 4, &acc_record.samples_after_event[i][0], len);
         flash_write_buffer(flash_buffer, flash_address, len);
@@ -532,11 +598,12 @@ void close_recording(void)
         sprintf(alert_str, "\r\nmissed samples=%d\r\n", acc_record.acc_overrrun_count);
         DisplayMessage(alert_str, strlen(alert_str), false);
     } else {
-        DisplayMessage("No missed samples", 0, false);
+        DisplayMessage("\r\nNo missed samples\r\n", 0, false);
     }
 
     terminal_buffer_release();
 
+    CreateAccidentEvent();
     record_create_new();
 }
 
@@ -600,9 +667,9 @@ void record_print(unsigned char record_num)
 
         j = 0;
 
-        while (j < 256) {
+        terminal_buffer_lock();
 
-            terminal_buffer_lock();
+        while (j < 256) {
 
             value = buffer[j];
             sprintf(alert_str, "%02X ", value);
@@ -612,11 +679,13 @@ void record_print(unsigned char record_num)
 
             if ((j % 16) == 0) {
                 DisplayMessage("\r\n", 0, false);
-                nrf_delay_ms(1);
+                terminal_buffer_release();
+                vTaskDelay(20);
+                terminal_buffer_lock();
             }
-
-            terminal_buffer_release();
         }
+
+        terminal_buffer_release();
 
         i += 256;
     }
