@@ -52,21 +52,22 @@ DriverBehaviourState driver_behaviour_state;
 
 void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
-// void           CalibrateAllSamples(void);
-void         ProcessDrivingState(void);
-void         ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
-void         Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
-void         Process_Calibrate(void);
-void         InitWakeupAlgorithm(void);
-signed short calculate_accident_hit_angle(AccConvertedSample *sample);
-bool         ProcessWakeupState(void);
-bool         CheckNoActivity(void);
-void         Calculate_Energy(void);
-static void  terminal_print_signal_mode(void);
-void         send_calibration_alert(void);
-void         print_movment(void);
-void         Set_Installation_Angle(void);
-uint16_t     get_current_state_timeout(void);
+void           ProcessDrivingState(void);
+void           ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
+void           Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
+void           Process_Calibrate(void);
+void           InitWakeupAlgorithm(void);
+signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
+bool           ProcessWakeupState(void);
+bool           CheckNoActivity(void);
+void           Calculate_Energy(void);
+static void    terminal_print_signal_mode(void);
+void           send_calibration_alert(void);
+void           print_movment(void);
+void           Set_Installation_Angle(void);
+uint16_t       get_current_state_timeout(void);
+void           send_acc_sample_to_ble(void);
+uint16_t       GetMinEneryForMovement(void);
 
 extern AccConvertedSample *incoming_sample_ptr;
 
@@ -183,12 +184,22 @@ void driver_behaviour_task(void *pvParameter)
         need_sleep = false;
 
         Calculate_Energy();
+        send_acc_sample_to_ble();
 
-        if (!driver_behaviour_state.calibrated) {
+        if (driver_behaviour_state.store_calibration) {
             Process_Calibrate();
-        } else {
-            // CalibrateAllSamples();
 
+            continue;
+        }
+
+        // no automatic calibration
+        /*
+        if (!driver_behaviour_state.calibrated) {
+            // Process_Calibrate();
+        } else
+        */
+
+        {
             switch (driver_behaviour_state.track_state) {
             case TRACKING_STATE_WAKEUP:
                 if (ProcessWakeupState()) {
@@ -228,8 +239,8 @@ void driver_behaviour_task(void *pvParameter)
             }
         }
 
-        /*
         // ???????????
+        /*
         driver_behaviour_state.last_activity_time = xTaskGetTickCount();
         need_sleep                                = false;
         */
@@ -387,12 +398,12 @@ void Calculate_Energy(void)
 
 void ProcessDrivingState(void)
 {
-    static uint8_t ble_buffer[16];
+    // static uint8_t ble_buffer[16];
 
     DriverBehaviourState *state = &driver_behaviour_state;
     AccConvertedSample *  sample;
 
-    if (state->energy > MIN_ENERGY_FOR_CONTINUE_ROUTE) {
+    if (state->energy > GetMinEneryForMovement()) {
 
         if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout())
             state->last_activity_time = xTaskGetTickCount();
@@ -402,14 +413,31 @@ void ProcessDrivingState(void)
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&incoming_sample_ptr[i];
 
-        if (i == 0) {
-            memset(ble_buffer, 0x00, 16);
-            memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
-            ble_services_notify_acc(ble_buffer, 16);
-        }
+        /*
+                if (i == 0) {
+                    memset(ble_buffer, 0x00, 16);
+                    memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
+                    ble_services_notify_acc(ble_buffer, 16);
+                }
+        */
 
         Process_Accident(state, sample);
     }
+}
+
+void send_acc_sample_to_ble(void)
+{
+    static uint8_t      ble_buffer[16];
+    AccConvertedSample *sample;
+
+    if (!ble_services_is_connected())
+        return;
+
+    sample = (AccConvertedSample *)&incoming_sample_ptr[0];
+
+    memset(ble_buffer, 0x00, 16);
+    memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
+    ble_services_notify_acc(ble_buffer, 16);
 }
 
 void InitWakeupAlgorithm(void)
@@ -431,7 +459,7 @@ bool ProcessWakeupState(void)
     return true;
 #endif
 
-    if (state->energy > MIN_ENERGY_FOR_START_ROUTE) {
+    if (state->energy > GetMinEneryForMovement()) {
         state->movement_count++;
 
         if (driver_behaviour_state.time_to_sleep_left_in_sec < get_current_state_timeout())
@@ -461,6 +489,14 @@ void Set_Installation_Angle(void)
 
     angle1        = atan(y / z);
     state->angle1 = angle1;
+}
+
+uint16_t GetMinEneryForMovement(void)
+{
+    if (driver_behaviour_state.calibrated)
+        return 100;
+    else
+        return 750;
 }
 
 void Process_Calibrate(void)
@@ -545,6 +581,9 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         return;
 
     if (driver_behaviour_state.registration_mode)
+        return;
+
+    if (!driver_behaviour_state.calibrated)
         return;
 
     switch (state->accident_state) {
