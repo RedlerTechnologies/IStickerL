@@ -67,7 +67,7 @@ typedef enum {
     LISDH_ACT_DUR = 0x3F,
 } eLis3dh;
 
-unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
+uint8_t Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
 
     // low power mode disabled, sample rate 200hz, x,y,z axis enabled
     LISDH_CTRL_REG1,
@@ -134,7 +134,7 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     0x00,
 };
 
-unsigned char Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
+uint8_t Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
 
     // TODO Disable INT1 - INT1_CFG
 
@@ -147,7 +147,7 @@ unsigned char Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
 
     // TODO CTRL_REG1 - move to low power (LPen)
     //LISDH_CTRL_REG1,
-    //0x3F,  //0x08 
+    //0x3F,  //0x08
     // this definition cause problem to wakeup by movement.
     // need to recheck again...
 
@@ -157,7 +157,8 @@ unsigned char Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
    0x08,
 };
 
-uint8_t lis3dh_read_reg(uint8_t reg);
+static void    write_reg(uint8_t reg, uint8_t value);
+static uint8_t lis3dh_read_reg(uint8_t reg);
 
 bool lis3dh_init(void)
 {
@@ -169,7 +170,7 @@ bool lis3dh_init(void)
     return true;
 }
 
-uint8_t lis3dh_read_reg(uint8_t reg)
+static uint8_t lis3dh_read_reg(uint8_t reg)
 {
     ret_code_t err_code;
     uint8_t    tx_temp_data = reg;
@@ -198,7 +199,9 @@ uint8_t lis3dh_read_reg(uint8_t reg)
 void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
 {
     ret_code_t err_code;
-    uint8_t    tx_temp_data = reg;
+    static uint8_t    tx_temp_data;
+
+    tx_temp_data = reg;
 
     const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data));
     const nrfx_twim_xfer_desc_t xfer_rx = NRFX_TWIM_XFER_DESC_RX(LIS3DH_ADDR, buffer, size);
@@ -214,9 +217,17 @@ void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
         return;
     }
+
+    //const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
+
+    //err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
+    //if (err_code != NRFX_SUCCESS) {
+    //    NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
+    //    return;
+    //}
 }
 
-void lis3dh_write_reg(uint8_t reg, uint8_t value)
+static void write_reg(uint8_t reg, uint8_t value)
 {
     ret_code_t err_code;
     uint8_t    tx_temp_data[2];
@@ -234,13 +245,13 @@ void lis3dh_write_reg(uint8_t reg, uint8_t value)
     }
 }
 
-bool configure_acc(unsigned char *table, unsigned char table_size)
+bool lis3dh_configure(uint8_t *table, uint8_t table_size)
 {
     unsigned char i, j, reg;
     bool          success = true;
 
     for (i = 0, j = 0; i < table_size; i++, j += 2) {
-        lis3dh_write_reg(table[j], table[j + 1]);
+        write_reg(table[j], table[j + 1]);
     }
 
     for (i = 0, j = 0; i < table_size; i++, j += 2) {

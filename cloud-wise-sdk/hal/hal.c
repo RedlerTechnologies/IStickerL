@@ -34,7 +34,7 @@ volatile struct {
 
 static void init_gpio(void);
 static void init_uart(void);
-static void init_twim(void);
+static void init_twim(nrfx_twim_evt_handler_t handler);
 static void init_spi(nrfx_spi_evt_handler_t handler);
 static void init_saadc(void);
 static void init_saadc_channels(void);
@@ -46,7 +46,7 @@ static void saadc_event_handler(nrfx_saadc_evt_t const *p_event);
 
 static hal_evt_handler_t p_evt_handler;
 
-void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler)
+void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler, nrfx_twim_evt_handler_t twim_handler)
 {
     ret_code_t ret;
 
@@ -63,7 +63,7 @@ void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler)
     nrf_gpio_pin_set(HAL_LED_GREEN);
     nrf_gpio_pin_set(HAL_LED_RED);
 
-    init_twim();
+    init_twim(twim_handler);
     init_spi(spi_handler);
     init_pwm();
     init_uart();
@@ -141,7 +141,7 @@ static void init_uart(void)
     APP_ERROR_CHECK(err_code);
 }
 
-static void init_twim(void)
+static void init_twim(nrfx_twim_evt_handler_t handler)
 {
     nrfx_err_t err_code;
 
@@ -151,7 +151,7 @@ static void init_twim(void)
                                            .interrupt_priority = NRFX_TWIM_DEFAULT_CONFIG_IRQ_PRIORITY,
                                            .hold_bus_uninit    = false};
 
-    err_code = nrfx_twim_init(&m_twim0, &twi_config, NULL, NULL);
+    err_code = nrfx_twim_init(&m_twim0, &twi_config, handler, NULL);
     APP_ERROR_CHECK(err_code);
 
     nrfx_twim_enable(&m_twim0);
