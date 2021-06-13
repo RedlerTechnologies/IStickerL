@@ -1,7 +1,7 @@
 #include "lis3dh.h"
-#include "logic/serial_comm.h"
 
 #include "hal/hal_drivers.h"
+#include "logic/serial_comm.h"
 
 #define NRF_LOG_MODULE_NAME cloud_wise_sdk_drivers_lis3dh
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -24,46 +24,134 @@ NRF_LOG_MODULE_REGISTER();
 #define ACC_REG_20H 0x77
 #endif
 
+typedef enum {
+    LISDH_CTRL_REG1 = 0x20,
+    LISDH_CTRL_REG2 = 0x21,
+    LISDH_CTRL_REG3 = 0x22,
+    LISDH_CTRL_REG4 = 0x23,
+    LISDH_CTRL_REG5 = 0x24,
+    LISDH_CTRL_REG6 = 0x25,
+
+    LISDH_REFERENCE  = 0x26,
+    LISDH_STATUS_REG = 0x27,
+
+    LISDH_OUT_XL = 0x28,
+    LISDH_OUT_XH = 0x29,
+    LISDH_OUT_YL = 0x2A,
+    LISDH_OUT_YH = 0x2B,
+    LISDH_OUT_ZL = 0x2C,
+    LISDH_OUT_ZH = 0x2D,
+
+    LISDH_FIFO_CTRL_REG = 0x2E,
+    LISDH_FIFO_SRC_REG  = 0x2F,
+
+    LISDH_INT1_CFG = 0x30,
+    LISDH_INT1_SRC = 0x31,
+    LISDH_INT1_THS = 0x32,
+    LISDH_INT1_DUR = 0x33,
+
+    LISDH_INT2_CFG = 0x34,
+    LISDH_INT2_SRC = 0x35,
+    LISDH_INT2_THS = 0x36,
+    LISDH_INT2_DUR = 0x37,
+
+    LISDH_CLICK_CFG = 0x38,
+    LISDH_CLICK_SRC = 0x38,
+    LISDH_CLICK_THS = 0x3A,
+
+    LISDH_TIME_LIMIT   = 0x3B,
+    LISDH_TIME_LATENCY = 0x3C,
+    LISDH_TIME_WINDOW  = 0x3D,
+
+    LISDH_ACT_THS = 0x3E,
+    LISDH_ACT_DUR = 0x3F,
+} eLis3dh;
+
 unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
-    0x20,
+
+    // low power mode disabled, sample rate 200hz, x,y,z axis enabled
+    LISDH_CTRL_REG1,
     ACC_REG_20H,
-    0x21,
+
+    // normal mode, click filter bypassed, high pass filter disabled
+    LISDH_CTRL_REG2,
     0x00,
-    0x22,
-    0x40,
-    0x23,
+
+    // click int disabled, ZYD data ready int disabled, FIFO water maek disabled,
+    // FIFO overrun int disanled
+    LISDH_CTRL_REG3,
+    0x00,
+
+    // BDU bit enabled, Full scale = 16g,
+    // High resolution disabled, SPI 3-wire disabled, seld-test disabled
+    LISDH_CTRL_REG4,
     0xB0,
-    0x24,
+
+    // FIFO disabled, BOOT disabled, 4D ditection int 1,2 disabled
+    // latch int 1,2 disabled,
+    LISDH_CTRL_REG5,
     0x00,
-    0x25,
+
+    // int 2 click disabled,
+    // activity interrupt enables (wakeup from deep sleep)
+    LISDH_CTRL_REG6,
     0x08,
-    0x26,
+
+    // interrupt reference value
+    LISDH_REFERENCE,
     0x00,
-    0x2E,
+
+    // no fifo
+    LISDH_FIFO_CTRL_REG,
     0x00,
-    0x30,
+
+    // no interrupt functionality
+    LISDH_INT1_CFG,
     0x00,
-    0x32,
+
+    // int1 threshold 0
+    LISDH_INT1_THS,
     0x00,
-    0x33,
+
+    // int1 duration 0
+    LISDH_INT1_DUR,
     0x00,
-    0x34,
+
+    // x,y,z disable x,y,z axis
+    LISDH_INT2_CFG,
     0x00,
-    0x36,
+
+    // int2 threhold
+    LISDH_INT2_DUR,
     0x40,
-    0x37,
+
+    // int 2 duration value = 100
+    LISDH_INT2_CFG,
     0x64,
-    0x38,
+
+    // click interrupt disbaled
+    LISDH_CLICK_CFG,
     0x00,
-    0x3E,
+
+    // activity interrupt disabled
+    LISDH_ACT_THS,
     0x00,
-    0x3F,
+
+    // activity interrupt disabled
+    LISDH_ACT_DUR,
     0x00,
 };
 
 unsigned char Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
-      0x3E, 0x02,
-      0x3F, 0x10,
+
+    // activity interrupt enabled
+    LISDH_ACT_THS,
+    0x02,
+
+    // activity interrupt enabled
+
+    LISDH_ACT_DUR,
+    0x10,
 };
 
 uint8_t lis3dh_read_reg(uint8_t reg);
@@ -187,9 +275,9 @@ bool configure_acc(unsigned char *table, unsigned char table_size)
     }
 
     if (success)
-      DisplayMessage( "\r\nAcc configured - OK\r\n", 0, true);
-     else
-      DisplayMessage( "\r\nError Acc Configuration\r\n", 0, true);
+        DisplayMessage("\r\nAcc configured - OK\r\n", 0, true);
+    else
+        DisplayMessage("\r\nError Acc Configuration\r\n", 0, true);
 
     return success;
 }
