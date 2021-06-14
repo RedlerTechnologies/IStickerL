@@ -119,6 +119,13 @@ typedef struct {
 
     unsigned short block_count;
 
+    ////////////
+    // tamper //
+    ////////////
+
+    AccSample tamper_value;
+    int       tamper_sample_count;
+
     ////////////////////////
     // accident algorithm //
     ////////////////////////
@@ -134,6 +141,8 @@ typedef struct {
 
     // on_driving
     unsigned       last_activity_time;
+    unsigned       enter_sleeping_time;
+    unsigned       block_sample_time;
     unsigned short sleep_delay_time;
 
     unsigned short acc_int_counter;

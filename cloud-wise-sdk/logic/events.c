@@ -30,7 +30,6 @@ xSemaphoreHandle event_semaphore;
 
 extern ScanResult scan_result;
 
-
 static void init_event(IStickerEvent *event)
 {
     uint8_t ch = 0x00;
@@ -48,7 +47,7 @@ bool CreateEvent(IStickerEvent *event)
     bool           semaphore_taken = false;
     bool           save_in_flash   = true;
 
-    // return true; 
+    // return true;
 
     if (driver_behaviour_state.block_new_events)
         drop = true;
@@ -180,6 +179,11 @@ void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size)
     event.data_len   = value_size;
     event.data       = buffer;
     event.event_type = event_type;
+
+    if (event_type == EVENT_TYPE_LOG) {
+        event.immediate_event = true;
+        event.save_in_flash   = true;
+    }
 
     CreateEvent(&event);
 }

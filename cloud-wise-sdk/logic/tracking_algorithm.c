@@ -68,6 +68,8 @@ void           Set_Installation_Angle(void);
 uint16_t       get_current_state_timeout(void);
 void           send_acc_sample_to_ble(void);
 uint16_t       GetMinEneryForMovement(void);
+void           ProcessTamper(void);
+void           TestTamperState(void);
 
 extern AccConvertedSample *incoming_sample_ptr;
 
@@ -79,6 +81,7 @@ void driver_behaviour_task(void *pvParameter)
     uint8_t          count     = 0;
     EventBits_t      uxBits;
     bool             need_sleep;
+    bool             sleep_flag;
 
     buzzer_train(1);
 
@@ -192,6 +195,11 @@ void driver_behaviour_task(void *pvParameter)
             continue;
         }
 
+        // avoid fake accident event after calibration
+        duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.block_sample_time) / 1000;
+        if (duration <= 3)
+            continue;
+
         // no automatic calibration
         /*
         if (!driver_behaviour_state.calibrated) {
@@ -202,6 +210,7 @@ void driver_behaviour_task(void *pvParameter)
         {
             switch (driver_behaviour_state.track_state) {
             case TRACKING_STATE_WAKEUP:
+
                 if (ProcessWakeupState()) {
                     driver_behaviour_state.track_state = TRACKING_STATE_ROUTE;
 
@@ -213,6 +222,7 @@ void driver_behaviour_task(void *pvParameter)
                     CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
                     continue;
                 } else {
+
                     need_sleep = CheckNoActivity();
 
                     if (need_sleep) {
@@ -235,41 +245,110 @@ void driver_behaviour_task(void *pvParameter)
 
             case TRACKING_STATE_SLEEP:
 
+                duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.enter_sleeping_time) / 1000;
+
+                if (duration <= 5) {
+                    ProcessTamper();
+                } else {
+                    TestTamperState();
+
+                    ble_services_disconnect();
+
+                    // need after creating end of route immediate events
+                    vTaskDelay(5000);
+
+                    DisplayMessageWithTime("Sleep\r\n", 0, true);
+                    buzzer_long(1200);
+
+                    configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
+                    vTaskDelay(2000);
+
+                    reset_data.reason = RESET_AFTER_SLEEP;
+
+                    isticker_bsp_board_sleep();
+
+                    nrf_gpio_pin_sense_t sense = NRF_GPIO_PIN_SENSE_LOW;
+                    nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
+
+                    SleepCPU(true);
+                }
+
                 break;
             }
         }
 
         // ???????????
-        /*
-        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-        need_sleep                                = false;
-        */
+        // driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+        // need_sleep = false;
 
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);
-
-            ble_services_disconnect();
-
-            // need after creating end of route immediate events
-            vTaskDelay(10000);
-
-            DisplayMessageWithTime("Sleep\r\n", 0, true);
-            buzzer_long(1200);
-
-            configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
-            vTaskDelay(2000);
-
-            reset_data.reason = RESET_AFTER_SLEEP;
-
-            isticker_bsp_board_sleep();
-
-            nrf_gpio_pin_sense_t sense = NRF_GPIO_PIN_SENSE_LOW;
-            nrf_gpio_cfg_sense_set(HAL_LIS3DH_INT2, sense);
-
-            SleepCPU(true);
+            driver_behaviour_state.track_state         = TRACKING_STATE_SLEEP;
+            driver_behaviour_state.enter_sleeping_time = xTaskGetTickCount();
+            driver_behaviour_state.tamper_sample_count = 0;
         }
 
         terminal_print_signal_mode();
+    }
+}
+
+void TestTamperState(void)
+{
+    uint16_t n;
+    uint32_t value;
+
+    n = driver_behaviour_state.tamper_sample_count;
+
+    driver_behaviour_state.tamper_value.X /= n;
+    driver_behaviour_state.tamper_value.Y /= n;
+    driver_behaviour_state.tamper_value.Z /= n;
+
+    value = GetGValue((AccConvertedSample *)&driver_behaviour_state.tamper_value);
+
+    if (value > 7) {
+        // tamper identified
+        buzzer_train(9);
+        DisplayMessage("\r\nTampered\r\n", 0, true);
+
+        CreateGeneralEvent(LOG_TAMPER, EVENT_TYPE_LOG, 1);
+
+        driver_behaviour_state.tampered   = true;
+        driver_behaviour_state.calibrated = false;
+
+        device_config.calibrate_value.avg_value.Z = 0;
+        SaveConfiguration(true);
+
+        vTaskDelay(10000);
+    }
+}
+
+void ProcessTamper(void)
+{
+    static uint8_t check_flag = false;
+
+    AccSample *sample;
+    uint8_t    i;
+
+    if (driver_behaviour_state.tampered)
+        return;
+
+    if (!driver_behaviour_state.calibrated)
+        return;
+
+    if (driver_behaviour_state.tamper_sample_count == 0) {
+        driver_behaviour_state.tamper_value.X = 0;
+        driver_behaviour_state.tamper_value.Y = 0;
+        driver_behaviour_state.tamper_value.Z = 0;
+    }
+
+    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        sample = (AccSample *)&incoming_sample_ptr[i];
+
+        driver_behaviour_state.tamper_sample_count++;
+
+        driver_behaviour_state.tamper_value.X += sample->X;
+        driver_behaviour_state.tamper_value.Y += sample->Y;
+        driver_behaviour_state.tamper_value.Z += sample->Z;
     }
 }
 
@@ -398,8 +477,6 @@ void Calculate_Energy(void)
 
 void ProcessDrivingState(void)
 {
-    // static uint8_t ble_buffer[16];
-
     DriverBehaviourState *state = &driver_behaviour_state;
     AccConvertedSample *  sample;
 
@@ -412,15 +489,6 @@ void ProcessDrivingState(void)
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&incoming_sample_ptr[i];
-
-        /*
-                if (i == 0) {
-                    memset(ble_buffer, 0x00, 16);
-                    memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
-                    ble_services_notify_acc(ble_buffer, 16);
-                }
-        */
-
         Process_Accident(state, sample);
     }
 }
@@ -454,10 +522,16 @@ bool ProcessWakeupState(void)
     bool                  sense1 = false;
     bool                  found  = false;
     EventBits_t           uxBits;
+    uint8_t               i;
 
 #ifdef SLEEP_DISABLE
     return true;
 #endif
+
+    for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        sample = (AccConvertedSample *)&incoming_sample_ptr[i];
+        Process_Accident(state, sample);
+    }
 
     if (state->energy > GetMinEneryForMovement()) {
         state->movement_count++;
@@ -570,6 +644,8 @@ void Process_Calibrate(void)
         sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", temp1, temp2, state->calibrated_value.axis);
         PostBleAlert(alert_str);
         terminal_buffer_release();
+
+        driver_behaviour_state.block_sample_time = xTaskGetTickCount();
     }
 }
 
@@ -646,6 +722,8 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         break;
 
     case ACCIDENT_STATE_IDENTIFIED:
+
+        driver_behaviour_state.movement_count = 0;
 
         if (state->accident_sample_count == MIN_SAMPLES_FOR_ACCIDENT) {
             // sending calibrate alert
@@ -757,21 +835,6 @@ uint16_t get_current_state_timeout(void)
 void set_sleep_timeout_on_ble(void)
 {
     uint16_t timeout_value = get_current_state_timeout();
-
-    /*
-        if (ble_services_is_connected()) {
-            if (driver_behaviour_state.track_state == TRACKING_STATE_WAKEUP)
-                timeout_value = SLEEP_TIMEOUT_ON_WAKEUP_BLE_CONNECTED;
-            else
-                timeout_value = SLEEP_TIMEOUT_ON_ROUTE_BLE_CONNECTED;
-
-        } else {
-            if (driver_behaviour_state.track_state == TRACKING_STATE_WAKEUP)
-                timeout_value = SLEEP_TIMEOUT_ON_WAKEUP_BLE_DISCONNECTED;
-            else
-                timeout_value = SLEEP_TIMEOUT_ON_ROUTE_BLE_DISCONNECTED;
-        }
-        */
 
     set_sleep_timeout(timeout_value);
 }
