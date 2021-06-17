@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
 #include "ble_file_transfer.h"
+#include "configuration.h"
 #include "decoder.h"
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
@@ -23,11 +24,13 @@
 #include <string.h>
 #include <time.h>
 
-static uint8_t              flash_buffer[260]; // ?????????????
+static uint8_t flash_buffer[260]; // ?????????????
+
 extern xSemaphoreHandle     tx_uart_semaphore;
 extern DriverBehaviourState driver_behaviour_state;
 extern AccidentState        accident_state;
 extern ScanResult           scan_result;
+extern DeviceConfiguration  device_config;
 
 xSemaphoreHandle acc_recording_semaphore;
 
@@ -432,7 +435,8 @@ uint8_t record_scan_for_new_records(bool forced)
 
     if (index >= 0) {
 
-        if (((ble_services_is_connected()) && (driver_behaviour_state.accident_state != ACCIDENT_STATE_IDENTIFIED) && (!in_sending_file())) ||
+        if (((ble_services_is_connected()) && (driver_behaviour_state.accident_state != ACCIDENT_STATE_IDENTIFIED) &&
+             (!in_sending_file())) ||
             forced) {
             SendRecordAlert(record_id);
         }
@@ -585,7 +589,8 @@ void close_recording(void)
     memcpy(flash_buffer + 4, (unsigned char *)(&acc_record.sample_count), 2);
     flash_write_buffer(flash_buffer, flash_address, 2);
 
-    buzzer_train(3);
+    if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
+        buzzer_train(3);
     terminal_buffer_lock();
     sprintf(alert_str, "\r\nRecord Saved: idx=%d\r\n", acc_record.record_num);
     DisplayMessageWithTime(alert_str, strlen(alert_str), false);

@@ -1,6 +1,7 @@
 #include "tracking_algorithm.h"
 
 #include "FreeRTOS.h"
+#include "accident.h"
 #include "ble/ble_services_manager.h"
 #include "ble/ble_task.h"
 #include "ble_file_transfer.h"
@@ -13,6 +14,7 @@
 #include "events.h"
 #include "flash_data.h"
 #include "float.h"
+#include "gfilters_algorithm.h"
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
@@ -23,6 +25,7 @@
 #include "nrf_gpio.h"
 #include "nrf_power.h"
 #include "nrf_pwr_mgmt.h"
+#include "nrf_queue.h"
 #include "nrfx_gpiote.h"
 #include "nrfx_log.h"
 #include "recording.h"
@@ -35,7 +38,6 @@
 
 extern uint8_t             Acc_Table[];
 extern uint8_t             Acc_Sleep_Table[];
-extern DeviceConfiguration device_config;
 extern uint32_t            reset_count_x;
 extern ResetData           reset_data;
 extern DeviceConfiguration device_config;
@@ -54,10 +56,8 @@ void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
 void           ProcessDrivingState(void);
 void           ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
-void           Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample);
 void           Process_Calibrate(void);
 void           InitWakeupAlgorithm(void);
-signed short   calculate_accident_hit_angle(AccConvertedSample *sample);
 bool           ProcessWakeupState(void);
 bool           CheckNoActivity(void);
 void           Calculate_Energy(void);
@@ -83,17 +83,21 @@ void driver_behaviour_task(void *pvParameter)
     bool             need_sleep;
     bool             sleep_flag;
 
-    buzzer_train(1);
-
     if ((RECORD_SIZE - RECORD_HEADER_SIZE - RECORD_TERMINATOR_SIZE) < SAMPLE_MEMORY_SIZE) {
         DisplayMessage("error in memory size", 0, true);
         ActivateSoftwareReset(RESET_OUT_OF_MEMORY, 0, 0, 0);
     }
 
     LoadConfiguration();
+
+    if (device_config.buzzer_mode != BUZZER_MODE_NONE)
+        buzzer_train(1);
+
     ble_services_init_0();
     SaveConfiguration(false);
     ble_services_init();
+
+    gfilter_init();
 
 #ifdef BLE_ADVERTISING
     ble_services_advertising_start();
@@ -216,7 +220,8 @@ void driver_behaviour_task(void *pvParameter)
 
                     set_sleep_timeout_on_ble();
 
-                    buzzer_train(2);
+                    if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
+                        buzzer_train(2);
 
                     DisplayMessage("\r\nStart route\r\n", 0, true);
                     CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
@@ -258,7 +263,9 @@ void driver_behaviour_task(void *pvParameter)
                     vTaskDelay(5000);
 
                     DisplayMessageWithTime("Sleep\r\n", 0, true);
-                    buzzer_long(1200);
+
+                    if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
+                        buzzer_long(1200);
 
                     configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
                     vTaskDelay(2000);
@@ -277,9 +284,11 @@ void driver_behaviour_task(void *pvParameter)
             }
         }
 
+        /*
         // ???????????
-        // driver_behaviour_state.last_activity_time = xTaskGetTickCount();
-        // need_sleep = false;
+                // driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+                need_sleep = false;
+                */
 
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);
@@ -307,7 +316,8 @@ void TestTamperState(void)
 
     if (value > 7) {
         // tamper identified
-        buzzer_train(9);
+        if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+            buzzer_train(9);
         DisplayMessage("\r\nTampered\r\n", 0, true);
 
         CreateGeneralEvent(LOG_TAMPER, EVENT_TYPE_LOG, 1);
@@ -384,7 +394,6 @@ static void terminal_print_signal_mode(void)
 
 void SleepCPU(bool with_memory_retention)
 {
-
     uint8_t i;
 
 #ifdef BLE_ADVERTISING
@@ -491,6 +500,8 @@ void ProcessDrivingState(void)
         sample = (AccConvertedSample *)&incoming_sample_ptr[i];
         Process_Accident(state, sample);
     }
+
+    Process_GFilters(&incoming_sample_ptr[0]);
 }
 
 void send_acc_sample_to_ble(void)
@@ -638,7 +649,9 @@ void Process_Calibrate(void)
         driver_behaviour_state.store_calibration = false;
         state->block_count                       = 0;
         state->calibrated                        = true;
-        buzzer_train(5);
+
+        if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+            buzzer_train(5);
 
         terminal_buffer_lock();
         sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", temp1, temp2, state->calibrated_value.axis);
@@ -647,151 +660,6 @@ void Process_Calibrate(void)
 
         driver_behaviour_state.block_sample_time = xTaskGetTickCount();
     }
-}
-
-void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
-{
-    unsigned short value;
-
-    if (driver_behaviour_state.print_signal_mode)
-        return;
-
-    if (driver_behaviour_state.registration_mode)
-        return;
-
-    if (!driver_behaviour_state.calibrated)
-        return;
-
-    switch (state->accident_state) {
-    case ACCIDENT_STATE_NONE:
-
-        if (abs(sample->turn_direction) >= ACC_MIN_ACCIDENT_VALUE)
-            state->accident_state = ACCIDENT_STATE_STARTED;
-
-        if (abs(sample->drive_direction) >= ACC_MIN_ACCIDENT_VALUE)
-            state->accident_state = ACCIDENT_STATE_STARTED;
-
-        if (driver_behaviour_state.calibrated) {
-            if (abs(sample->earth_direction) >= ACC_MIN_ACCIDENT_VALUE)
-                state->accident_state = ACCIDENT_STATE_STARTED;
-        }
-
-        if (driver_behaviour_state.record_triggered)
-            state->accident_state = ACCIDENT_STATE_STARTED;
-
-        if (state->accident_state == ACCIDENT_STATE_STARTED) {
-            state->accident_sample_count = 1;
-            state->max_g                 = GetGValue(sample);
-            state->sum_g_accident        = state->max_g;
-            state->hit_angle             = calculate_accident_hit_angle(sample);
-        }
-
-        break;
-
-    case ACCIDENT_STATE_STARTED:
-
-        state->accident_sample_count++;
-        value = GetGValue(sample);
-        state->sum_g_accident += value;
-
-        if (value > state->max_g) {
-            state->max_g                     = value;
-            state->sample_in_drive_direction = sample->drive_direction;
-            state->sample_in_turn_direction  = sample->turn_direction;
-            state->hit_angle                 = calculate_accident_hit_angle(sample);
-        }
-
-        if (state->accident_sample_count >= MIN_SAMPLES_FOR_ACCIDENT) {
-            if (state->max_g >= (device_config.AccidentG * 10) || driver_behaviour_state.record_triggered) {
-                /////////////////////////
-                // accident identified //
-                /////////////////////////
-
-                FileTransferFailed(true);
-
-                state->last_activity_time               = xTaskGetTickCount();
-                state->accident_state                   = ACCIDENT_STATE_IDENTIFIED;
-                driver_behaviour_state.record_triggered = false;
-
-                record_trigger(0);
-            } else {
-                state->accident_state = ACCIDENT_STATE_NONE;
-            }
-        }
-
-        break;
-
-    case ACCIDENT_STATE_IDENTIFIED:
-
-        driver_behaviour_state.movement_count = 0;
-
-        if (state->accident_sample_count == MIN_SAMPLES_FOR_ACCIDENT) {
-            // sending calibrate alert
-
-            terminal_buffer_lock();
-            // sprintf(alert_str + 2, "@?X,%d,%d,%d\r\n", state->max_g, state->hit_angle, state->sum_g_accident);
-            sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
-            PostBleAlert(alert_str);
-            terminal_buffer_release();
-
-            // beep a buzzer
-            buzzer_long(4000);
-        }
-
-        state->accident_sample_count++;
-        // continue recording
-        // ..
-
-        // ~30 seconds delay between accident
-        if (state->accident_sample_count >= DELAY_BETWEEN_ACCIDENTS) {
-
-            state->accident_state = ACCIDENT_STATE_NONE;
-            DisplayMessage("\r\nListen to accident on\r\n", 0, true);
-        }
-        break;
-    }
-}
-
-signed short calculate_accident_hit_angle(AccConvertedSample *sample)
-{
-    float        value;
-    signed short v1;
-
-    if (sample->drive_direction == 0)
-        sample->drive_direction = 1;
-
-    value = atan((float)sample->turn_direction / sample->drive_direction);
-    value = value * 180 / PI;
-
-    if (sample->drive_direction < 0) {
-        if (sample->turn_direction > 0)
-            value = 360 + value;
-    } else {
-        value = 180 + value;
-    }
-
-    v1 = (short)value;
-
-    /*
-        // patch (reverse direction)
-        v1 -= 180;
-        if (v1 < 0)
-            v1 += 360;
-     */
-
-    return v1;
-}
-
-unsigned short GetGValue(AccConvertedSample *sample)
-{
-    unsigned int value;
-
-    value = sample->drive_direction * sample->drive_direction;
-    value += sample->turn_direction * sample->turn_direction;
-    value += sample->earth_direction * sample->earth_direction;
-
-    value = sqrt(value);
-    return value;
 }
 
 bool IsDeviceMoved(unsigned moved_in_last_seconds)

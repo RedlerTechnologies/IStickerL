@@ -11,7 +11,7 @@ typedef struct {
     unsigned char DeviceID[28];
 
     unsigned char AccidentG;
-    unsigned char reservered2;
+    unsigned char buzzer_mode;
     unsigned char reservered3;
 
     // 0x0030

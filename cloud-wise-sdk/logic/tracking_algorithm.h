@@ -46,6 +46,10 @@
 
 #define PI 3.1415
 
+#define BUZZER_MODE_NONE 0
+#define BUZZER_MODE_ON 1 
+#define BUZZER_MODE_DEBUG 2    
+
 typedef enum {
     TRACKING_STATE_WAKEUP = 0,
     TRACKING_STATE_ROUTE  = 1,
@@ -172,6 +176,7 @@ typedef struct {
     signed short Gy;
 
 } DriverBehaviourState;
+
 
 void driver_behaviour_task(void *pvParameter);
 void sampler_task(void *pvParameter);

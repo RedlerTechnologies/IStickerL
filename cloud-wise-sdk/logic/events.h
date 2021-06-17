@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hal/hal_data_types.h"
+#include "gfilters_algorithm.h"
 
 typedef struct {
     uint32_t time;
@@ -13,17 +14,18 @@ typedef struct {
 } IStickerEvent;
 
 typedef enum {
-    EVENT_TYPE_TIME_SET    = 3,
-    EVENT_TYPE_START_ROUTE = 11,
-    EVENT_TYPE_END_ROUTE   = 12,
-    EVENT_TYPE_MEASURE     = 14,
-    EVENT_TYPE_ACCIDENT    = 16,
-    EVENT_TYPE_LOG         = 22,
-    EVENT_TYPE_DEBUG       = 23,
-    EVENT_TYPE_VERSION     = 25,
-    EVENT_TYPE_DEBUG_EXT   = 36,
-    EVENT_TYPE_KEEP_ALIVE  = 37,
-    EVENT_TYPE_RESET_INFO  = 40,
+    EVENT_TYPE_TIME_SET         = 3,
+    EVENT_TYPE_START_ROUTE      = 11,
+    EVENT_TYPE_END_ROUTE        = 12,
+    EVENT_TYPE_MEASURE          = 14,
+    EVENT_TYPE_ACCIDENT         = 16,
+    EVENT_TYPE_LOG              = 22,
+    EVENT_TYPE_DEBUG            = 23,
+    EVENT_TYPE_VERSION          = 25,
+    EVENT_TYPE_DRIVER_BEHAVIOUR = 31,
+    EVENT_TYPE_DEBUG_EXT        = 36,
+    EVENT_TYPE_KEEP_ALIVE       = 37,
+    EVENT_TYPE_RESET_INFO       = 40,
 
 } EventType;
 
@@ -157,6 +159,7 @@ void CreateAccidentEvent(void);
 void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size);
 void CreateEndRouteEvent(void);
 void CreateVersionEvent(bool is_immediate);
+void CreateDriverBehaviourEvent(GFilterConfig *event_config, GFilterState *event_state);
 
 uint16_t CRC16_Calc(uint8_t *ptrPct, uint16_t pctLen, uint16_t crc16);
 void     CreateDebugEvent(uint16_t value_type, int32_t value, bool extened);

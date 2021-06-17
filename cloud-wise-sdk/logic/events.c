@@ -8,6 +8,7 @@
 #include "drivers/buzzer.h"
 #include "drivers/flash.h"
 #include "flash_data.h"
+#include "gfilters_algorithm.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
 #include "logic/serial_comm.h"
@@ -25,6 +26,7 @@ extern Calendar             absolute_time;
 extern DriverBehaviourState driver_behaviour_state;
 extern AccRecord            acc_record;
 extern ResetData            reset_data_copy;
+extern DeviceConfiguration  device_config;
 
 xSemaphoreHandle event_semaphore;
 
@@ -184,6 +186,52 @@ void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size)
         event.immediate_event = true;
         event.save_in_flash   = true;
     }
+
+    CreateEvent(&event);
+}
+
+void CreateDriverBehaviourEvent(GFilterConfig *event_config, GFilterState *event_state)
+{
+    IStickerEvent event;
+    uint8_t       buffer[12];
+    //uint8_t       severity = 0;
+    uint8_t       status   = 0;
+
+    init_event(&event);
+
+    memset(buffer, 0x00, 12);
+
+    buffer[0] = event_config->code;
+
+/*
+    //   severity values
+    if (event_state->energy > 350)
+        severity++;
+    if (event_state->energy > 750)
+        severity++;
+    if (event_state->energy > 1250)
+        severity++;
+    */
+
+    status = event_state->severity;
+    status |= 0x80; // new structure for driver behaviour
+
+    // left/right bit
+    if (event_config->code == DRIVER_BEHAVIOR_SHARP_TURN) {
+        if (event_config->min_g < 0)
+            status |= 0x04;
+    }
+
+    memcpy(&event.time, &event_state->event_time, 4);
+    
+    /*
+    memcpy(buffer + 2, (uint8_t *)(&event_state->energy), 2);
+    memcpy(buffer + 4, (uint8_t *)(&event_state->duration_count), 2);
+    */
+
+    event.data_len   = 9;
+    event.data       = buffer;
+    event.event_type = EVENT_TYPE_DRIVER_BEHAVIOUR;
 
     CreateEvent(&event);
 }

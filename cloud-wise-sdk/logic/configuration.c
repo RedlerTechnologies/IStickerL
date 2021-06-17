@@ -72,7 +72,9 @@ void SetManufactureDefault(void)
 
     memset(&device_config, 0x00, 254);
 
-    device_config.AccidentG = MIN_G_FOR_ACCIDENT_EVENT;
+    device_config.AccidentG   = MIN_G_FOR_ACCIDENT_EVENT;
+    device_config.buzzer_mode = BUZZER_MODE_ON;
+
     memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
 
     device_config.crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);

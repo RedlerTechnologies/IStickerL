@@ -63,6 +63,8 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"MANUF", NULL, PARAM_COMMAND},
     {"SETTINGS", NULL, PARAM_COMMAND},
     {"DATATX", NULL, PARAM_COMMAND},
+    {"DBGMODE", (uint32_t *)&device_config.buzzer_mode, PARAM_NUMERIC},
+
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -467,10 +469,20 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
             if (param_num >= 4) {
                 memcpy((uint32_t *)p->param_address, &param_num, 1);
             }
-
         } else {
             memset(&result, 0x00, 4);
             memcpy(&result, (uint32_t *)p->param_address, 1);
+        }
+
+        break;
+
+    case COMMAND_BUZZER_MODE:
+
+        if (is_set_command) {
+            memcpy((uint8_t *)p->param_address, &param_num, 1);
+        } else {
+            memset(&result, 0x00, 4);
+            memcpy(&result, (uint8_t *)p->param_address, 1);
         }
 
         break;

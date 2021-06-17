@@ -23,6 +23,7 @@
 #include <string.h>
 
 extern DriverBehaviourState driver_behaviour_state;
+extern DeviceConfiguration  device_config;
 extern IStickerErrorBits    error_bits;
 extern AccRecord            acc_record;
 
@@ -191,13 +192,14 @@ void monitor_thread(void *arg)
         if (driver_behaviour_state.fill_event_flash)
             CreateVersionEvent(false);
 
-        if ((current_time % 4) == 0) {
-            if (driver_behaviour_state.registration_mode)
-                buzzer_train(3);
+        if (device_config.buzzer_mode >= BUZZER_MODE_ON) {
+            if ((current_time % 4) == 0) {
+                if (driver_behaviour_state.registration_mode)
+                    buzzer_train(3);
+            }
         }
 
         if ((current_time % 8) == 0 || first) {
-
             first = false;
 
             temperature = peripherals_read_temperature();
