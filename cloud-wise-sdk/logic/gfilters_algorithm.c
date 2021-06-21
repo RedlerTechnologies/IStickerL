@@ -40,6 +40,7 @@
 extern DriverBehaviourState driver_behaviour_state;
 extern DeviceConfiguration  device_config;
 extern xSemaphoreHandle     clock_semaphore;
+extern IStickerErrorBits    error_bits;
 
 GFilterConfig filter_configs[GFILTER_NUM];
 GFilterState  filter_states[GFILTER_NUM];
@@ -47,6 +48,9 @@ GFilterState  filter_states[GFILTER_NUM];
 NRF_QUEUE_DEF(GFilterState, m_event_queue, MAX_EVENTS_IN_QUEUE, NRF_QUEUE_MODE_NO_OVERFLOW);
 
 static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_state, AccConvertedSample *sample);
+static void Process_Bumper(void);
+static void Process_Offroad(void);
+static void send_ble_offroad_alert(uint8_t status);
 
 void gfilter_init(void)
 {
@@ -89,7 +93,7 @@ void gfilter_init(void)
     filter_config->min_duration3 = TURN_MIN_HIGH_DUR;
     filter_config->min_g3        = TURN_MIN_HIGH_G;
     filter_config->code          = DRIVER_BEHAVIOR_SHARP_TURN;
-    filter_config->positive      = 1;
+    filter_config->positive      = 0;
     strcpy(filter_config->name, "TLEFT");
 
     filter_config                = &filter_configs[GFILTER_TURN_RIGHT];
@@ -101,7 +105,7 @@ void gfilter_init(void)
     filter_config->min_duration3 = TURN_MIN_HIGH_DUR;
     filter_config->min_g3        = TURN_MIN_HIGH_G;
     filter_config->code          = DRIVER_BEHAVIOR_SHARP_TURN;
-    filter_config->positive      = 0;
+    filter_config->positive      = 1;
     strcpy(filter_config->name, "TRIGHT");
 
     for (i = 0; i < GFILTER_NUM; i++) {
@@ -120,41 +124,48 @@ void Process_GFilters(AccConvertedSample *samples)
     uint8_t             i, j;
     ret_code_t          status;
 
-    if (driver_behaviour_state.print_signal_mode)
-        return;
-
     if (driver_behaviour_state.registration_mode)
         return;
 
     if (!driver_behaviour_state.calibrated)
         return;
 
-    filter_config = &filter_configs[GFILTER_ACCELERATION];
-    filter_state  = &filter_states[GFILTER_ACCELERATION];
+    Process_Offroad();
 
-    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        Process_GFilter(filter_config, filter_state, &samples[i]);
-    }
+    Process_Bumper();
+    duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_bumper_time);
 
-    filter_config = &filter_configs[GFILTER_BRAKES];
-    filter_state  = &filter_states[GFILTER_BRAKES];
+    // ???????????????? disable bumper blocking for this version
+    duration = 10000;
 
-    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        Process_GFilter(filter_config, filter_state, &samples[i]);
-    }
+    if (duration >= 3000) { // block driver events on bumper
+        filter_config = &filter_configs[GFILTER_ACCELERATION];
+        filter_state  = &filter_states[GFILTER_ACCELERATION];
 
-    filter_config = &filter_configs[GFILTER_TURN_LEFT];
-    filter_state  = &filter_states[GFILTER_TURN_LEFT];
+        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+            Process_GFilter(filter_config, filter_state, &samples[i]);
+        }
 
-    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        Process_GFilter(filter_config, filter_state, &samples[i]);
-    }
+        filter_config = &filter_configs[GFILTER_BRAKES];
+        filter_state  = &filter_states[GFILTER_BRAKES];
 
-    filter_config = &filter_configs[GFILTER_TURN_RIGHT];
-    filter_state  = &filter_states[GFILTER_TURN_RIGHT];
+        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+            Process_GFilter(filter_config, filter_state, &samples[i]);
+        }
 
-    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        Process_GFilter(filter_config, filter_state, &samples[i]);
+        filter_config = &filter_configs[GFILTER_TURN_LEFT];
+        filter_state  = &filter_states[GFILTER_TURN_LEFT];
+
+        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+            Process_GFilter(filter_config, filter_state, &samples[i]);
+        }
+
+        filter_config = &filter_configs[GFILTER_TURN_RIGHT];
+        filter_state  = &filter_states[GFILTER_TURN_RIGHT];
+
+        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+            Process_GFilter(filter_config, filter_state, &samples[i]);
+        }
     }
 
     // write one event from queue into the flash
@@ -192,6 +203,104 @@ static int16_t GetAxisValue(AccConvertedSample *sample, uint8_t code)
     }
 
     return value;
+}
+
+static void Process_Offroad(void)
+{
+    uint32_t bumper_history;
+    uint32_t duration;
+    uint8_t  count;
+    uint8_t  percentage;
+    uint8_t  i;
+    bool     offroad = false;
+
+    if (driver_behaviour_state.Gz >= 10)
+        offroad = true;
+
+    bumper_history = driver_behaviour_state.bumper_history;
+    bumper_history = bumper_history << 1;
+
+    if (offroad) {
+        bumper_history |= 0x00000001;
+    }
+
+    driver_behaviour_state.bumper_history = bumper_history;
+
+    count = 0;
+
+    for (i = 0; i < 32; i++) {
+        if (bumper_history & 0x00000001)
+            count++;
+
+        bumper_history = bumper_history >> 1;
+    }
+
+    percentage = count * 100 / 32;
+
+    if (percentage > 15) {
+        // offroaad
+        driver_behaviour_state.offroad_stated_time = xTaskGetTickCount();
+
+        if (!error_bits.Offroad) {
+            // offroad started
+            send_ble_offroad_alert(1);
+        }
+
+        error_bits.Offroad = 1;
+    } else {
+        duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.offroad_stated_time) / 1000;
+
+        if (duration > 10) {
+
+            if (error_bits.Offroad) {
+                // offroad stops
+                send_ble_offroad_alert(0);
+            }
+
+            error_bits.Offroad = 0;
+        }
+    }
+}
+
+static void send_ble_offroad_alert(uint8_t status)
+{
+    terminal_buffer_lock();
+    sprintf(alert_str + 2, "@?OFFROAD,%d\r\n", status);
+    PostBleAlert(alert_str);
+    terminal_buffer_release();
+}
+
+static void Process_Bumper(void)
+{
+    static uint32_t measure_time = 0;
+    static uint32_t bumper_count = 0;
+
+    uint32_t duration;
+    bool     bumper = false;
+
+    if (driver_behaviour_state.Gz >= device_config.filter_z) {
+        bumper = true;
+    }
+
+    if (bumper) {
+        driver_behaviour_state.last_bumper_time = xTaskGetTickCount();
+        bumper_count++;
+
+        terminal_buffer_lock();
+        sprintf(alert_str + 2, "@?BUMPER,%d\r\n", driver_behaviour_state.Gz);
+        PostBleAlert(alert_str);
+        terminal_buffer_release();
+    }
+
+    duration = timeDiff(xTaskGetTickCount(), measure_time) / 1000;
+
+    if (duration > 60) {
+        if (bumper_count > 0)
+            CreateGeneralEvent(bumper_count, EVENT_TYPE_BUMPER, 2);
+        bumper_count = 0;
+        measure_time = xTaskGetTickCount();
+        ;
+    }
 }
 
 static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_state, AccConvertedSample *sample)
@@ -306,13 +415,13 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
                 buzzer_train(1);
         } else {
             if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-                buzzer_train(filter_state->severity * 2);
+                buzzer_train((filter_state->severity - 1) * 4);
         }
 
         // BLE alert //
         uint8_t code = filter_config->code;
-        if ( !filter_config->positive && filter_config->axis == GFILTER_AXIS_Y)
-          code = DRIVER_BEHAVIOR_SHARP_TURN_RIGHT;
+        if (filter_config->positive && filter_config->axis == GFILTER_AXIS_Y)
+            code = DRIVER_BEHAVIOR_SHARP_TURN_RIGHT;
 
         terminal_buffer_lock();
         sprintf(alert_str + 2, "@?DR,%d,%d\r\n", code, filter_state->severity);
@@ -322,8 +431,6 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
         nrf_queue_write(&m_event_queue, filter_state, 1);
 
         filter_state->state = GFILTER_AXIS_STATE_DELAY;
-        // filter_state->duration_count = 0;
-        // filter_state->energy         = 0;
 
         break;
 

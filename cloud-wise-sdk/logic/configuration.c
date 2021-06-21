@@ -74,6 +74,7 @@ void SetManufactureDefault(void)
 
     device_config.AccidentG   = MIN_G_FOR_ACCIDENT_EVENT;
     device_config.buzzer_mode = BUZZER_MODE_ON;
+    device_config.filter_z = 50;
 
     memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
 

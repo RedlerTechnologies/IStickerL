@@ -16,7 +16,7 @@ typedef struct {
 
     // 0x0030
     unsigned short max_sleep_time;
-    unsigned short reservered10;
+    unsigned short filter_z;
     unsigned short reservered11;
     unsigned short reservered12;
     unsigned short reservered13;

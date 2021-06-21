@@ -1,7 +1,7 @@
 #pragma once
 
-#include "hal/hal_data_types.h"
 #include "gfilters_algorithm.h"
+#include "hal/hal_data_types.h"
 
 typedef struct {
     uint32_t time;
@@ -23,6 +23,7 @@ typedef enum {
     EVENT_TYPE_DEBUG            = 23,
     EVENT_TYPE_VERSION          = 25,
     EVENT_TYPE_DRIVER_BEHAVIOUR = 31,
+    EVENT_TYPE_BUMPER           = 32,
     EVENT_TYPE_DEBUG_EXT        = 36,
     EVENT_TYPE_KEEP_ALIVE       = 37,
     EVENT_TYPE_RESET_INFO       = 40,

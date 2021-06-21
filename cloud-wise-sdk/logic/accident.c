@@ -103,10 +103,10 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         if (abs(sample->drive_direction) >= ACC_MIN_ACCIDENT_VALUE)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
-        if (driver_behaviour_state.calibrated) {
-            if (abs(sample->earth_direction) >= ACC_MIN_ACCIDENT_VALUE)
-                state->accident_state = ACCIDENT_STATE_STARTED;
-        }
+/*
+        if (abs(sample->earth_direction) >= ACC_MIN_ACCIDENT_VALUE)
+            state->accident_state = ACCIDENT_STATE_STARTED;
+*/
 
         if (driver_behaviour_state.record_triggered)
             state->accident_state = ACCIDENT_STATE_STARTED;

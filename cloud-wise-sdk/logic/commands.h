@@ -47,6 +47,7 @@ typedef enum {
     COMMAND_SETTINGS,
     COMMAND_DATATX,
     COMMAND_BUZZER_MODE,
+    COMMAND_FILTER_Z,
 } ECOMMANDS;
 
 typedef struct {
@@ -62,8 +63,9 @@ typedef struct {
     uint32_t TestMode : 1;
     uint32_t ExternalPower : 1;
     uint32_t Offroad : 1;
+    uint32_t NotInsideRoute : 1;
 
-    uint32_t Reserved : 20;
+    uint32_t Reserved : 19;
 } IStickerErrorBits;
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source);

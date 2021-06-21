@@ -139,8 +139,8 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     acc_sample_in->Y -= state->calibrated_value.avg_value.Y;
     acc_sample_in->Z -= state->calibrated_value.avg_value.Z;
 
-    x = acc_sample_in->X;
-    y = acc_sample_in->Y;
+    x = -acc_sample_in->X;
+    y = -acc_sample_in->Y;
     z = acc_sample_in->Z;
 
     x /= ACC_NORMALIZATION_VALUE;

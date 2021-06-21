@@ -64,7 +64,7 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"SETTINGS", NULL, PARAM_COMMAND},
     {"DATATX", NULL, PARAM_COMMAND},
     {"DBGMODE", (uint32_t *)&device_config.buzzer_mode, PARAM_NUMERIC},
-
+    {"FILTER_Z", (uint32_t *)&device_config.filter_z, PARAM_NUMERIC},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -417,6 +417,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         case PRINT_SIGNAL_MODE_ENERGY:
         case PRINT_SIGNAL_MODE_GX:
+        case PRINT_SIGNAL_MODE_GY:
+        case PRINT_SIGNAL_MODE_GZ:
             if (driver_behaviour_state.print_signal_mode == param_num)
                 driver_behaviour_state.print_signal_mode = 0;
             else
@@ -487,6 +489,17 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         break;
 
+    case COMMAND_FILTER_Z:
+
+        if (is_set_command) {
+            memcpy((uint8_t *)p->param_address, &param_num, 2);
+        } else {
+            memset(&result, 0x00, 4);
+            memcpy(&result, (uint8_t *)p->param_address, 2);
+        }
+
+        break;
+
     case COMMAND_SAVE:
 
         SaveConfiguration(false);
@@ -495,8 +508,14 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_DEFAULT_MANUFACTURE:
 
-        SetManufactureDefault();
-        SaveConfiguration(true);
+        if (is_set_command) {
+
+            SetManufactureDefault();
+            SaveConfiguration(true);
+
+            ActivateSoftwareReset(RESET_SET_MANUFACTURE_DEFAULT, 0, 0, 0);
+        }
+
         break;
 
     case COMMAND_SETTINGS:

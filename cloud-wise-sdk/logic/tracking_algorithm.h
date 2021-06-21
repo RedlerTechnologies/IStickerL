@@ -47,8 +47,8 @@
 #define PI 3.1415
 
 #define BUZZER_MODE_NONE 0
-#define BUZZER_MODE_ON 1 
-#define BUZZER_MODE_DEBUG 2    
+#define BUZZER_MODE_ON 1
+#define BUZZER_MODE_DEBUG 2
 
 typedef enum {
     TRACKING_STATE_WAKEUP = 0,
@@ -82,10 +82,11 @@ typedef enum {
 
 #define TEST_MODE_TRIGGER_ACCIDENT 8
 #define PRINT_SIGNAL_MODE_ENERGY 9
-#define TEST_MODE_PRINT_SENT_EVENT
+//#define TEST_MODE_PRINT_SENT_EVENT
 
 #define PRINT_SIGNAL_MODE_GX 11
 #define PRINT_SIGNAL_MODE_GY 12
+#define PRINT_SIGNAL_MODE_GZ 13
 #define TEST_MODE_PRINT_ALL_EVENTS 20
 #define TEST_MODE_PRINT_ALL_EVENTS_AND_DATA 21
 #define TEST_MODE_PRINT_SENT_EVENT_MODE 30
@@ -151,6 +152,10 @@ typedef struct {
 
     unsigned short acc_int_counter;
 
+    // offroad
+    unsigned last_bumper_time;
+    unsigned offroad_stated_time;
+
     // flags
     bool time_synced;
     bool new_transfer_protocol;
@@ -171,12 +176,14 @@ typedef struct {
     unsigned last_ble_command_time;
     unsigned stop_advertising_time;
 
+    unsigned bumper_history;
+
     signed       energy;
     signed short Gx;
     signed short Gy;
+    signed short Gz;
 
 } DriverBehaviourState;
-
 
 void driver_behaviour_task(void *pvParameter);
 void sampler_task(void *pvParameter);

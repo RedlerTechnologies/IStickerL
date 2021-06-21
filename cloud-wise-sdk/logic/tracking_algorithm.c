@@ -306,6 +306,8 @@ void TestTamperState(void)
     uint16_t n;
     uint32_t value;
 
+    return; // ??????????????
+
     n = driver_behaviour_state.tamper_sample_count;
 
     driver_behaviour_state.tamper_value.X /= n;
@@ -317,7 +319,7 @@ void TestTamperState(void)
     if (value > 7) {
         // tamper identified
         if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-            buzzer_train(9);
+            buzzer_train(25);
         DisplayMessage("\r\nTampered\r\n", 0, true);
 
         CreateGeneralEvent(LOG_TAMPER, EVENT_TYPE_LOG, 1);
@@ -381,6 +383,9 @@ static void terminal_print_signal_mode(void)
 
     case PRINT_SIGNAL_MODE_GY:
         sprintf(alert_str, "\r\nGy=%d\r\n", driver_behaviour_state.Gy);
+        break;
+    case PRINT_SIGNAL_MODE_GZ:
+        sprintf(alert_str, "\r\nGz=%d\r\n", driver_behaviour_state.Gz);
         break;
     }
 
@@ -447,13 +452,16 @@ void Calculate_Energy(void)
 {
     AccSample *sample;
     AccSample *dif_sample;
-    uint32_t   delta_energy;
+    uint32_t   delta_energy, Gx, Gy, Gz;
     int32_t    temp;
     uint8_t    i = 0;
 
     static AccSample prev_sample;
 
     delta_energy = 0;
+    Gx           = 0;
+    Gy           = 0;
+    Gz           = 0;
 
     if (driver_behaviour_state.energy < 0) {
         memcpy((unsigned char *)&prev_sample, (unsigned char *)(&incoming_sample_ptr[0]), sizeof(AccSample));
@@ -466,14 +474,17 @@ void Calculate_Energy(void)
 
         temp = (sample->X - prev_sample.X);
         temp *= temp;
+        Gx += temp;
         delta_energy += temp;
 
         temp = (sample->Y - prev_sample.Y);
         temp *= temp;
+        Gy += temp;
         delta_energy += temp;
 
         temp = (sample->Z - prev_sample.Z);
         temp *= temp;
+        Gz += temp;
         delta_energy += temp;
 
         memcpy((unsigned char *)&prev_sample, (unsigned char *)(sample), sizeof(AccSample));
@@ -482,6 +493,9 @@ void Calculate_Energy(void)
     delta_energy = (uint32_t)sqrt(delta_energy);
 
     driver_behaviour_state.energy = delta_energy;
+    driver_behaviour_state.Gx     = sqrt(Gx);
+    driver_behaviour_state.Gy     = sqrt(Gy);
+    driver_behaviour_state.Gz     = sqrt(Gz);
 }
 
 void ProcessDrivingState(void)
@@ -510,6 +524,9 @@ void send_acc_sample_to_ble(void)
     AccConvertedSample *sample;
 
     if (!ble_services_is_connected())
+        return;
+
+    if (!driver_behaviour_state.calibrated)
         return;
 
     sample = (AccConvertedSample *)&incoming_sample_ptr[0];
@@ -552,7 +569,7 @@ bool ProcessWakeupState(void)
         print_movment();
     }
 
-    if (state->movement_count >= 7) {
+    if (state->movement_count >= 4) {
         found = true;
     }
 

@@ -250,6 +250,8 @@ void monitor_thread(void *arg)
                 error_bits.GPS_Disconnected = 1;
                 error_bits.Tampered         = driver_behaviour_state.tampered;
                 error_bits.NotCalibrated    = !(driver_behaviour_state.calibrated);
+                error_bits.NotInsideRoute    = (driver_behaviour_state.track_state != TRACKING_STATE_ROUTE);
+
                 // error_bits.NotCalibrated    = 1;
                 memcpy(ble_buffer + 6, (uint8_t *)(&error_bits), 4);
                 ble_services_notify_status(ble_buffer, 16);
@@ -518,14 +520,16 @@ void print_indicators(void)
     uint8_t ind_route;
     uint8_t ind_tamper;
     uint8_t ind_calibrate;
+    uint8_t ind_offroad;
 
     ind_ble       = (ble_services_is_connected()) ? '1' : '0';
     ind_route     = (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE) ? '1' : '0';
     ind_tamper    = (driver_behaviour_state.tampered) ? '1' : '0';
     ind_calibrate = (driver_behaviour_state.calibratation_saved_in_flash) ? '1' : '0';
+    ind_offroad = (error_bits.Offroad) ? '1' : '0';
 
     memset(alert_str, 0x00, ALERT_BUFFER_SIZE);
 
-    sprintf(alert_str, "BLE=%c, ROUTE=%c, TMP=%c, CAL=%c\r\n\r\n", ind_ble, ind_route, ind_tamper, ind_calibrate);
+    sprintf(alert_str, "BLE=%c, ROUTE=%c, TMP=%c, CAL=%c, OFF=%c\r\n\r\n", ind_ble, ind_route, ind_tamper, ind_calibrate, ind_offroad);
     DisplayMessage(alert_str, 0, false);
 }
