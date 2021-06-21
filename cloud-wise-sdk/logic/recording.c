@@ -24,7 +24,7 @@
 #include <string.h>
 #include <time.h>
 
-static uint8_t flash_buffer[260]; // ?????????????
+static uint8_t flash_buffer[260];
 
 extern xSemaphoreHandle     tx_uart_semaphore;
 extern DriverBehaviourState driver_behaviour_state;

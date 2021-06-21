@@ -155,38 +155,35 @@ static void check_ble_events(void)
 
     if (uxBits) {
 
-        switch (uxBits) {
-
-        case BLE_EVENTS_ENTER_FAST_ADV:
+        if (uxBits & BLE_EVENTS_ENTER_FAST_ADV) {
             DisplayMessage("\r\nFast Advertising\r\n", 0, true);
-            break;
+        }
 
-        case BLE_EVENTS_ENTER_SLOW_ADV:
+        if (uxBits & BLE_EVENTS_ENTER_SLOW_ADV) {
             DisplayMessage("\r\nSlow Advertising\r\n", 0, true);
-            break;
+        }
 
-        case BLE_EVENTS_ENTER_NO_ADV:
+        if (uxBits & BLE_EVENTS_ENTER_NO_ADV) {
             DisplayMessage("\r\nStop Advertising\r\n", 0, true);
             driver_behaviour_state.stop_advertising_time = xTaskGetTickCount();
-            break;
+        }
 
-        case BLE_EVENTS_CONNECTED:
+        if (uxBits & BLE_EVENTS_CONNECTED) {
             DisplayMessage("\r\nBLE connected\r\n", 0, true);
             set_sleep_timeout_on_ble();
 
             CreateGeneralEvent(LOG_BLE_CONNECTED, EVENT_TYPE_LOG, 2);
-            break;
+        }
 
-        case BLE_EVENTS_DISCONNECTED:
+        if (uxBits & BLE_EVENTS_DISCONNECTED) {
             DisplayMessage("\r\nBLE disconnected\r\n", 0, true);
             set_sleep_timeout_on_ble();
-            break;
-
-        case BLE_EVENTS_SERVER_TIMEOUT:
-        case BLE_EVENTS_CLIENT_TIMEOUT:
-            DisplayMessage("\r\nBLE timeout\r\n", 0, true);
-            break;
         }
+
+        if (uxBits & (BLE_EVENTS_SERVER_TIMEOUT | BLE_EVENTS_CLIENT_TIMEOUT)) {
+            DisplayMessage("\r\nBLE timeout\r\n", 0, true);
+        }
+
 
         // ??????????? CreateDebugEvent(EVENT_DEBUG_BLE_STATUS_CHANGE , get_bit(uxBits), false);
     }

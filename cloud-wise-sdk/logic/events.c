@@ -214,13 +214,15 @@ void CreateDriverBehaviourEvent(GFilterConfig *event_config, GFilterState *event
     */
 
     status = event_state->severity;
-    status |= 0x80; // new structure for driver behaviour
+    //status |= 0x80; // new structure for driver behaviour
 
     // left/right bit
     if (event_config->code == DRIVER_BEHAVIOR_SHARP_TURN) {
-        if (event_config->min_g < 0)
+        if (event_config->positive)
             status |= 0x04;
     }
+
+    buffer[1] = status;
 
     memcpy(&event.time, &event_state->event_time, 4);
     

@@ -351,10 +351,10 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
             filter_state->max_g = value_pos;
 
         if (negative_flag) {
-            if (value > -filter_config->min_g)
+            if (value > -filter_config->min_g / 2)
                 new_state_found = true;
         } else {
-            if (value < filter_config->min_g)
+            if (value < filter_config->min_g / 2)
                 new_state_found = true;
         }
 
@@ -377,18 +377,16 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
             n = MAX_EVENT_DURATION / SAMPLE_PERIOD;
 
             if (filter_state->duration_count > n)
-                filter_state->state = GFILTER_AXIS_STATE_COMPLETED;
+                filter_state->state = GFILTER_AXIS_STATE_COMPLETED2;
         }
 
         break;
 
     case GFILTER_AXIS_STATE_COMPLETED:
+    case GFILTER_AXIS_STATE_COMPLETED2:
         // add inside queue
 
-        /* ?????????
-        if (device_config.buzzer_mode == BUZZER_MODE_DRIVER_BEHAVIOUR)
-            buzzer_train(3);
-            */
+        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
 
         terminal_buffer_lock();
         sprintf(alert_str, "\r\nEvent: %s\r\n", filter_config->name);
@@ -410,12 +408,28 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
         if (filter_state->max_g >= filter_config->min_g3 && filter_state->duration_count >= n)
             filter_state->severity++;
 
-        if (filter_state->severity <= 1) {
-            if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
-                buzzer_train(1);
-        } else {
-            if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-                buzzer_train((filter_state->severity - 1) * 4);
+        {
+            uint8_t beeps = 0;
+
+            switch (filter_state->severity) {
+            case 2:
+                if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+                    beeps = 2;
+                break;
+
+            case 3:
+                if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+                    beeps = 6;
+                break;
+
+            default:
+                if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
+                    beeps = 1;
+                break;
+            }
+
+            if (beeps > 0)
+                buzzer_train(beeps);
         }
 
         // BLE alert //
@@ -430,7 +444,10 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
 
         nrf_queue_write(&m_event_queue, filter_state, 1);
 
-        filter_state->state = GFILTER_AXIS_STATE_DELAY;
+        if (filter_state->state == GFILTER_AXIS_STATE_COMPLETED)
+            filter_state->state = GFILTER_AXIS_STATE_DELAY;
+        else
+            filter_state->state = GFILTER_AXIS_STATE_DELAY2;
 
         break;
 
@@ -447,6 +464,15 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
             filter_state->index = n;
 
             filter_state->state = GFILTER_AXIS_STATE_NONE;
+        }
+
+        break;
+
+    case GFILTER_AXIS_STATE_DELAY2:
+
+        if (value_pos < filter_config->min_g / 2) {
+            filter_state->duration_count = 0;
+            filter_state->state          = GFILTER_AXIS_STATE_DELAY;
         }
 
         break;
