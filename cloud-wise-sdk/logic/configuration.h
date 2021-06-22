@@ -25,8 +25,8 @@ typedef struct {
     unsigned short reservered16;
 
     // 0x0040
-    CalibratedValue calibrate_value; // size 8 bytes
-    unsigned char   reserved20[8];
+    CalibratedValue calibrate_value; // size 12 bytes
+    unsigned char   reserved20[4];
 
     // 0x0050
     unsigned char reserved21[16];

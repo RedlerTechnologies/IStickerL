@@ -139,8 +139,14 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     acc_sample_in->Y -= state->calibrated_value.avg_value.Y;
     acc_sample_in->Z -= state->calibrated_value.avg_value.Z;
 
-    x = -acc_sample_in->X;
-    y = -acc_sample_in->Y;
+    /*
+        x = -acc_sample_in->X;
+        y = -acc_sample_in->Y;
+        */
+
+    x = acc_sample_in->X;
+    y = acc_sample_in->Y;
+
     z = acc_sample_in->Z;
 
     x /= ACC_NORMALIZATION_VALUE;
@@ -218,7 +224,7 @@ void sampler_task(void *pvParameter)
 
             calculate_sample(&acc_sample, sample_buffer);
 
-            if (driver_behaviour_state.calibrated) {
+            if (driver_behaviour_state.calibrated && driver_behaviour_state.track_state != TRACKING_STATE_SLEEP) {
                 ACC_CalibrateSample(&acc_sample, &acc_sample1);
             } else {
                 memcpy(&acc_sample1, &acc_sample, sizeof(AccSample));

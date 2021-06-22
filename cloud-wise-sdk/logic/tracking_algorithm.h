@@ -71,6 +71,9 @@ typedef struct {
 typedef struct {
     AccSample avg_value;
     uint8_t   axis;
+    uint8_t   reserved;
+    int16_t   angle1;
+    int16_t   angle2;
 } CalibratedValue;
 
 typedef enum {

@@ -214,7 +214,7 @@ static void Process_Offroad(void)
     uint8_t  i;
     bool     offroad = false;
 
-    if (driver_behaviour_state.Gz >= 10)
+    if (driver_behaviour_state.Gz >= 30)
         offroad = true;
 
     bumper_history = driver_behaviour_state.bumper_history;
@@ -237,7 +237,7 @@ static void Process_Offroad(void)
 
     percentage = count * 100 / 32;
 
-    if (percentage > 15) {
+    if (percentage > 25) {
         // offroaad
         driver_behaviour_state.offroad_stated_time = xTaskGetTickCount();
 
@@ -278,8 +278,10 @@ static void Process_Bumper(void)
     uint32_t duration;
     bool     bumper = false;
 
-    if (driver_behaviour_state.Gz >= device_config.filter_z) {
-        bumper = true;
+    if (device_config.filter_z > 0) {
+        if (driver_behaviour_state.Gz > device_config.filter_z) {
+            bumper = true;
+        }
     }
 
     if (bumper) {
@@ -386,7 +388,9 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
     case GFILTER_AXIS_STATE_COMPLETED2:
         // add inside queue
 
-        driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+        // dont use the following line! activity (sleeping delay) is only done by
+        // energy signal and not by driver behaviour events
+        // driver_behaviour_state.last_activity_time = xTaskGetTickCount();
 
         terminal_buffer_lock();
         sprintf(alert_str, "\r\nEvent: %s\r\n", filter_config->name);

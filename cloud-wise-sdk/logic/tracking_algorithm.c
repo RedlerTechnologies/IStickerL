@@ -56,7 +56,7 @@ void           calculate_sample(AccSample *acc_sample, uint8_t *buffer);
 unsigned short GetGValue(AccConvertedSample *sample);
 void           ProcessDrivingState(void);
 void           ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out);
-void           Process_Calibrate(void);
+void           Process_Calibrate(bool tamper_mode);
 void           InitWakeupAlgorithm(void);
 bool           ProcessWakeupState(void);
 bool           CheckNoActivity(void);
@@ -68,8 +68,6 @@ void           Set_Installation_Angle(void);
 uint16_t       get_current_state_timeout(void);
 void           send_acc_sample_to_ble(void);
 uint16_t       GetMinEneryForMovement(void);
-void           ProcessTamper(void);
-void           TestTamperState(void);
 
 extern AccConvertedSample *incoming_sample_ptr;
 
@@ -83,6 +81,8 @@ void driver_behaviour_task(void *pvParameter)
     bool             need_sleep;
     bool             sleep_flag;
 
+    buzzer_train(1);
+
     if ((RECORD_SIZE - RECORD_HEADER_SIZE - RECORD_TERMINATOR_SIZE) < SAMPLE_MEMORY_SIZE) {
         DisplayMessage("error in memory size", 0, true);
         ActivateSoftwareReset(RESET_OUT_OF_MEMORY, 0, 0, 0);
@@ -91,9 +91,8 @@ void driver_behaviour_task(void *pvParameter)
     LoadConfiguration();
 
     if (device_config.buzzer_mode != BUZZER_MODE_NONE)
-        buzzer_train(1);
 
-    ble_services_init_0();
+        ble_services_init_0();
     SaveConfiguration(false);
     ble_services_init();
 
@@ -194,7 +193,7 @@ void driver_behaviour_task(void *pvParameter)
         send_acc_sample_to_ble();
 
         if (driver_behaviour_state.store_calibration) {
-            Process_Calibrate();
+            Process_Calibrate(false);
 
             continue;
         }
@@ -252,15 +251,14 @@ void driver_behaviour_task(void *pvParameter)
 
                 duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.enter_sleeping_time) / 1000;
 
-                if (duration <= 5) {
-                    ProcessTamper();
-                } else {
-                    TestTamperState();
+                if (duration <= 5 && !driver_behaviour_state.tampered) {
+                    Process_Calibrate(true);
 
+                } else {
                     ble_services_disconnect();
 
                     // need after creating end of route immediate events
-                    vTaskDelay(5000);
+                    vTaskDelay(8000);
 
                     DisplayMessageWithTime("Sleep\r\n", 0, true);
 
@@ -298,69 +296,6 @@ void driver_behaviour_task(void *pvParameter)
         }
 
         terminal_print_signal_mode();
-    }
-}
-
-void TestTamperState(void)
-{
-    uint16_t n;
-    uint32_t value;
-
-    return; // ??????????????
-
-    n = driver_behaviour_state.tamper_sample_count;
-
-    driver_behaviour_state.tamper_value.X /= n;
-    driver_behaviour_state.tamper_value.Y /= n;
-    driver_behaviour_state.tamper_value.Z /= n;
-
-    value = GetGValue((AccConvertedSample *)&driver_behaviour_state.tamper_value);
-
-    if (value > 7) {
-        // tamper identified
-        if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-            buzzer_train(25);
-        DisplayMessage("\r\nTampered\r\n", 0, true);
-
-        CreateGeneralEvent(LOG_TAMPER, EVENT_TYPE_LOG, 1);
-
-        driver_behaviour_state.tampered   = true;
-        driver_behaviour_state.calibrated = false;
-
-        device_config.calibrate_value.avg_value.Z = 0;
-        SaveConfiguration(true);
-
-        vTaskDelay(10000);
-    }
-}
-
-void ProcessTamper(void)
-{
-    static uint8_t check_flag = false;
-
-    AccSample *sample;
-    uint8_t    i;
-
-    if (driver_behaviour_state.tampered)
-        return;
-
-    if (!driver_behaviour_state.calibrated)
-        return;
-
-    if (driver_behaviour_state.tamper_sample_count == 0) {
-        driver_behaviour_state.tamper_value.X = 0;
-        driver_behaviour_state.tamper_value.Y = 0;
-        driver_behaviour_state.tamper_value.Z = 0;
-    }
-
-    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-        sample = (AccSample *)&incoming_sample_ptr[i];
-
-        driver_behaviour_state.tamper_sample_count++;
-
-        driver_behaviour_state.tamper_value.X += sample->X;
-        driver_behaviour_state.tamper_value.Y += sample->Y;
-        driver_behaviour_state.tamper_value.Z += sample->Z;
     }
 }
 
@@ -601,7 +536,7 @@ uint16_t GetMinEneryForMovement(void)
         return 750;
 }
 
-void Process_Calibrate(void)
+void Process_Calibrate(bool tamper_mode)
 {
     DriverBehaviourState *state = &driver_behaviour_state;
 
@@ -646,6 +581,9 @@ void Process_Calibrate(void)
         angle1 = atan(y / z);
         temp1  = (int16_t)(angle1 * 180 / PI);
 
+        state->calibrated_value.angle1 = temp1;
+        state->calibrated_value.angle2 = temp2;
+
         state->angle1 = angle1;
 
         if (angle1 < PI * 45 / 180) {
@@ -656,26 +594,56 @@ void Process_Calibrate(void)
             state->calibrated_value.axis = 3;
         }
 
-        if (driver_behaviour_state.store_calibration) {
-            memcpy(&device_config.calibrate_value, &state->calibrated_value, sizeof(CalibratedValue));
-            state->tampered = false;
-            SaveConfiguration(false);
-            driver_behaviour_state.registration_mode = false;
+        if (tamper_mode) {
+            bool is_tampered = false;
+
+            temp1 = abs(state->calibrated_value.angle1 - device_config.calibrate_value.angle1);
+            if (temp1 >= 25)
+                is_tampered = true;
+
+            temp2 = abs(state->calibrated_value.angle2 - device_config.calibrate_value.angle2);
+            if (temp2 >= 10)
+                is_tampered = true;
+
+            if (is_tampered) {
+                // tampered identified
+
+                if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+                    buzzer_train(25);
+
+                DisplayMessage("\r\nTampered\r\n", 0, true);
+
+                CreateGeneralEvent(LOG_TAMPER, EVENT_TYPE_LOG, 1);
+
+                driver_behaviour_state.tampered   = true;
+                driver_behaviour_state.calibrated = false;
+
+                device_config.calibrate_value.avg_value.Z = 0;
+                SaveConfiguration(true);
+            }
+        } else {
+
+            if (driver_behaviour_state.store_calibration) {
+                memcpy(&device_config.calibrate_value, &state->calibrated_value, sizeof(CalibratedValue));
+                state->tampered = false;
+                SaveConfiguration(false);
+                driver_behaviour_state.registration_mode = false;
+            }
+
+            driver_behaviour_state.store_calibration = false;
+            state->block_count                       = 0;
+            state->calibrated                        = true;
+
+            if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+                buzzer_train(5);
+
+            terminal_buffer_lock();
+            sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", temp1, temp2, state->calibrated_value.axis);
+            PostBleAlert(alert_str);
+            terminal_buffer_release();
+
+            driver_behaviour_state.block_sample_time = xTaskGetTickCount();
         }
-
-        driver_behaviour_state.store_calibration = false;
-        state->block_count                       = 0;
-        state->calibrated                        = true;
-
-        if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-            buzzer_train(5);
-
-        terminal_buffer_lock();
-        sprintf(alert_str + 2, "@?C,%d,%d,%d\r\n", temp1, temp2, state->calibrated_value.axis);
-        PostBleAlert(alert_str);
-        terminal_buffer_release();
-
-        driver_behaviour_state.block_sample_time = xTaskGetTickCount();
     }
 }
 
