@@ -90,9 +90,7 @@ void driver_behaviour_task(void *pvParameter)
 
     LoadConfiguration();
 
-    if (device_config.buzzer_mode != BUZZER_MODE_NONE)
-
-        ble_services_init_0();
+    ble_services_init_0();
     SaveConfiguration(false);
     ble_services_init();
 
