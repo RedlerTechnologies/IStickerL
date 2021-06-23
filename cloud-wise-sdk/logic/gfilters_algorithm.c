@@ -115,6 +115,21 @@ void gfilter_init(void)
     }
 }
 
+bool is_bumper_occured(void)
+{
+    uint32_t duration;
+
+    if (device_config.config_flags.bumper_dis)
+        return false;
+
+    duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_bumper_time);
+
+    if (duration < 3000)
+        return true;
+    else
+        return false;
+}
+
 void Process_GFilters(AccConvertedSample *samples)
 {
     static GFilterState event_state;
@@ -133,12 +148,17 @@ void Process_GFilters(AccConvertedSample *samples)
     Process_Offroad();
 
     Process_Bumper();
+
+    /*
     duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_bumper_time);
 
-    // ???????????????? disable bumper blocking for this version
-    duration = 10000;
+    // disable bumper blocking driver events
+    if (device_config.config_flags.bumper_dis)
+        duration = 10 * 24 * 3600 * 1000;
+    */
 
-    if (duration >= 3000) { // block driver events on bumper
+    // if (duration >= 3000)
+    { // block driver events on bumper
         filter_config = &filter_configs[GFILTER_ACCELERATION];
         filter_state  = &filter_states[GFILTER_ACCELERATION];
 
@@ -214,7 +234,7 @@ static void Process_Offroad(void)
     uint8_t  i;
     bool     offroad = false;
 
-    if (driver_behaviour_state.Gz >= 30)
+    if (driver_behaviour_state.Gz >= device_config.offroad_g)
         offroad = true;
 
     bumper_history = driver_behaviour_state.bumper_history;
@@ -237,13 +257,14 @@ static void Process_Offroad(void)
 
     percentage = count * 100 / 32;
 
-    if (percentage > 25) {
+    if (percentage > device_config.offroad_per) {
         // offroaad
         driver_behaviour_state.offroad_stated_time = xTaskGetTickCount();
 
         if (!error_bits.Offroad) {
             // offroad started
             send_ble_offroad_alert(1);
+            CreateGeneralEvent(0, EVENT_TYPE_OFFROAD_START, 2);
         }
 
         error_bits.Offroad = 1;
@@ -255,6 +276,7 @@ static void Process_Offroad(void)
             if (error_bits.Offroad) {
                 // offroad stops
                 send_ble_offroad_alert(0);
+                CreateGeneralEvent(duration, EVENT_TYPE_OFFROAD_END, 4);
             }
 
             error_bits.Offroad = 0;
@@ -272,8 +294,9 @@ static void send_ble_offroad_alert(uint8_t status)
 
 static void Process_Bumper(void)
 {
-    static uint32_t measure_time = 0;
-    static uint32_t bumper_count = 0;
+    static uint32_t measure_time     = 0;
+    static uint32_t last_buzzer_time = 0;
+    static uint32_t bumper_count     = 0;
 
     uint32_t duration;
     bool     bumper = false;
@@ -284,6 +307,10 @@ static void Process_Bumper(void)
         }
     }
 
+    duration = timeDiff(xTaskGetTickCount(), last_buzzer_time);
+    if (duration < 1500)
+        return;
+
     if (bumper) {
         driver_behaviour_state.last_bumper_time = xTaskGetTickCount();
         bumper_count++;
@@ -292,6 +319,11 @@ static void Process_Bumper(void)
         sprintf(alert_str + 2, "@?BUMPER,%d\r\n", driver_behaviour_state.Gz);
         PostBleAlert(alert_str);
         terminal_buffer_release();
+
+        last_buzzer_time = xTaskGetTickCount();
+
+        if (device_config.buzzer_mode == BUZZER_MODE_OFFROAD)
+            buzzer_train(4);
     }
 
     duration = timeDiff(xTaskGetTickCount(), measure_time) / 1000;
@@ -312,9 +344,16 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
     uint16_t n;
     bool     new_state_found = false;
     bool     negative_flag   = false;
+    bool     report          = true;
 
     if (filter_config->min_duration == 0)
         return;
+
+    if (!device_config.config_flags.offroad_disabled) {
+        if (error_bits.Offroad) {
+            return;
+        }
+    }
 
     value     = GetAxisValue(sample, filter_config->axis);
     value_pos = abs(value);
@@ -432,21 +471,31 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
                 break;
             }
 
-            if (beeps > 0)
-                buzzer_train(beeps);
+            if (device_config.buzzer_mode != BUZZER_MODE_OFFROAD) {
+                if (beeps > 0)
+                    buzzer_train(beeps);
+            }
         }
 
-        // BLE alert //
-        uint8_t code = filter_config->code;
-        if (filter_config->positive && filter_config->axis == GFILTER_AXIS_Y)
-            code = DRIVER_BEHAVIOR_SHARP_TURN_RIGHT;
+        if (is_bumper_occured())
+            report = false;
 
-        terminal_buffer_lock();
-        sprintf(alert_str + 2, "@?DR,%d,%d\r\n", code, filter_state->severity);
-        PostBleAlert(alert_str);
-        terminal_buffer_release();
+         driver_behaviour_state.event_count_for_tamper++;
 
-        nrf_queue_write(&m_event_queue, filter_state, 1);
+        if (report) {
+            // BLE alert //
+            uint8_t code = filter_config->code;
+            if (filter_config->positive && filter_config->axis == GFILTER_AXIS_Y)
+                code = DRIVER_BEHAVIOR_SHARP_TURN_RIGHT;
+
+            terminal_buffer_lock();
+            sprintf(alert_str + 2, "@?DR,%d,%d\r\n", code, filter_state->severity);
+            PostBleAlert(alert_str);
+            terminal_buffer_release();
+
+            // send to flash memory
+            nrf_queue_write(&m_event_queue, filter_state, 1);
+        }
 
         if (filter_state->state == GFILTER_AXIS_STATE_COMPLETED)
             filter_state->state = GFILTER_AXIS_STATE_DELAY;

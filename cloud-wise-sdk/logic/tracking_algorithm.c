@@ -529,9 +529,26 @@ void Set_Installation_Angle(void)
 uint16_t GetMinEneryForMovement(void)
 {
     if (driver_behaviour_state.calibrated)
-        return 100;
+        return 80;
     else
         return 750;
+}
+
+void set_tamper_mode(uint8_t log_code)
+{
+
+    if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+        buzzer_train(25);
+
+    DisplayMessage("\r\nTampered\r\n", 0, true);
+
+    CreateGeneralEvent(log_code, EVENT_TYPE_LOG, 1);
+
+    driver_behaviour_state.tampered   = true;
+    driver_behaviour_state.calibrated = false;
+
+    device_config.calibrate_value.avg_value.Z = 0;
+    SaveConfiguration(true);
 }
 
 void Process_Calibrate(bool tamper_mode)
@@ -595,29 +612,23 @@ void Process_Calibrate(bool tamper_mode)
         if (tamper_mode) {
             bool is_tampered = false;
 
-            temp1 = abs(state->calibrated_value.angle1 - device_config.calibrate_value.angle1);
-            if (temp1 >= 25)
-                is_tampered = true;
+            if (device_config.calibrate_value.angle1) {
+                temp1 = abs(state->calibrated_value.angle1 - device_config.calibrate_value.angle1);
+                if (temp1 >= device_config.tamper_angle1)
+                    is_tampered = true;
+            }
 
-            temp2 = abs(state->calibrated_value.angle2 - device_config.calibrate_value.angle2);
-            if (temp2 >= 10)
-                is_tampered = true;
+            if (device_config.calibrate_value.angle2) {
+
+                temp2 = abs(state->calibrated_value.angle2 - device_config.calibrate_value.angle2);
+                if (temp2 >= device_config.tamper_angle2)
+                    is_tampered = true;
+            }
 
             if (is_tampered) {
                 // tampered identified
 
-                if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-                    buzzer_train(25);
-
-                DisplayMessage("\r\nTampered\r\n", 0, true);
-
-                CreateGeneralEvent(LOG_TAMPER, EVENT_TYPE_LOG, 1);
-
-                driver_behaviour_state.tampered   = true;
-                driver_behaviour_state.calibrated = false;
-
-                device_config.calibrate_value.avg_value.Z = 0;
-                SaveConfiguration(true);
+                set_tamper_mode(LOG_TAMPER_STATIC);
             }
         } else {
 

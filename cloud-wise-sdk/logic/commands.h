@@ -2,7 +2,7 @@
 
 #include "hal/hal_data_types.h"
 
-#define NUM_OF_PARAMETERS 21
+#define NUM_OF_PARAMETERS 28
 
 #define PARAM_TYPE_STRING 0
 #define PARAM_TYPE_INTEGER 1
@@ -15,15 +15,10 @@
 typedef struct {
     uint8_t   param_name[16];
     uint32_t *param_address;
-    uint8_t   param_type;
 
-    /*
-        uint16_t param_id;
-        uint8_t  max_size;
-        uint8_t  param_type;
-        uint8_t  counter_id;
-        uint8_t  read_only;
-        */
+    uint8_t param_type;
+    uint8_t size;
+
 } ConfigParameter;
 
 typedef enum {
@@ -48,6 +43,13 @@ typedef enum {
     COMMAND_DATATX,
     COMMAND_BUZZER_MODE,
     COMMAND_FILTER_Z,
+    COMMAND_OFFROAD_G,
+    COMMAND_OFFROAD_PER,
+    COMMAND_OFFROAD_DIS,
+    COMMAND_BUMPER_DIS,
+    COMMAND_TAMPER_MIN,
+    COMMAND_TAMPER_ANGLE1,
+    COMMAND_TAMPER_ANGLE2,
 } ECOMMANDS;
 
 typedef struct {

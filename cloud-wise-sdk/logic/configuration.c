@@ -35,10 +35,7 @@ void LoadConfiguration(void)
         SaveConfiguration(true);
     }
 
-    // device_config.max_sleep_time = 600; // 120;
     // strcpy ( device_config.DeviceName , "S-KKKK0000001" );
-
-    // driver_behaviour_state.sleep_delay_time = device_config.max_sleep_time;
 
     // device_config.AccidentG = MIN_G_FOR_ACCIDENT_EVENT;
 }
@@ -74,7 +71,16 @@ void SetManufactureDefault(void)
 
     device_config.AccidentG   = MIN_G_FOR_ACCIDENT_EVENT;
     device_config.buzzer_mode = BUZZER_MODE_ON;
-    device_config.filter_z = 50;
+    device_config.filter_z = 40;
+    device_config.offroad_g = 25;
+    device_config.offroad_per = 50;
+    device_config.min_events_for_tamper = 15;
+    device_config.tamper_angle1 = 35;
+    device_config.tamper_angle2 = 15;
+
+    memset( &device_config.config_flags,  0x00, 4);
+    device_config.config_flags.offroad_disabled = 1; // 0 - ?????????? 
+    device_config.config_flags.bumper_dis = 1; // 0 - ?????????? 
 
     memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
 

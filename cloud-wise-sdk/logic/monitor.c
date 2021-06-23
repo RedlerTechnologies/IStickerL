@@ -224,6 +224,17 @@ void monitor_thread(void *arg)
                 CreateMeasurementEvent(vdd_float, (float)(temperature));
             }
 
+            if ((current_time % 32) == 0 && device_config.min_events_for_tamper && !driver_behaviour_state.tampered)
+            {
+                if (driver_behaviour_state.event_count_for_tamper > device_config.min_events_for_tamper )
+                {
+                  // tampered identified
+                  set_tamper_mode(LOG_TAMPER_DYNAMIC);
+                }
+
+                driver_behaviour_state.event_count_for_tamper = 0;
+            }
+
             // search for pending recording files
             duration = timeDiff(xTaskGetTickCount(), acc_record.last_found_record_time) / 1000;
             if (duration >= 30) {

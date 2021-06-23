@@ -4,7 +4,7 @@
 
 #define APP_MAJOR_VERSION 1
 #define APP_MINOR_VERSION 2
-#define APP_BUILD 9
+#define APP_BUILD 10
 
 #define HARDWARE_TYPE 11
 

@@ -48,7 +48,8 @@
 
 #define BUZZER_MODE_NONE 0
 #define BUZZER_MODE_ON 1
-#define BUZZER_MODE_DEBUG 2
+#define BUZZER_MODE_OFFROAD 2
+#define BUZZER_MODE_DEBUG 3
 
 typedef enum {
     TRACKING_STATE_WAKEUP = 0,
@@ -133,6 +134,7 @@ typedef struct {
 
     AccSample tamper_value;
     int       tamper_sample_count;
+    short     event_count_for_tamper;
 
     ////////////////////////
     // accident algorithm //
@@ -197,3 +199,4 @@ void copy_calibration(void);
 bool IsDeviceMoved(unsigned moved_in_last_seconds);
 void set_sleep_timeout(uint16_t value);
 void set_sleep_timeout_on_ble(void);
+void set_tamper_mode(uint8_t log_code);

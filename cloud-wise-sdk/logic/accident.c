@@ -94,6 +94,9 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
     if (!driver_behaviour_state.calibrated)
         return;
 
+    if (device_config.AccidentG == 0)
+      return;
+
     switch (state->accident_state) {
     case ACCIDENT_STATE_NONE:
 

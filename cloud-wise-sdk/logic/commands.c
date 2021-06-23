@@ -44,27 +44,35 @@ void print_all_parameters(void);
 void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, uint8_t is_set_command, uint8_t source);
 
 ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
-    {"BEEP", NULL, PARAM_COMMAND},
-    {"CALIBRATE", NULL, PARAM_COMMAND},
-    {"SLPD", NULL, PARAM_COMMAND},
-    {"SW_VERSION", NULL, PARAM_COMMAND},
-    {"SW_BUILD", NULL, PARAM_COMMAND},
-    {"DEVID", (uint32_t *)device_config.DeviceID, PARAM_STRING},
-    {"BLEID", (uint32_t *)device_config.DeviceName, PARAM_STRING},
-    {"TIME", NULL, PARAM_COMMAND},
-    {"RESET", NULL, PARAM_COMMAND},
-    {"MEM_CLEAR", NULL, PARAM_COMMAND},
-    {"RECORD", NULL, PARAM_COMMAND},
-    {"FILE", NULL, PARAM_COMMAND},
-    {"BLE", NULL, PARAM_COMMAND},
-    {"TEST_MODE", NULL, PARAM_COMMAND},
-    {"ACCIDENT_G", (uint32_t *)&device_config.AccidentG, PARAM_NUMERIC},
-    {"SAVE", NULL, PARAM_COMMAND},
-    {"MANUF", NULL, PARAM_COMMAND},
+    {"BEEP", NULL, PARAM_COMMAND, 0},
+    {"CALIBRATE", NULL, PARAM_COMMAND, 0},
+    {"SLPD", NULL, PARAM_COMMAND, 0},
+    {"SW_VERSION", NULL, PARAM_COMMAND, 0},
+    {"SW_BUILD", NULL, PARAM_COMMAND, 0},
+    {"DEVID", (uint32_t *)device_config.DeviceID, PARAM_STRING, 28},
+    {"BLEID", (uint32_t *)device_config.DeviceName, PARAM_STRING, 16},
+    {"TIME", NULL, PARAM_COMMAND, 0},
+    {"RESET", NULL, PARAM_COMMAND, 0},
+    {"MEM_CLEAR", NULL, PARAM_COMMAND, 0},
+    {"RECORD", NULL, PARAM_COMMAND, 0},
+    {"FILE", NULL, PARAM_COMMAND, 0},
+    {"BLE", NULL, PARAM_COMMAND, 0},
+    {"TEST_MODE", NULL, PARAM_COMMAND, 0},
+    {"ACCIDENT_G", (uint32_t *)&device_config.AccidentG, PARAM_NUMERIC, 1},
+    {"SAVE", NULL, PARAM_COMMAND, 0},
+    {"MANUF", NULL, PARAM_COMMAND, 0},
     {"SETTINGS", NULL, PARAM_COMMAND},
-    {"DATATX", NULL, PARAM_COMMAND},
-    {"DBGMODE", (uint32_t *)&device_config.buzzer_mode, PARAM_NUMERIC},
-    {"FILTER_Z", (uint32_t *)&device_config.filter_z, PARAM_NUMERIC},
+    {"DATATX", NULL, PARAM_COMMAND, 0},
+    {"DBGMODE", (uint32_t *)&device_config.buzzer_mode, PARAM_NUMERIC, 1},
+    {"FILTER_Z", (uint32_t *)&device_config.filter_z, PARAM_NUMERIC, 2},
+    {"OFFROAD_G", (uint32_t *)&device_config.offroad_g, PARAM_NUMERIC, 2},
+    {"OFFROAD_PER", (uint32_t *)&device_config.offroad_per, PARAM_NUMERIC, 1},
+    {"OFFROAD_DIS", (uint32_t *)&device_config.config_flags, PARAM_NUMERIC, 13},
+    {"BUMPER_DIS", (uint32_t *)&device_config.config_flags, PARAM_NUMERIC, 1},
+    {"TAMPER_MIN", (uint32_t *)&device_config.min_events_for_tamper, PARAM_NUMERIC, 1},
+    {"TAMPER_ANGLE1", (uint32_t *)&device_config.tamper_angle1, PARAM_NUMERIC, 1},
+    {"TAMPER_ANGLE2", (uint32_t *)&device_config.tamper_angle2, PARAM_NUMERIC, 1},
+
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -86,10 +94,13 @@ bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buf
         if (command_str[i] == 'P')
             break;
 
+        if (command_str[i] == 'B')
+            break;
+
         i++;
     }
 
-    if (command_str[i] == 'P') {
+    if (command_str[i] == 'P' || command_str[i] == 'B') {
         memset(command, 0x00, MAX_COMMAND_SIZE);
         i += 2;
         j = 0;
@@ -465,39 +476,75 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         break;
 
-    case COMMAND_ACCIDENT_G:
+        /*
+            case COMMAND_ACCIDENT_G:
 
-        if (is_set_command) {
-            if (param_num >= 4) {
-                memcpy((uint32_t *)p->param_address, &param_num, 1);
-            }
-        } else {
-            memset(&result, 0x00, 4);
-            memcpy(&result, (uint32_t *)p->param_address, 1);
-        }
+                if (is_set_command) {
+                    if (param_num >= 4) {
+                        memcpy((uint32_t *)p->param_address, &param_num, 1);
+                    }
+                } else {
+                    memset(&result, 0x00, 4);
+                    memcpy(&result, (uint32_t *)p->param_address, 1);
+                }
 
-        break;
+                break;
+        */
 
-    case COMMAND_BUZZER_MODE:
+        /*
+            case COMMAND_BUZZER_MODE:
 
-        if (is_set_command) {
-            memcpy((uint8_t *)p->param_address, &param_num, 1);
-        } else {
-            memset(&result, 0x00, 4);
-            memcpy(&result, (uint8_t *)p->param_address, 1);
-        }
+                if (is_set_command) {
+                    memcpy((uint8_t *)p->param_address, &param_num, 1);
+                } else {
+                    memset(&result, 0x00, 4);
+                    memcpy(&result, (uint8_t *)p->param_address, 1);
+                }
 
-        break;
-
+                break;
+        */
     case COMMAND_FILTER_Z:
+    case COMMAND_ACCIDENT_G:
+    case COMMAND_BUZZER_MODE:
+    case COMMAND_OFFROAD_G:
+    case COMMAND_OFFROAD_PER:
+    case COMMAND_TAMPER_MIN:
+    case COMMAND_TAMPER_ANGLE1:
+    case COMMAND_TAMPER_ANGLE2:
 
         if (is_set_command) {
-            memcpy((uint8_t *)p->param_address, &param_num, 2);
+            memcpy((uint8_t *)p->param_address, &param_num, p->size);
         } else {
             memset(&result, 0x00, 4);
-            memcpy(&result, (uint8_t *)p->param_address, 2);
+            memcpy(&result, (uint8_t *)p->param_address, p->size);
         }
 
+        break;
+
+    case COMMAND_OFFROAD_DIS:
+    case COMMAND_BUMPER_DIS:
+        if (is_set_command) {
+
+            memcpy(&result, (uint8_t *)p->param_address, 4);
+
+            if (param_num)
+                result |= (1 << p->size);
+            else
+                result &= ~(1 << p->size);
+
+            memcpy((uint8_t *)p->param_address, &result, 4);
+
+            if (param_num)
+                result = 1;
+            else
+                result = 0;
+        } else {
+            memset(&result, 0x00, 4);
+            memcpy(&result, (uint8_t *)p->param_address, 4);
+            result = result & (1 << p->size);
+            if (result)
+                result = 1;
+        }
         break;
 
     case COMMAND_SAVE:
