@@ -256,6 +256,7 @@ static void Process_Offroad(void)
     }
 
     percentage = count * 100 / 32;
+    driver_behaviour_state.offroad_percentage = percentage;
 
     if (percentage > device_config.offroad_per) {
         // offroaad

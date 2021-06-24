@@ -160,6 +160,7 @@ typedef struct {
     // offroad
     unsigned last_bumper_time;
     unsigned offroad_stated_time;
+    unsigned char offroad_percentage;
 
     // flags
     bool time_synced;

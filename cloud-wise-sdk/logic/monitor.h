@@ -17,6 +17,8 @@ typedef struct {
     uint32_t v2;
     uint32_t v3;
     uint8_t  reason;
+
+    bool inside_route;
 } ResetData;
 
 void monitor_thread(void *arg);

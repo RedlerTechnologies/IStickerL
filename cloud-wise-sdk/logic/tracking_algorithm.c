@@ -212,6 +212,8 @@ void driver_behaviour_task(void *pvParameter)
             switch (driver_behaviour_state.track_state) {
             case TRACKING_STATE_WAKEUP:
 
+                reset_data.inside_route = false;
+
                 if (ProcessWakeupState()) {
                     driver_behaviour_state.track_state = TRACKING_STATE_ROUTE;
 
@@ -220,8 +222,14 @@ void driver_behaviour_task(void *pvParameter)
                     if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
                         buzzer_train(2);
 
-                    DisplayMessage("\r\nStart route\r\n", 0, true);
-                    CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
+                    if (reset_data_copy.inside_route) {
+                        DisplayMessage("\r\nContinue route\r\n", 0, true);
+                        CreateGeneralEvent(LOG_START_ROUTE_AFTER_RESET, EVENT_TYPE_LOG, 2);
+
+                    } else {
+                        DisplayMessage("\r\nStart route\r\n", 0, true);
+                        CreateGeneralEvent(0, EVENT_TYPE_START_ROUTE, 1);
+                    }
                     continue;
                 } else {
 
@@ -235,6 +243,9 @@ void driver_behaviour_task(void *pvParameter)
                 break;
 
             case TRACKING_STATE_ROUTE:
+
+                reset_data.inside_route = true;
+
                 ProcessDrivingState();
 
                 need_sleep = CheckNoActivity();
@@ -246,6 +257,8 @@ void driver_behaviour_task(void *pvParameter)
                 break;
 
             case TRACKING_STATE_SLEEP:
+
+                reset_data.inside_route = false;
 
                 duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.enter_sleeping_time) / 1000;
 
@@ -456,8 +469,10 @@ void send_acc_sample_to_ble(void)
     static uint8_t      ble_buffer[16];
     AccConvertedSample *sample;
 
+#ifdef BLE_ADVERTISING
     if (!ble_services_is_connected())
         return;
+#endif
 
     if (!driver_behaviour_state.calibrated)
         return;
@@ -466,7 +481,16 @@ void send_acc_sample_to_ble(void)
 
     memset(ble_buffer, 0x00, 16);
     memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
+
+    // patch instead of gyro, send another data for debugging
+    sample->drive_direction = driver_behaviour_state.Gz;
+    sample->turn_direction  = driver_behaviour_state.offroad_percentage;
+    sample->earth_direction = driver_behaviour_state.event_count_for_tamper;
+    memcpy(ble_buffer + 6, sample, sizeof(AccConvertedSample));
+
+#ifdef BLE_ADVERTISING
     ble_services_notify_acc(ble_buffer, 16);
+#endif
 }
 
 void InitWakeupAlgorithm(void)
@@ -488,6 +512,10 @@ bool ProcessWakeupState(void)
 #ifdef SLEEP_DISABLE
     return true;
 #endif
+
+    if (reset_data_copy.inside_route) {
+        return true;
+    }
 
     for (unsigned char i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
         sample = (AccConvertedSample *)&incoming_sample_ptr[i];

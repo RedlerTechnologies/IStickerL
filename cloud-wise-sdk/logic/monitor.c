@@ -224,12 +224,10 @@ void monitor_thread(void *arg)
                 CreateMeasurementEvent(vdd_float, (float)(temperature));
             }
 
-            if ((current_time % 32) == 0 && device_config.min_events_for_tamper && !driver_behaviour_state.tampered)
-            {
-                if (driver_behaviour_state.event_count_for_tamper > device_config.min_events_for_tamper )
-                {
-                  // tampered identified
-                  set_tamper_mode(LOG_TAMPER_DYNAMIC);
+            if ((current_time % 32) == 0 && device_config.min_events_for_tamper && !driver_behaviour_state.tampered) {
+                if (driver_behaviour_state.event_count_for_tamper > device_config.min_events_for_tamper) {
+                    // tampered identified
+                    set_tamper_mode(LOG_TAMPER_DYNAMIC);
                 }
 
                 driver_behaviour_state.event_count_for_tamper = 0;
@@ -241,10 +239,14 @@ void monitor_thread(void *arg)
                 record_scan_for_new_records(false);
             }
 
-            if (ble_services_is_connected()) {
+#ifdef BLE_ADVERTISING
+            if (ble_services_is_connected())
+#endif
+            {
 
 #ifdef BLE_ADVERTISING
                 ble_services_update_battery_level(bat_level);
+#endif
 
                 // send measurements to BLE
                 memset(ble_buffer, 0x00, 16);
@@ -252,8 +254,12 @@ void monitor_thread(void *arg)
                 ble_buffer[10] = temperature;
                 ble_buffer[11] = bat_level;
 
-                ble_services_notify_measurement(ble_buffer, 12);
+                // patch: send the number of seconds to sleep
+                memcpy(ble_buffer + 8, (uint8_t *)(&driver_behaviour_state.time_to_sleep_left_in_sec), 2);
 
+#ifdef BLE_ADVERTISING
+                ble_services_notify_measurement(ble_buffer, 12);
+#endif
                 // send status and error bit to BLE
                 memset(ble_buffer, 0x00, 16);
                 ble_buffer[0]               = 1; // record type
@@ -261,11 +267,14 @@ void monitor_thread(void *arg)
                 error_bits.GPS_Disconnected = 1;
                 error_bits.Tampered         = driver_behaviour_state.tampered;
                 error_bits.NotCalibrated    = !(driver_behaviour_state.calibrated);
-                error_bits.NotInsideRoute    = (driver_behaviour_state.track_state != TRACKING_STATE_ROUTE);
+                error_bits.NotInsideRoute   = (driver_behaviour_state.track_state != TRACKING_STATE_ROUTE);
 
                 // error_bits.NotCalibrated    = 1;
                 memcpy(ble_buffer + 6, (uint8_t *)(&error_bits), 4);
+
+#ifdef BLE_ADVERTISING
                 ble_services_notify_status(ble_buffer, 16);
+#endif
 
                 if (!driver_behaviour_state.time_synced) {
                     terminal_buffer_lock();
@@ -273,7 +282,6 @@ void monitor_thread(void *arg)
                     PostBleAlert(alert_str);
                     terminal_buffer_release();
                 }
-#endif
             }
         }
     }
@@ -537,7 +545,7 @@ void print_indicators(void)
     ind_route     = (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE) ? '1' : '0';
     ind_tamper    = (driver_behaviour_state.tampered) ? '1' : '0';
     ind_calibrate = (driver_behaviour_state.calibratation_saved_in_flash) ? '1' : '0';
-    ind_offroad = (error_bits.Offroad) ? '1' : '0';
+    ind_offroad   = (error_bits.Offroad) ? '1' : '0';
 
     memset(alert_str, 0x00, ALERT_BUFFER_SIZE);
 
