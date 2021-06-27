@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gfilters_algorithm.h"
 #include "hal/hal_data_types.h"
 #include "tracking_algorithm.h"
 
@@ -86,15 +87,18 @@ typedef struct {
     unsigned char reserved27[16];
 
     // 0x00C0
-    unsigned char reserved28[16];
-
-    // 0x00D0
-    unsigned char reserved29[16];
+    unsigned short dr_bh_gvalues[NUM_DRIVER_EVENT_TYPES][3];
+    unsigned char reserved_50;
+    unsigned char reserved_52;
 
     // 0x00E0
-    unsigned char reserved30[16];
+    unsigned char dr_bh_durations[NUM_DRIVER_EVENT_TYPES][3];
+    unsigned char reserved_51;
 
-    // 0x0030
+    // 0x00E0
+    //unsigned char reserved30[16];
+
+    // 0x00F0
     unsigned short reservered40;
     unsigned short reservered41;
     unsigned short reservered42;

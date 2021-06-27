@@ -24,7 +24,7 @@
 #include <string.h>
 
 #define MAX_COMMAND_SIZE 16
-#define MAX_PARAM_SIZE 16
+#define MAX_PARAM_SIZE 32
 
 extern DriverBehaviourState driver_behaviour_state;
 extern DeviceConfiguration  device_config;
@@ -72,7 +72,7 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"TAMPER_MIN", (uint32_t *)&device_config.min_events_for_tamper, PARAM_NUMERIC, 1},
     {"TAMPER_ANGLE1", (uint32_t *)&device_config.tamper_angle1, PARAM_NUMERIC, 1},
     {"TAMPER_ANGLE2", (uint32_t *)&device_config.tamper_angle2, PARAM_NUMERIC, 1},
-
+    {"DR_BH", NULL, PARAM_NUMERIC, 0},
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -197,6 +197,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     int32_t                 result         = -1;
     uint8_t                 numeric_result = 1;
     bool                    is_remote      = (source == 1); // ble
+
+    static uint8_t xxx = 0; // ????????????
 
     param_num = atoi(param);
     p         = &parameter_list[command_index];
@@ -476,33 +478,6 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         break;
 
-        /*
-            case COMMAND_ACCIDENT_G:
-
-                if (is_set_command) {
-                    if (param_num >= 4) {
-                        memcpy((uint32_t *)p->param_address, &param_num, 1);
-                    }
-                } else {
-                    memset(&result, 0x00, 4);
-                    memcpy(&result, (uint32_t *)p->param_address, 1);
-                }
-
-                break;
-        */
-
-        /*
-            case COMMAND_BUZZER_MODE:
-
-                if (is_set_command) {
-                    memcpy((uint8_t *)p->param_address, &param_num, 1);
-                } else {
-                    memset(&result, 0x00, 4);
-                    memcpy(&result, (uint8_t *)p->param_address, 1);
-                }
-
-                break;
-        */
     case COMMAND_FILTER_Z:
     case COMMAND_ACCIDENT_G:
     case COMMAND_BUZZER_MODE:
@@ -576,6 +551,22 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
         if (is_set_command) {
             ActivateSoftwareReset(RESET_AFTER_CHANGING_RX_PTR, param_num, 0, 0);
         }
+        break;
+
+    case COMMAND_DRIVER_BEHAVIOUR_CONFIG:
+
+        // testing
+        if (xxx == 1)
+            strcpy(param, "ACCEL,T,3");
+        else if (xxx == 2)
+            strcpy(param, "ACCEL,T,3,5");
+        else if (xxx == 3)
+            strcpy(param, "ACCEL,G,2");
+        else if (xxx == 4)
+            strcpy(param, "ACCEL,G,2,0.65");
+
+        ConfigureDriverBehaviorThresholds(param, param_result, is_set_command);
+        numeric_result = 0;
         break;
 
     default:

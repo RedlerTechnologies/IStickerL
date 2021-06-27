@@ -66,23 +66,66 @@ void SaveConfiguration(bool force)
 
 void SetManufactureDefault(void)
 {
+    uint8_t i;
 
     memset(&device_config, 0x00, 254);
 
-    device_config.AccidentG   = MIN_G_FOR_ACCIDENT_EVENT;
-    device_config.buzzer_mode = BUZZER_MODE_ON;
-    device_config.filter_z = 40;
-    device_config.offroad_g = 25;
-    device_config.offroad_per = 50;
+    device_config.AccidentG             = MIN_G_FOR_ACCIDENT_EVENT;
+    device_config.buzzer_mode           = BUZZER_MODE_ON;
+    device_config.filter_z              = 40;
+    device_config.offroad_g             = 25;
+    device_config.offroad_per           = 50;
     device_config.min_events_for_tamper = 15;
-    device_config.tamper_angle1 = 35;
-    device_config.tamper_angle2 = 15;
+    device_config.tamper_angle1         = 35;
+    device_config.tamper_angle2         = 15;
 
-    memset( &device_config.config_flags,  0x00, 4);
-    device_config.config_flags.offroad_disabled = 1; // 0 - ?????????? 
-    device_config.config_flags.bumper_dis = 1; // 0 - ?????????? 
+    memset(&device_config.config_flags, 0x00, 4);
+    device_config.config_flags.offroad_disabled = 1; // 0 - ??????????
+    device_config.config_flags.bumper_dis       = 1; // 0 - ??????????
 
     memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
+
+    // driver behaviour table
+
+    for (i = 0; i < NUM_DRIVER_EVENT_TYPES; i++) {
+        device_config.dr_bh_durations[i][0] = 3;
+        device_config.dr_bh_durations[i][1] = 3;
+        device_config.dr_bh_durations[i][2] = 3;
+
+        device_config.dr_bh_gvalues[i][0] = 15;
+        device_config.dr_bh_gvalues[i][1] = 15;
+        device_config.dr_bh_gvalues[i][2] = 15;
+    }
+
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][2] = DR_BRAKES_G_TH_3;
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][1] = DR_BRAKES_G_TH_2;
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][0] = DR_BRAKES_G_TH_1;
+
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][2] = DR_BRAKES_DURATION_TH_3;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][1] = DR_BRAKES_DURATION_TH_2;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][0] = DR_BRAKES_DURATION_TH_1;
+
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][2] = DR_ACCEL_G_TH_3;
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][1] = DR_ACCEL_G_TH_2;
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][0] = DR_ACCEL_G_TH_1;
+
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][2] = DR_ACCEL_DURATION_TH_3;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][1] = DR_ACCEL_DURATION_TH_2;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][0] = DR_ACCEL_DURATION_TH_1;
+
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][2] = DR_SHARP_TURN_G_TH_3;
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][1] = DR_SHARP_TURN_G_TH_2;
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][0] = DR_SHARP_TURN_G_TH_1;
+
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][2] = DR_SHARP_TURN_DURATION_TH_3;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][1] = DR_SHARP_TURN_DURATION_TH_2;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][0] = DR_SHARP_TURN_DURATION_TH_1;
+
+/*
+    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SLALUM][0]   = DR_SLALUM_GFORCE_TH;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SLALUM][0] = DR_SLALUM_MAX_DUR_BETWEEN_TURNS;
+    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SLALUM][1] = DR_SLALUM_MIN_TURNS;
+*/
 
     device_config.crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
 }

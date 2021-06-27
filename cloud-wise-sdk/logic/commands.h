@@ -2,7 +2,7 @@
 
 #include "hal/hal_data_types.h"
 
-#define NUM_OF_PARAMETERS 28
+#define NUM_OF_PARAMETERS 29
 
 #define PARAM_TYPE_STRING 0
 #define PARAM_TYPE_INTEGER 1
@@ -50,6 +50,7 @@ typedef enum {
     COMMAND_TAMPER_MIN,
     COMMAND_TAMPER_ANGLE1,
     COMMAND_TAMPER_ANGLE2,
+    COMMAND_DRIVER_BEHAVIOUR_CONFIG,
 } ECOMMANDS;
 
 typedef struct {

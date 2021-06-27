@@ -51,62 +51,56 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
 static void Process_Bumper(void);
 static void Process_Offroad(void);
 static void send_ble_offroad_alert(uint8_t status);
+void        ftoa(double n, char *res, int afterpoint);
 
 void gfilter_init(void)
 {
     GFilterConfig *filter_config;
     GFilterState * filter_state;
     uint8_t        i;
+    uint8_t        code;
 
-    filter_config                = &filter_configs[GFILTER_ACCELERATION];
-    filter_config->axis          = GFILTER_AXIS_X;
-    filter_config->min_duration  = ACCELERATION_MIN_DUR;
-    filter_config->min_g         = ACCELERATION_MIN_G;
-    filter_config->min_duration2 = ACCELERATION_MIN_MED_DUR;
-    filter_config->min_g2        = ACCELERATION_MIN_MED_G;
-    filter_config->min_duration3 = ACCELERATION_MIN_HIGH_DUR;
-    filter_config->min_g3        = ACCELERATION_MIN_HIGH_G;
-    filter_config->code          = DRIVER_BEHAVIOR_EVENT_ACCEL;
-    filter_config->positive      = 1;
+    filter_config       = &filter_configs[GFILTER_ACCELERATION];
+    filter_config->code = DRIVER_BEHAVIOR_EVENT_ACCEL;
+
+    filter_config->axis     = GFILTER_AXIS_X;
+    filter_config->positive = 1;
     strcpy(filter_config->name, "ACCEL");
 
-    filter_config                = &filter_configs[GFILTER_BRAKES];
-    filter_config->axis          = GFILTER_AXIS_X;
-    filter_config->min_duration  = ACCELERATION_MIN_DUR;
-    filter_config->min_g         = ACCELERATION_MIN_G;
-    filter_config->min_duration2 = ACCELERATION_MIN_MED_DUR;
-    filter_config->min_g2        = ACCELERATION_MIN_MED_G;
-    filter_config->min_duration3 = ACCELERATION_MIN_HIGH_DUR;
-    filter_config->min_g3        = ACCELERATION_MIN_HIGH_G;
-    filter_config->code          = DRIVER_BEHAVIOR_EVENT_BRAKES;
-    filter_config->positive      = 0;
-    filter_config->positive      = 0;
+    filter_config       = &filter_configs[GFILTER_BRAKES];
+    filter_config->code = DRIVER_BEHAVIOR_EVENT_BRAKES;
 
+    filter_config->axis     = GFILTER_AXIS_X;
+    filter_config->positive = 0;
     strcpy(filter_config->name, "BRAKES");
 
-    filter_config                = &filter_configs[GFILTER_TURN_LEFT];
-    filter_config->axis          = GFILTER_AXIS_Y;
-    filter_config->min_duration  = TURN_MIN_DUR;
-    filter_config->min_g         = TURN_MIN_G;
-    filter_config->min_duration2 = TURN_MIN_MED_DUR;
-    filter_config->min_g2        = TURN_MIN_MED_G;
-    filter_config->min_duration3 = TURN_MIN_HIGH_DUR;
-    filter_config->min_g3        = TURN_MIN_HIGH_G;
-    filter_config->code          = DRIVER_BEHAVIOR_SHARP_TURN;
-    filter_config->positive      = 0;
+    filter_config       = &filter_configs[GFILTER_TURN_LEFT];
+    filter_config->code = DRIVER_BEHAVIOR_SHARP_TURN;
+
+    filter_config->axis     = GFILTER_AXIS_Y;
+    filter_config->positive = 0;
     strcpy(filter_config->name, "TLEFT");
 
-    filter_config                = &filter_configs[GFILTER_TURN_RIGHT];
-    filter_config->axis          = GFILTER_AXIS_Y;
-    filter_config->min_duration  = TURN_MIN_DUR;
-    filter_config->min_g         = TURN_MIN_G;
-    filter_config->min_duration2 = TURN_MIN_MED_DUR;
-    filter_config->min_g2        = TURN_MIN_MED_G;
-    filter_config->min_duration3 = TURN_MIN_HIGH_DUR;
-    filter_config->min_g3        = TURN_MIN_HIGH_G;
-    filter_config->code          = DRIVER_BEHAVIOR_SHARP_TURN;
-    filter_config->positive      = 1;
+    filter_config       = &filter_configs[GFILTER_TURN_RIGHT];
+    filter_config->code = DRIVER_BEHAVIOR_SHARP_TURN;
+
+    filter_config->axis     = GFILTER_AXIS_Y;
+    filter_config->positive = 1;
     strcpy(filter_config->name, "TRIGHT");
+
+    for (i = 0; i < GFILTER_NUM; i++) {
+
+        filter_config = &filter_configs[i];
+        code          = filter_config->code;
+
+        filter_config->min_g  = device_config.dr_bh_gvalues[code][0];
+        filter_config->min_g2 = device_config.dr_bh_gvalues[code][1];
+        filter_config->min_g3 = device_config.dr_bh_gvalues[code][2];
+
+        filter_config->min_duration  = device_config.dr_bh_durations[code][0] * 100;
+        filter_config->min_duration2 = device_config.dr_bh_durations[code][1] * 100;
+        filter_config->min_duration3 = device_config.dr_bh_durations[code][2] * 100;
+    }
 
     for (i = 0; i < GFILTER_NUM; i++) {
         filter_state = &filter_states[i];
@@ -255,7 +249,7 @@ static void Process_Offroad(void)
         bumper_history = bumper_history >> 1;
     }
 
-    percentage = count * 100 / 32;
+    percentage                                = count * 100 / 32;
     driver_behaviour_state.offroad_percentage = percentage;
 
     if (percentage > device_config.offroad_per) {
@@ -481,7 +475,7 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
         if (is_bumper_occured())
             report = false;
 
-         driver_behaviour_state.event_count_for_tamper++;
+        driver_behaviour_state.event_count_for_tamper++;
 
         if (report) {
             // BLE alert //
@@ -530,5 +524,193 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
         }
 
         break;
+    }
+}
+
+void ConfigureDriverBehaviorThresholds(uint8_t *param_str, uint8_t *ret_value, uint8_t is_set_command)
+{
+    static uint8_t str_value[32];
+    uint8_t *      ptr;
+    uint8_t *      ptr1;
+    uint8_t        len;
+    uint8_t        value_type = 0;
+    uint8_t        severity   = 0;
+    int8_t         event_type = -1;
+
+    // read event type to be configured
+
+    ptr = strchr((const char *)param_str, ',');
+
+    if (ptr == NULL)
+        return;
+
+    len  = ptr - param_str;
+    ptr1 = ptr + 1;
+
+    memset(str_value, 0x00, 32);
+    strncpy(str_value, param_str, len);
+
+    if (strcmp(str_value, "ACCEL") == 0)
+        event_type = DRIVER_BEHAVIOR_EVENT_ACCEL;
+    else if (strcmp(str_value, "BRAKE") == 0)
+        event_type = DRIVER_BEHAVIOR_EVENT_BRAKES;
+    else if (strcmp(str_value, "SHARP_TURN") == 0)
+        event_type = DRIVER_BEHAVIOR_SHARP_TURN;
+    else if (strcmp(str_value, "SLALUM") == 0)
+        event_type = DRIVER_BEHAVIOR_SLALUM;
+    else if (strcmp(str_value, "BRAKE_IN_TURN") == 0)
+        event_type = DRIVER_BEHAVIOR_BRAKE_INSIDE_TURN;
+
+    if (event_type < 0)
+        return;
+
+    // read parameter type
+
+    ptr = strchr((const char *)ptr1, ',');
+
+    if (ptr == NULL)
+        return;
+
+    len = ptr - ptr1;
+
+    memset(str_value, 0x00, 32);
+    strncpy(str_value, ptr1, len);
+    ptr1 = ptr + 1;
+
+    if (str_value[0] == 'T')
+        value_type = 1;
+    else if (str_value[0] == 'G')
+        value_type = 2;
+
+    if (value_type == 0)
+        return;
+
+    // read severity
+
+    ptr = strchr((const char *)ptr1, ',');
+
+    if (ptr == NULL) {
+        is_set_command = 0;
+        ptr            = param_str + strlen(param_str);
+    } else {
+        is_set_command = 1;
+    }
+
+    len = ptr - ptr1;
+    memset(str_value, 0x00, 32);
+    strncpy(str_value, ptr1, len);
+    ptr1 = ptr;
+
+    severity = atoi(str_value);
+
+    if (severity < 1 || severity > 3)
+        return;
+
+    // read value
+
+    float val;
+
+    if (is_set_command) {
+        *ret_value = 0;
+
+        ptr1++;
+        ptr = strchr((const char *)ptr1, 0x00);
+
+        if (ptr == NULL)
+            return;
+
+        len = ptr - ptr1;
+        memset(str_value, 0x00, 32);
+        strncpy(str_value, ptr1, len);
+        ptr1 = ptr + 1;
+
+        if (value_type == 1) {
+            device_config.dr_bh_durations[event_type][severity - 1] = atoi(str_value);
+
+        } else if (value_type == 2) {
+            val                                                   = atof(str_value);
+            device_config.dr_bh_gvalues[event_type][severity - 1] = (uint8_t)(val * 100);
+        }
+
+        strcpy(param_str, str_value);
+    }
+
+    // read the command
+    if (value_type == 1) {
+        itoa(device_config.dr_bh_durations[event_type][severity - 1], ret_value, 10);
+    } else if (value_type == 2) {
+        val = (float)(device_config.dr_bh_gvalues[event_type][severity - 1]) / 100;
+        ftoa(val, ret_value, 2);
+    }
+}
+
+void reverse(char *str, int len)
+{
+    int i = 0, j = len - 1, temp;
+
+    while (i < j) {
+        temp   = str[i];
+        str[i] = str[j];
+        str[j] = temp;
+        i++;
+        j--;
+    }
+}
+
+int intToStr(int x, char str[], int d, uint8_t is_negative)
+{
+    int i = 0;
+
+    while (x) {
+        str[i++] = (x % 10) + '0';
+        x        = x / 10;
+    }
+
+    // If number of digits required is more, then
+    // add 0s at the beginning
+    while (i < d)
+        str[i++] = '0';
+
+    if (is_negative)
+        str[i++] = '-';
+
+    reverse(str, i);
+    str[i] = '\0';
+
+    return i;
+}
+
+// Converts a floating point number to string.
+void ftoa(double n, char *res, int afterpoint)
+{
+    uint8_t is_negative = 0;
+
+    // Extract integer part
+    int ipart = (int)n;
+
+    if (n < 0)
+        n = -n;
+
+    if (ipart < 0) {
+        ipart       = -ipart;
+        is_negative = 1;
+    }
+
+    // Extract floating part
+    double fpart = n - (double)ipart;
+
+    // convert integer part to string
+    int i = intToStr(ipart, res, 0, is_negative);
+
+    // check for display option after point
+    if (afterpoint != 0) {
+        res[i] = '.'; // add dot
+
+        // Get the value of fraction part upto given no.
+        // of points after dot. The third parameter is needed
+        // to handle cases like 233.007
+        fpart = fpart * pow(10, afterpoint);
+
+        intToStr((int)fpart, res + i + 1, afterpoint, 0);
     }
 }
