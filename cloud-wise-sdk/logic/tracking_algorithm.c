@@ -109,7 +109,6 @@ void driver_behaviour_task(void *pvParameter)
     driver_behaviour_state.track_state                = TRACKING_STATE_WAKEUP;
     driver_behaviour_state.stop_advertising_time      = 0;
     driver_behaviour_state.store_calibration          = false;
-    driver_behaviour_state.acc_int_counter            = 0;
     driver_behaviour_state.manual_delayed             = false;
     driver_behaviour_state.energy                     = -1;
     driver_behaviour_state.print_signal_mode          = 0;

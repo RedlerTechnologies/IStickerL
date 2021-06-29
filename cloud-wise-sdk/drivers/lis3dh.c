@@ -56,7 +56,7 @@ typedef enum {
     LISDH_INT2_DUR = 0x37,
 
     LISDH_CLICK_CFG = 0x38,
-    LISDH_CLICK_SRC = 0x38,
+    LISDH_CLICK_SRC = 0x39,
     LISDH_CLICK_THS = 0x3A,
 
     LISDH_TIME_LIMIT   = 0x3B,
@@ -93,9 +93,9 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     0x00,
 
     // int 2 click disabled,
-    // activity interrupt enables (wakeup from deep sleep)
+    //  activity interrupt disable
     LISDH_CTRL_REG6,
-    0x08,
+    0x00,
 
     // interrupt reference value
     LISDH_REFERENCE,
@@ -121,14 +121,6 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     LISDH_INT2_CFG,
     0x00,
 
-    // int2 threhold
-    LISDH_INT2_DUR,
-    0x40,
-
-    // int 2 duration value = 100
-    LISDH_INT2_CFG,
-    0x64,
-
     // click interrupt disbaled
     LISDH_CLICK_CFG,
     0x00,
@@ -144,14 +136,25 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
 
 unsigned char Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
 
+    // TODO Disable INT1 - INT1_CFG
+
     // activity interrupt enabled
-    LISDH_ACT_THS,
-    0x02,
+    LISDH_ACT_THS, 0x02,
 
     // activity interrupt enabled
 
-    LISDH_ACT_DUR,
-    0x10,
+    LISDH_ACT_DUR, 0x10,
+
+    // TODO CTRL_REG1 - move to low power (LPen)
+    //LISDH_CTRL_REG1,
+    //0x3F,  //0x08 
+    // this definition cause problem to wakeup by movement.
+    // need to recheck again...
+
+    // int 2 click disabled,
+    // activity interrupt enables (wakeup from deep sleep)
+    LISDH_CTRL_REG6,
+   0x08,
 };
 
 uint8_t lis3dh_read_reg(uint8_t reg);
@@ -164,30 +167,6 @@ bool lis3dh_init(void)
     NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
     return true;
-    /*
-        ret_code_t err_code;
-        uint8_t    tx_temp_data = LIS3DH_WHO_AM_I_ADDR;
-        uint8_t    rx_temp_data;
-
-        const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data));
-        const nrfx_twim_xfer_desc_t xfer_rx = NRFX_TWIM_XFER_DESC_RX(LIS3DH_ADDR, &rx_temp_data, sizeof(rx_temp_data));
-
-        err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_tx, NRFX_TWIM_FLAG_TX_NO_STOP);
-        if (err_code != NRFX_SUCCESS) {
-            NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-            return false;
-        }
-
-        err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_rx, 0);
-        if (err_code != NRFX_SUCCESS) {
-            NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-            return false;
-        }
-
-        NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, rx_temp_data);
-
-        return true;
-        */
 }
 
 uint8_t lis3dh_read_reg(uint8_t reg)
@@ -220,7 +199,6 @@ void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
 {
     ret_code_t err_code;
     uint8_t    tx_temp_data = reg;
-    // uint8_t    rx_temp_data;
 
     const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data));
     const nrfx_twim_xfer_desc_t xfer_rx = NRFX_TWIM_XFER_DESC_RX(LIS3DH_ADDR, buffer, size);

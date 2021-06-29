@@ -155,8 +155,6 @@ typedef struct {
     unsigned       block_sample_time;
     unsigned short sleep_delay_time;
 
-    unsigned short acc_int_counter;
-
     // offroad
     unsigned last_bumper_time;
     unsigned offroad_stated_time;

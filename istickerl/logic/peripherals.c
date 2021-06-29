@@ -55,7 +55,6 @@ static void hal_evt_handler(const hal_event_type_t event)
 
     case HAL_EVENT_LIS3DH_INT2:
         NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT2", __func__);
-        driver_behaviour_state.acc_int_counter++;
         break;
 
     case HAL_EVENT_UART0_RX:
