@@ -183,8 +183,6 @@ static void peripherals_init(void)
 
     hal_interrupts_set(true, false);
 
-    lis3dh_configure(false);
-
     NRF_LOG_FLUSH();
 }
 
@@ -234,6 +232,10 @@ int main(void)
 
     // Start FreeRTOS scheduler.
     vTaskStartScheduler();
+
+    lis3dh_configure(false);
+
+    NRF_LOG_FLUSH();
 
     for (;;) {
         APP_ERROR_HANDLER(NRF_ERROR_FORBIDDEN);

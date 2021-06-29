@@ -122,6 +122,14 @@ static uint8_t m_acc_table[34] = {
     LISDH_INT2_CFG,
     0x00,
 
+    // int2 threhold
+    LISDH_INT2_THS,
+    0x40,
+
+    // int 2 duration value = 100
+    LISDH_INT2_DUR,
+    0x64,
+
     // click interrupt disbaled
     LISDH_CLICK_CFG,
     0x00,
@@ -159,6 +167,7 @@ static uint8_t m_acc_sleep_table[6] = {
 };
 
 static volatile bool m_xfer_done = false;
+static volatile bool m_read_buffers = false;
 
 static void    write_reg_blocking(uint8_t reg, uint8_t value);
 static uint8_t read_reg_blocking(uint8_t reg);
@@ -178,6 +187,11 @@ void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
     switch (p_event->type) {
     case NRFX_TWIM_EVT_DONE:
         m_xfer_done = true;
+
+        if (m_read_buffers) {
+            m_read_buffers = false;
+            // TODO Notify
+        }
         break;
 
     default:
@@ -221,28 +235,16 @@ void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
 
     tx_temp_data = reg;
 
-    const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data));
-    const nrfx_twim_xfer_desc_t xfer_rx = NRFX_TWIM_XFER_DESC_RX(LIS3DH_ADDR, buffer, size);
+     const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
 
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_tx, NRFX_TWIM_FLAG_TX_NO_STOP);
-    if (err_code != NRFX_SUCCESS) {
+     m_xfer_done = false;
+     m_read_buffers = true;
+
+     err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
+     if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
         return;
     }
-
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_rx, 0);
-    if (err_code != NRFX_SUCCESS) {
-        NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-        return;
-    }
-
-    // const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
-
-    // err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
-    // if (err_code != NRFX_SUCCESS) {
-    //    NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-    //    return;
-    //}
 }
 
 static void write_reg_blocking(uint8_t reg, uint8_t value)
