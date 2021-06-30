@@ -118,7 +118,7 @@ bool is_bumper_occured(void)
 
     duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_bumper_time);
 
-    if (duration < 3000)
+    if (duration < BUMPER_BLOCK_DRIVER_EVENTS_TIME)
         return true;
     else
         return false;
@@ -143,43 +143,32 @@ void Process_GFilters(AccConvertedSample *samples)
 
     Process_Bumper();
 
-    /*
-    duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_bumper_time);
+    filter_config = &filter_configs[GFILTER_ACCELERATION];
+    filter_state  = &filter_states[GFILTER_ACCELERATION];
 
-    // disable bumper blocking driver events
-    if (device_config.config_flags.bumper_dis)
-        duration = 10 * 24 * 3600 * 1000;
-    */
+    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        Process_GFilter(filter_config, filter_state, &samples[i]);
+    }
 
-    // if (duration >= 3000)
-    { // block driver events on bumper
-        filter_config = &filter_configs[GFILTER_ACCELERATION];
-        filter_state  = &filter_states[GFILTER_ACCELERATION];
+    filter_config = &filter_configs[GFILTER_BRAKES];
+    filter_state  = &filter_states[GFILTER_BRAKES];
 
-        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-            Process_GFilter(filter_config, filter_state, &samples[i]);
-        }
+    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        Process_GFilter(filter_config, filter_state, &samples[i]);
+    }
 
-        filter_config = &filter_configs[GFILTER_BRAKES];
-        filter_state  = &filter_states[GFILTER_BRAKES];
+    filter_config = &filter_configs[GFILTER_TURN_LEFT];
+    filter_state  = &filter_states[GFILTER_TURN_LEFT];
 
-        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-            Process_GFilter(filter_config, filter_state, &samples[i]);
-        }
+    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        Process_GFilter(filter_config, filter_state, &samples[i]);
+    }
 
-        filter_config = &filter_configs[GFILTER_TURN_LEFT];
-        filter_state  = &filter_states[GFILTER_TURN_LEFT];
+    filter_config = &filter_configs[GFILTER_TURN_RIGHT];
+    filter_state  = &filter_states[GFILTER_TURN_RIGHT];
 
-        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-            Process_GFilter(filter_config, filter_state, &samples[i]);
-        }
-
-        filter_config = &filter_configs[GFILTER_TURN_RIGHT];
-        filter_state  = &filter_states[GFILTER_TURN_RIGHT];
-
-        for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
-            Process_GFilter(filter_config, filter_state, &samples[i]);
-        }
+    for (i = 0; i < SAMPLE_BUFFER_SIZE; i++) {
+        Process_GFilter(filter_config, filter_state, &samples[i]);
     }
 
     // write one event from queue into the flash
@@ -354,8 +343,6 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
     value_pos = abs(value);
 
     negative_flag = filter_config->positive != 1;
-    // if (filter_config->min_g < 0)
-    //    negative_flag = true;
 
     switch (filter_state->state) {
 
@@ -386,41 +373,17 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
         if (value_pos > filter_state->max_g)
             filter_state->max_g = value_pos;
 
-        if (negative_flag) {
-            if (value > -filter_config->min_g / 2)
-                new_state_found = true;
-        } else {
-            if (value < filter_config->min_g / 2)
-                new_state_found = true;
-        }
-
+        filter_state->duration_count++;
         filter_state->energy += value * value;
 
-        if (new_state_found) {
-            // check if duration is enough
-            // ..
+        n = (filter_config->min_duration) / SAMPLE_PERIOD;
 
-            n = filter_config->min_duration / SAMPLE_PERIOD;
-
-            if (filter_state->duration_count > n)
-                filter_state->state = GFILTER_AXIS_STATE_COMPLETED;
-            else
-                filter_state->state = GFILTER_AXIS_STATE_NONE;
-        } else {
-            filter_state->duration_count++;
-
-            // duration_count is too long
-            n = MAX_EVENT_DURATION / SAMPLE_PERIOD;
-
-            if (filter_state->duration_count > n)
-                filter_state->state = GFILTER_AXIS_STATE_COMPLETED2;
-        }
+        if (filter_state->duration_count > n)
+            filter_state->state = GFILTER_AXIS_STATE_COMPLETED;
 
         break;
 
     case GFILTER_AXIS_STATE_COMPLETED:
-    case GFILTER_AXIS_STATE_COMPLETED2:
-        // add inside queue
 
         // dont use the following line! activity (sleeping delay) is only done by
         // energy signal and not by driver behaviour events
@@ -492,37 +455,33 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
             nrf_queue_write(&m_event_queue, filter_state, 1);
         }
 
-        if (filter_state->state == GFILTER_AXIS_STATE_COMPLETED)
-            filter_state->state = GFILTER_AXIS_STATE_DELAY;
-        else
-            filter_state->state = GFILTER_AXIS_STATE_DELAY2;
+        filter_state->state          = GFILTER_AXIS_STATE_DELAY;
+        filter_state->duration_count = 0;
 
         break;
 
     case GFILTER_AXIS_STATE_DELAY:
 
-        n = (DELAY_BETWEEN_GFILTER_EVENT_MSEC / SAMPLE_PERIOD);
+        if (value_pos < abs(filter_config->min_g) / 2 && !filter_state->g_is_over) {
+            filter_state->g_is_over = 1;
+        } else {
 
-        filter_state->duration_count++;
+            n = (DELAY_BETWEEN_GFILTER_EVENT_MSEC / SAMPLE_PERIOD);
 
-        if (filter_state->duration_count > n) {
+            filter_state->duration_count++;
 
+            if (filter_state->duration_count > n) {
+
+                new_state_found = true;
+            }
+        };
+
+        if (new_state_found) {
             n = filter_state->index;
             memset(filter_state, 0x00, sizeof(GFilterState));
             filter_state->index = n;
-
             filter_state->state = GFILTER_AXIS_STATE_NONE;
         }
-
-        break;
-
-    case GFILTER_AXIS_STATE_DELAY2:
-
-        if (value_pos < filter_config->min_g / 2) {
-            filter_state->duration_count = 0;
-            filter_state->state          = GFILTER_AXIS_STATE_DELAY;
-        }
-
         break;
     }
 }

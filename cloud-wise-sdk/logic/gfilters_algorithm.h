@@ -7,8 +7,11 @@
 #define GFILTER_NUM 4
 #define MAX_EVENTS_IN_QUEUE 5
 #define TIME_EVENT_IN_QUEUE 5
-#define DELAY_BETWEEN_GFILTER_EVENT_MSEC 2000
+#define DELAY_BETWEEN_GFILTER_EVENT_MSEC 5000
 
+#define BUMPER_BLOCK_DRIVER_EVENTS_TIME (3*1000)
+
+/*
 // table of driver behaviour thresholds
 // g in handredth of g
 // duration in msec
@@ -32,6 +35,7 @@
 #define TURN_MIN_MED_DUR 250
 #define TURN_MIN_HIGH_G 75
 #define TURN_MIN_HIGH_DUR 350
+*/
 
 #define GFILTER_ACCELERATION 0
 #define GFILTER_BRAKES 1
@@ -124,6 +128,7 @@ typedef struct {
     uint8_t  state;
     uint8_t  severity;
     uint8_t  index;
+    uint8_t  g_is_over;
 } GFilterState;
 
 void Process_GFilters(AccConvertedSample *samples);

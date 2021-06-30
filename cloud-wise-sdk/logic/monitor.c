@@ -230,6 +230,7 @@ void monitor_thread(void *arg)
                     set_tamper_mode(LOG_TAMPER_DYNAMIC);
                 }
 
+
                 driver_behaviour_state.event_count_for_tamper = 0;
             }
 
