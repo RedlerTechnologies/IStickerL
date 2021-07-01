@@ -47,6 +47,8 @@ GFilterState  filter_states[GFILTER_NUM];
 
 NRF_QUEUE_DEF(GFilterState, m_event_queue, MAX_EVENTS_IN_QUEUE, NRF_QUEUE_MODE_NO_OVERFLOW);
 
+static uint32_t last_driver_event_identified_time = 0;
+
 static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_state, AccConvertedSample *sample);
 static void Process_Bumper(void);
 static void Process_Offroad(void);
@@ -300,7 +302,7 @@ static void Process_Bumper(void)
         bumper_count++;
 
         terminal_buffer_lock();
-        sprintf(alert_str + 2, "@?BUMPER,%d\r\n", driver_behaviour_state.Gz);
+        sprintf(alert_str + 2, "@?ALERT,2\r\n"); // bumper
         PostBleAlert(alert_str);
         terminal_buffer_release();
 
@@ -323,12 +325,14 @@ static void Process_Bumper(void)
 
 static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_state, AccConvertedSample *sample)
 {
+    uint32_t duration;
     int16_t  value;
     uint16_t value_pos;
     uint16_t n;
     bool     new_state_found = false;
     bool     negative_flag   = false;
     bool     report          = true;
+    uint8_t  beeps           = 0;
 
     if (filter_config->min_duration == 0)
         return;
@@ -357,6 +361,7 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
         }
 
         if (new_state_found) {
+
             filter_state->state          = GFILTER_AXIS_STATE_IDENTIFIED;
             filter_state->duration_count = 1;
             filter_state->energy         = value * value;
@@ -378,8 +383,17 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
 
         n = (filter_config->min_duration) / SAMPLE_PERIOD;
 
-        if (filter_state->duration_count > n)
-            filter_state->state = GFILTER_AXIS_STATE_COMPLETED;
+        // block the event if other driver event occured during the last second
+        duration = timeDiff(xTaskGetTickCount(), last_driver_event_identified_time);
+        if (duration < 1000) {
+            filter_state->state = GFILTER_AXIS_STATE_NONE;
+            break;
+        }
+
+        if (filter_state->duration_count > n) {
+            filter_state->state               = GFILTER_AXIS_STATE_COMPLETED;
+            last_driver_event_identified_time = xTaskGetTickCount();
+        }
 
         break;
 
@@ -409,38 +423,38 @@ static void Process_GFilter(GFilterConfig *filter_config, GFilterState *filter_s
         if (filter_state->max_g >= filter_config->min_g3 && filter_state->duration_count >= n)
             filter_state->severity++;
 
-        {
-            uint8_t beeps = 0;
+        // handle buzzer //
 
-            switch (filter_state->severity) {
-            case 2:
-                if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-                    beeps = 2;
-                break;
+        switch (filter_state->severity) {
+        case 2:
+            if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+                beeps = 2;
+            break;
 
-            case 3:
-                if (device_config.buzzer_mode >= BUZZER_MODE_ON)
-                    beeps = 6;
-                break;
+        case 3:
+            if (device_config.buzzer_mode >= BUZZER_MODE_ON)
+                beeps = 6;
+            break;
 
-            default:
-                if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
-                    beeps = 1;
-                break;
-            }
-
-            if (device_config.buzzer_mode != BUZZER_MODE_OFFROAD) {
-                if (beeps > 0)
-                    buzzer_train(beeps);
-            }
+        default:
+            if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
+                beeps = 1;
+            break;
         }
 
         if (is_bumper_occured())
             report = false;
 
-        driver_behaviour_state.event_count_for_tamper++;
+        if (filter_state->severity >= 2)
+            driver_behaviour_state.event_count_for_tamper++;
 
         if (report) {
+
+            if (device_config.buzzer_mode != BUZZER_MODE_OFFROAD) {
+                if (beeps > 0)
+                    buzzer_train(beeps);
+            }
+
             // BLE alert //
             uint8_t code = filter_config->code;
             if (filter_config->positive && filter_config->axis == GFILTER_AXIS_Y)

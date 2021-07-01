@@ -13,6 +13,7 @@
 #include "events.h"
 #include "flash_data.h"
 #include "float.h"
+#include "gfilters_algorithm.h"
 #include "hal/hal.h"
 #include "hal/hal_boards.h"
 #include "hal/hal_drivers.h"
@@ -95,10 +96,13 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         return;
 
     if (device_config.AccidentG == 0)
-      return;
+        return;
 
     switch (state->accident_state) {
     case ACCIDENT_STATE_NONE:
+
+        if (is_bumper_occured())
+            break;
 
         if (abs(sample->turn_direction) >= ACC_MIN_ACCIDENT_VALUE)
             state->accident_state = ACCIDENT_STATE_STARTED;
@@ -106,10 +110,10 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
         if (abs(sample->drive_direction) >= ACC_MIN_ACCIDENT_VALUE)
             state->accident_state = ACCIDENT_STATE_STARTED;
 
-/*
-        if (abs(sample->earth_direction) >= ACC_MIN_ACCIDENT_VALUE)
-            state->accident_state = ACCIDENT_STATE_STARTED;
-*/
+        /*
+                if (abs(sample->earth_direction) >= ACC_MIN_ACCIDENT_VALUE)
+                    state->accident_state = ACCIDENT_STATE_STARTED;
+        */
 
         if (driver_behaviour_state.record_triggered)
             state->accident_state = ACCIDENT_STATE_STARTED;
@@ -135,6 +139,10 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
             state->sample_in_turn_direction  = sample->turn_direction;
             state->hit_angle                 = calculate_accident_hit_angle(sample);
         }
+
+        // bumper block accident
+        if (is_bumper_occured())
+            state->accident_state = ACCIDENT_STATE_NONE;
 
         if (state->accident_sample_count >= MIN_SAMPLES_FOR_ACCIDENT) {
             if (state->max_g >= (device_config.AccidentG * 10) || driver_behaviour_state.record_triggered) {
@@ -168,6 +176,8 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample)
             sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
             PostBleAlert(alert_str);
             terminal_buffer_release();
+
+            driver_behaviour_state.accident_count_for_tamper++;
 
             // beep a buzzer
             if (device_config.buzzer_mode >= BUZZER_MODE_ON)

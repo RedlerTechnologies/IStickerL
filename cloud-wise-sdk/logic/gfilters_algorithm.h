@@ -68,13 +68,13 @@
 
 #define DR_ACCEL_MIN_GFORCE 0.05
 
-#define DR_ACCEL_DURATION_TH_3 7// 30
-#define DR_ACCEL_DURATION_TH_2 6 // 8
+#define DR_ACCEL_DURATION_TH_3 5// 30
+#define DR_ACCEL_DURATION_TH_2 4 // 8
 #define DR_ACCEL_DURATION_TH_1 3 //4
 
-#define DR_ACCEL_G_TH_3 30
-#define DR_ACCEL_G_TH_2 20
-#define DR_ACCEL_G_TH_1 16
+#define DR_ACCEL_G_TH_3 55
+#define DR_ACCEL_G_TH_2 45
+#define DR_ACCEL_G_TH_1 35
 
 /////////////////////////
 // brakes event define //
@@ -87,8 +87,8 @@
 #define DR_BRAKES_DURATION_TH_1 4
 
 #define DR_BRAKES_G_TH_3 70
-#define DR_BRAKES_G_TH_2 35
-#define DR_BRAKES_G_TH_1 20
+#define DR_BRAKES_G_TH_2 50
+#define DR_BRAKES_G_TH_1 35
 
 /////////////////////////////
 // Sharp-turn event define //
@@ -96,13 +96,13 @@
 
 #define DR_SHARP_TURN_MIN_GFORCE 0.05
 
-#define DR_SHARP_TURN_DURATION_TH_3 20
-#define DR_SHARP_TURN_DURATION_TH_2 12
-#define DR_SHARP_TURN_DURATION_TH_1 10 // 5
+#define DR_SHARP_TURN_DURATION_TH_3 5
+#define DR_SHARP_TURN_DURATION_TH_2 4
+#define DR_SHARP_TURN_DURATION_TH_1 3 // 5
 
-#define DR_SHARP_TURN_G_TH_3 75
-#define DR_SHARP_TURN_G_TH_2 30 // 0.36
-#define DR_SHARP_TURN_G_TH_1 18 // 0.26
+#define DR_SHARP_TURN_G_TH_3 70
+#define DR_SHARP_TURN_G_TH_2 45 // 0.36
+#define DR_SHARP_TURN_G_TH_1 30 // 0.26
 
 typedef struct {
     uint8_t code;
@@ -134,3 +134,4 @@ typedef struct {
 void Process_GFilters(AccConvertedSample *samples);
 void gfilter_init(void);
 void ConfigureDriverBehaviorThresholds(uint8_t *param_str, uint8_t *ret_value_type, uint8_t is_set_command);
+bool is_bumper_occured(void);

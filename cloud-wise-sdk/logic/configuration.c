@@ -81,7 +81,8 @@ void SetManufactureDefault(void)
 
     memset(&device_config.config_flags, 0x00, 4);
     device_config.config_flags.offroad_disabled = 1; // 0 - ??????????
-    device_config.config_flags.bumper_dis       = 1; // 0 - ??????????
+    //device_config.config_flags.bumper_dis       = 1;
+    device_config.config_flags.tamper_disabled = 0;
 
     memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
 

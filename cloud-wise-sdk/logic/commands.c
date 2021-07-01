@@ -73,6 +73,8 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"TAMPER_ANGLE1", (uint32_t *)&device_config.tamper_angle1, PARAM_NUMERIC, 1},
     {"TAMPER_ANGLE2", (uint32_t *)&device_config.tamper_angle2, PARAM_NUMERIC, 1},
     {"DR_BH", NULL, PARAM_NUMERIC, 0},
+    {"TAMPER_DIS", (uint32_t *)&device_config.config_flags, PARAM_NUMERIC, 1},
+
 };
 
 bool command_decoder(uint8_t *command_str, uint8_t max_size, uint8_t *result_buffer, uint8_t source)
@@ -498,6 +500,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
     case COMMAND_OFFROAD_DIS:
     case COMMAND_BUMPER_DIS:
+    case COMMAND_TAMPER_DIS:
         if (is_set_command) {
 
             memcpy(&result, (uint8_t *)p->param_address, 4);

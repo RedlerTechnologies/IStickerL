@@ -237,11 +237,6 @@ int main(void)
     }
 }
 
-void SuspendAllTasks(void)
-{
-    // xTaskSuspend(monitor_thread);
-}
-
 void init_tasks(void)
 {
     tx_uart_semaphore = xSemaphoreCreateBinary();

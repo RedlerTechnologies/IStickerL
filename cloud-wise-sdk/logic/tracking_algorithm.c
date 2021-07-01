@@ -464,8 +464,9 @@ void ProcessDrivingState(void)
 
 void send_acc_sample_to_ble(void)
 {
-    static uint8_t      ble_buffer[16];
-    AccConvertedSample *sample;
+    static uint8_t            ble_buffer[16];
+    static AccConvertedSample sample_copy;
+    AccConvertedSample *      sample;
 
 #ifdef BLE_ADVERTISING
     if (!ble_services_is_connected())
@@ -476,15 +477,18 @@ void send_acc_sample_to_ble(void)
         return;
 
     sample = (AccConvertedSample *)&incoming_sample_ptr[0];
+    memcpy(&sample_copy, sample, sizeof(AccConvertedSample));
 
     memset(ble_buffer, 0x00, 16);
-    memcpy(ble_buffer, sample, sizeof(AccConvertedSample));
+
+    sample_copy.earth_direction = driver_behaviour_state.Gz * 100;
+    memcpy(ble_buffer, &sample_copy, sizeof(AccConvertedSample));
 
     // patch instead of gyro, send another data for debugging
-    sample->drive_direction = driver_behaviour_state.Gz;
-    sample->turn_direction  = driver_behaviour_state.offroad_percentage;
-    sample->earth_direction = driver_behaviour_state.event_count_for_tamper;
-    memcpy(ble_buffer + 6, sample, sizeof(AccConvertedSample));
+    sample_copy.drive_direction = driver_behaviour_state.Gz;
+    sample_copy.turn_direction  = driver_behaviour_state.offroad_percentage;
+    sample_copy.earth_direction = driver_behaviour_state.event_count_for_tamper;
+    memcpy(ble_buffer + 6, &sample_copy, sizeof(AccConvertedSample));
 
 #ifdef BLE_ADVERTISING
     ble_services_notify_acc(ble_buffer, 16);
@@ -570,11 +574,13 @@ void set_tamper_mode(uint8_t log_code)
 
     CreateGeneralEvent(log_code, EVENT_TYPE_LOG, 1);
 
-    driver_behaviour_state.tampered   = true;
-    driver_behaviour_state.calibrated = false;
+    if (!device_config.config_flags.tamper_disabled) {
+        driver_behaviour_state.tampered   = true;
+        driver_behaviour_state.calibrated = false;
 
-    device_config.calibrate_value.avg_value.Z = 0;
-    SaveConfiguration(true);
+        device_config.calibrate_value.avg_value.Z = 0;
+        SaveConfiguration(true);
+    }
 }
 
 void Process_Calibrate(bool tamper_mode)

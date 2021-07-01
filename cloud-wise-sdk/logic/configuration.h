@@ -19,7 +19,7 @@ typedef struct {
     uint32_t reserved_bit_11 : 1;
     uint32_t reserved_bit_12 : 1;
     uint32_t offroad_disabled : 1;
-    uint32_t reserved_bit_14 : 1;
+    uint32_t tamper_disabled : 1;
     uint32_t reserved_bit_15 : 1;
     uint32_t reserved_bit_16 : 1;
     uint32_t reserved_bit_17 : 1;

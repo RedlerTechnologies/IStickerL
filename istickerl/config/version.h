@@ -31,4 +31,4 @@ extern char version[];
 #endif
 
 // Firmware Revision String (Device Information Service)
-#define FIRMWARE_REV "1.2.13"
+#define FIRMWARE_REV "1.2.15"

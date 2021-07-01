@@ -228,10 +228,13 @@ void monitor_thread(void *arg)
                 if (driver_behaviour_state.event_count_for_tamper > device_config.min_events_for_tamper) {
                     // tampered identified
                     set_tamper_mode(LOG_TAMPER_DYNAMIC);
+                } else if (driver_behaviour_state.accident_count_for_tamper >= 2) {
+                    // tampered identified
+                    set_tamper_mode(LOG_TAMPER_BY_TOO_MANY_ACCIDENTS);
                 }
 
-
-                driver_behaviour_state.event_count_for_tamper = 0;
+                driver_behaviour_state.event_count_for_tamper    = 0;
+                driver_behaviour_state.accident_count_for_tamper = 0;
             }
 
             // search for pending recording files

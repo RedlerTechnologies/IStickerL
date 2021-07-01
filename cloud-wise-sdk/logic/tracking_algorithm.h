@@ -135,6 +135,7 @@ typedef struct {
     AccSample tamper_value;
     int       tamper_sample_count;
     short     event_count_for_tamper;
+    short     accident_count_for_tamper;
 
     ////////////////////////
     // accident algorithm //
