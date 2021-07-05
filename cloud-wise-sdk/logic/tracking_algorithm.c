@@ -16,8 +16,6 @@
 #include "float.h"
 #include "gfilters_algorithm.h"
 #include "hal/hal.h"
-#include "hal/hal_boards.h"
-#include "hal/hal_drivers.h"
 #include "logic/clock.h"
 #include "logic/serial_comm.h"
 #include "monitor.h"
@@ -30,6 +28,7 @@
 #include "nrfx_log.h"
 #include "recording.h"
 #include "task.h"
+#include "version.h"
 
 #include <math.h>
 #include <stdio.h>

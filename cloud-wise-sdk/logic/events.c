@@ -9,14 +9,13 @@
 #include "drivers/flash.h"
 #include "flash_data.h"
 #include "gfilters_algorithm.h"
-#include "hal/hal_boards.h"
-#include "hal/hal_drivers.h"
 #include "logic/serial_comm.h"
 #include "monitor.h"
 #include "recording.h"
 #include "semphr.h"
 #include "task.h"
 #include "tracking_algorithm.h"
+#include "version.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -225,7 +224,7 @@ void CreateDriverBehaviourEvent(GFilterConfig *event_config, GFilterState *event
     buffer[1] = status;
 
     memcpy(&event.time, &event_state->event_time, 4);
-    
+
     /*
     memcpy(buffer + 2, (uint8_t *)(&event_state->energy), 2);
     memcpy(buffer + 4, (uint8_t *)(&event_state->duration_count), 2);
