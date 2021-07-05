@@ -114,6 +114,7 @@ typedef enum {
 #define LOG_MODEM_FAILED_SETTING_SECURITY_PARAMS 75
 #define LOG_TAMPER_DYNAMIC 76
 #define LOG_TAMPER_BY_TOO_MANY_ACCIDENTS 77
+#define LOG_CONTINUE_ROUTE 78
 
 
 // DEBUG CODES
@@ -163,7 +164,7 @@ typedef enum {
 bool CreateEvent(IStickerEvent *event);
 void CreateAccidentEvent(void);
 void CreateGeneralEvent(uint32_t value, uint8_t event_type, uint8_t value_size);
-void CreateEndRouteEvent(void);
+void CreateEndRouteEvent(uint32_t time);
 void CreateVersionEvent(bool is_immediate);
 void CreateDriverBehaviourEvent(GFilterConfig *event_config, GFilterState *event_state);
 

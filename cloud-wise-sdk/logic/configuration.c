@@ -72,7 +72,7 @@ void SetManufactureDefault(void)
 
     device_config.AccidentG             = MIN_G_FOR_ACCIDENT_EVENT;
     device_config.buzzer_mode           = BUZZER_MODE_ON;
-    device_config.filter_z              = 40;
+    device_config.filter_z              = 75;
     device_config.offroad_g             = 25;
     device_config.offroad_per           = 50;
     device_config.min_events_for_tamper = 15;

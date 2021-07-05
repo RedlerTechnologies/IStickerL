@@ -180,6 +180,7 @@ typedef struct {
     unsigned last_ble_connected_time;
     unsigned last_ble_command_time;
     unsigned stop_advertising_time;
+    unsigned end_of_route_time;
 
     unsigned bumper_history;
 
@@ -200,3 +201,4 @@ bool IsDeviceMoved(unsigned moved_in_last_seconds);
 void set_sleep_timeout(uint16_t value);
 void set_sleep_timeout_on_ble(void);
 void set_tamper_mode(uint8_t log_code);
+bool IsInsideRoute(void);

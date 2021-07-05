@@ -268,7 +268,7 @@ void CreateDebugEvent(uint16_t value_type, int32_t value, bool extened)
     CreateEvent(&event);
 }
 
-void CreateEndRouteEvent(void)
+void CreateEndRouteEvent(uint32_t time)
 {
     IStickerEvent event;
     uint8_t       buffer[13];
@@ -285,6 +285,9 @@ void CreateEndRouteEvent(void)
     event.data_len   = 13;
     event.data       = buffer;
     event.event_type = EVENT_TYPE_END_ROUTE;
+
+    if (time > 0)
+      event.time = time;
 
     CreateEvent(&event);
 }

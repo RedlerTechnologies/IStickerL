@@ -68,6 +68,7 @@ void           Set_Installation_Angle(void);
 uint16_t       get_current_state_timeout(void);
 void           send_acc_sample_to_ble(void);
 uint16_t       GetMinEneryForMovement(void);
+void           UpdateEndOfRouteTime(bool need_to_sleep);
 
 extern AccConvertedSample *incoming_sample_ptr;
 
@@ -248,11 +249,13 @@ void driver_behaviour_task(void *pvParameter)
                 ProcessDrivingState();
 
                 need_sleep = CheckNoActivity();
+                UpdateEndOfRouteTime(need_sleep);
 
                 if (need_sleep) {
-                    CreateEndRouteEvent();
+                    CreateEndRouteEvent(driver_behaviour_state.end_of_route_time);
                     CreateGeneralEvent(LOG_SLEEP_BY_NO_MOVEMENT, EVENT_TYPE_LOG, 2);
                 }
+
                 break;
 
             case TRACKING_STATE_SLEEP:
@@ -390,6 +393,46 @@ bool CheckNoActivity(void)
     }
 
     return need_sleep;
+}
+
+void UpdateEndOfRouteTime(bool need_to_sleep)
+{
+    uint32_t duration;
+
+    if (need_to_sleep) {
+        if (driver_behaviour_state.end_of_route_time == 0) {
+            driver_behaviour_state.end_of_route_time = GetTimeStampFromDate();
+        }
+    } else {
+
+        duration = timeDiff(xTaskGetTickCount(), driver_behaviour_state.last_activity_time) / 1000;
+
+        if (duration >= (3 * 60)) {
+            if (driver_behaviour_state.end_of_route_time == 0) {
+                driver_behaviour_state.end_of_route_time = GetTimeStampFromDate();
+            }
+        } else {
+
+            if (driver_behaviour_state.end_of_route_time > 0) {
+                DisplayMessage("\r\nContinue route\r\n", 0, true);
+                CreateGeneralEvent(LOG_CONTINUE_ROUTE, EVENT_TYPE_LOG, 2);
+            }
+
+            driver_behaviour_state.end_of_route_time = 0;
+        }
+    }
+}
+
+bool IsInsideRoute(void)
+{
+    bool res = false;
+
+    if (driver_behaviour_state.track_state == TRACKING_STATE_ROUTE) {
+        if (driver_behaviour_state.end_of_route_time == 0)
+            res = true;
+    }
+
+    return res;
 }
 
 void Calculate_Energy(void)
