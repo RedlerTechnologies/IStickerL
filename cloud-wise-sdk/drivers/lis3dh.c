@@ -11,6 +11,8 @@ NRF_LOG_MODULE_REGISTER();
 
 #define LIS3DH_ADDR 0x19
 
+#define TWI_MULTI_READ 0x80
+
 #define LIS3DH_WHO_AM_I_ADDR 0x0F
 
 #ifdef ACC_SAMPLE_FREQ_100HZ
@@ -19,6 +21,7 @@ NRF_LOG_MODULE_REGISTER();
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
 #define ACC_REG_20H 0x67
+//#define ACC_REG_20H 0x27
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
@@ -68,7 +71,7 @@ typedef enum {
     LISDH_ACT_DUR = 0x3F,
 } eLis3dh;
 
-static uint8_t m_acc_table[34] = {
+static uint8_t m_acc_init[] = {
 
     // low power mode disabled, sample rate 200hz, x,y,z axis enabled
     LISDH_CTRL_REG1,
@@ -78,8 +81,8 @@ static uint8_t m_acc_table[34] = {
     LISDH_CTRL_REG2,
     0x00,
 
-    // click int disabled, ZYD data ready int disabled, FIFO water maek disabled,
-    // FIFO overrun int disanled
+    // click int disabled, ZYD data ready int disabled, FIFO watermark disabled,
+    // FIFO overrun int disabled
     LISDH_CTRL_REG3,
     0x00,
 
@@ -88,10 +91,10 @@ static uint8_t m_acc_table[34] = {
     LISDH_CTRL_REG4,
     0xB0,
 
-    // FIFO disabled, BOOT disabled, 4D ditection int 1,2 disabled
+    // FIFO enabled, BOOT disabled, 4D ditection int 1,2 disabled
     // latch int 1,2 disabled,
     LISDH_CTRL_REG5,
-    0x00,
+    0x40,
 
     // int 2 click disabled,
     //  activity interrupt disable
@@ -124,11 +127,11 @@ static uint8_t m_acc_table[34] = {
 
     // int2 threhold
     LISDH_INT2_THS,
-    0x40,
+    0x00,
 
     // int 2 duration value = 100
     LISDH_INT2_DUR,
-    0x64,
+    0x00,
 
     // click interrupt disbaled
     LISDH_CLICK_CFG,
@@ -143,34 +146,15 @@ static uint8_t m_acc_table[34] = {
     0x00,
 };
 
-static uint8_t m_acc_sleep_table[6] = {
-
-    // TODO Disable INT1 - INT1_CFG
-
-    // activity interrupt enabled
-    LISDH_ACT_THS, 0x02,
-
-    // activity interrupt enabled
-
-    LISDH_ACT_DUR, 0x10,
-
-    // TODO CTRL_REG1 - move to low power (LPen)
-    //LISDH_CTRL_REG1,
-    //0x3F,  //0x08
-    // this definition cause problem to wakeup by movement.
-    // need to recheck again...
-
-    // int 2 click disabled,
-    // activity interrupt enables (wakeup from deep sleep)
-    LISDH_CTRL_REG6,
-   0x08,
-};
-
-static volatile bool m_xfer_done = false;
+static volatile bool m_xfer_done    = false;
 static volatile bool m_read_buffers = false;
 
+static bool    configure(uint8_t *table, uint8_t table_size);
 static void    write_reg_blocking(uint8_t reg, uint8_t value);
 static uint8_t read_reg_blocking(uint8_t reg);
+
+#define BUFFER_LENGTH (32 * sizeof(uint16_t) * 3)
+static uint8_t m_samples_buffer[BUFFER_LENGTH];
 
 bool lis3dh_init(void)
 {
@@ -179,7 +163,7 @@ bool lis3dh_init(void)
     value = read_reg_blocking(LIS3DH_WHO_AM_I_ADDR);
     NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
-    return true;
+    return configure(m_acc_init, sizeof(m_acc_init) >> 1);
 }
 
 void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
@@ -190,7 +174,8 @@ void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
 
         if (m_read_buffers) {
             m_read_buffers = false;
-            // TODO Notify
+
+            // NRFX_LOG_HEXDUMP_INFO(m_samples_buffer, p_event->xfer_desc.secondary_length);
         }
         break;
 
@@ -235,13 +220,13 @@ void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
 
     tx_temp_data = reg;
 
-     const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
+    const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
 
-     m_xfer_done = false;
-     m_read_buffers = true;
+    m_xfer_done    = false;
+    m_read_buffers = true;
 
-     err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
-     if (err_code != NRFX_SUCCESS) {
+    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
+    if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
         return;
     }
@@ -284,23 +269,111 @@ static bool configure(uint8_t *table, uint8_t table_size)
         if (reg != table[j + 1]) {
             success = false;
             NRFX_LOG_ERROR("%s 0x%02x 0x%02x 0x%02x", __func__, table[j], reg, table[j + 1]);
-            break;
         }
-    }
-
-    if (success) {
-        NRFX_LOG_INFO("%s Acc configured OK", __func__);
-    } else {
-        NRFX_LOG_ERROR("%s Acc Configuration Failed", __func__);
     }
 
     return success;
 }
 
-bool lis3dh_configure(bool sleep_mode)
+bool lis3dh_configure_idle(void)
 {
-    if (sleep_mode)
-        return configure(m_acc_sleep_table, sizeof(m_acc_sleep_table) >> 1);
-    else
-        return configure(m_acc_table, sizeof(m_acc_table) >> 1);
+    uint8_t config[] = {
+        // no fifo
+        LISDH_FIFO_CTRL_REG,
+        0x00,
+
+        // activity interrupt disabled
+        LISDH_ACT_THS,
+        0x00,
+
+        // activity interrupt disabled
+        LISDH_ACT_DUR,
+        0x00,
+
+        // int 2 click disabled,
+        //  activity interrupt disable
+        LISDH_CTRL_REG6,
+        0x00,
+    };
+
+    if (configure(config, sizeof(config) >> 1)) {
+        NRFX_LOG_INFO("%s OK", __func__);
+    } else {
+        NRFX_LOG_ERROR("%s Failed", __func__);
+    }
+}
+
+bool lis3dh_configure_sleep(void)
+{
+    uint8_t config[] = {
+        // no fifo
+        LISDH_FIFO_CTRL_REG,
+        0x00,
+
+        // activity interrupt enabled
+        LISDH_ACT_THS,
+        0x02,
+
+        LISDH_ACT_DUR,
+        0x10,
+
+        // TODO CTRL_REG1 - move to low power (LPen)
+        // LISDH_CTRL_REG1,
+        // 0x3F,  //0x08
+        // this definition cause problem to wakeup by movement.
+        // need to recheck again...
+
+        // int 2 click disabled,
+        // activity interrupt enables (wakeup from deep sleep)
+        LISDH_CTRL_REG6,
+        0x08,
+    };
+
+    if (configure(config, sizeof(config) >> 1)) {
+        NRFX_LOG_INFO("%s OK", __func__);
+    } else {
+        NRFX_LOG_ERROR("%s Failed", __func__);
+    }
+}
+
+bool lis3dh_configure_fifo(void)
+{
+    uint8_t config[] = {
+        // activity interrupt disabled
+        LISDH_ACT_THS,
+        0x00,
+
+        // activity interrupt disabled
+        LISDH_ACT_DUR,
+        0x00,
+
+        // int 2 click disabled,
+        // activity interrupt disable
+        LISDH_CTRL_REG6,
+        0x00,
+
+        // click int disabled, ZYD data ready int disabled, FIFO watermark enabled,
+        // FIFO overrun int enabled
+        LISDH_CTRL_REG3,
+        0x04,
+
+        // Stream-to-FIFO, INT1, FTH set to 15 (half as read to N+1)
+        LISDH_FIFO_CTRL_REG,
+        0xAF,
+
+    };
+
+    if (configure(config, sizeof(config) >> 1)) {
+        NRFX_LOG_INFO("%s OK", __func__);
+    } else {
+        NRFX_LOG_ERROR("%s Failed", __func__);
+    }
+}
+
+inline bool lis3dh_int_handler(void)
+{
+    // uint8_t int_src = read_reg_blocking(LISDH_FIFO_SRC_REG);
+    // NRFX_LOG_INFO("%s %x", __func__, int_src);
+
+    lis3dh_read_buffer(m_samples_buffer, BUFFER_LENGTH, LISDH_OUT_XL | TWI_MULTI_READ);
 }

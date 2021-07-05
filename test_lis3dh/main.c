@@ -31,7 +31,7 @@ static TaskHandle_t m_logger_thread; // Logger thread
 
 TaskHandle_t driver_behaviour_task_handle;
 TaskHandle_t transfer_task_handle;
-TaskHandle_t sanpler_task_handle;
+TaskHandle_t sampler_task_handle;
 
 void init_tasks(void);
 
@@ -46,7 +46,10 @@ void init_tasks(void);
  * @param[in] line_num   Line number of the failing ASSERT call.
  * @param[in] file_name  File name of the failing ASSERT call.
  */
-void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name) { app_error_handler(DEAD_BEEF, line_num, p_file_name); }
+void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name)
+{
+    app_error_handler(DEAD_BEEF, line_num, p_file_name);
+}
 
 /**@brief Function for the various modules initialization.
  *
@@ -87,6 +90,7 @@ __STATIC_INLINE void log_init(void)
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 }
 
+#if NRF_LOG_ENABLED
 /**@brief Thread for handling the logger.
  *
  * @details This thread is responsible for processing log entries if logs are deferred.
@@ -105,13 +109,35 @@ static void logger_thread(void *arg)
         vTaskSuspend(NULL); // Suspend myself
     }
 }
+#endif // NRF_LOG_ENABLED
 
-/**@brief A function which is hooked to idle task
+#if NRF_LOG_ENABLED && NRF_LOG_DEFERRED
+void log_pending_hook(void)
+{
+    BaseType_t result = pdFAIL;
+
+    if (__get_IPSR() != 0) {
+        BaseType_t higherPriorityTaskWoken = pdFALSE;
+
+        //result = xTaskNotifyFromISR(m_logger_thread, 0, eSetValueWithoutOverwrite, &higherPriorityTaskWoken);
+        result = xTaskResumeFromISR(m_logger_thread);
+
+        if (pdFAIL != result) {
+            portYIELD_FROM_ISR(higherPriorityTaskWoken);
+        }
+    } else {
+        UNUSED_RETURN_VALUE(xTaskNotify(m_logger_thread, 0, eSetValueWithoutOverwrite));
+    }
+}
+#endif
+
+/**@brief A function which is hooked to idle task.
+ * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
  */
 void vApplicationIdleHook(void)
 {
 #if NRF_LOG_ENABLED
-    vTaskResume(m_logger_thread);
+    // vTaskResume(m_logger_thread);
 #endif
 }
 
@@ -135,9 +161,12 @@ static void ble_stack_init(void)
     // Configure the BLE stack using the default settings.
     // Fetch the start address of the application RAM.
     uint32_t ram_start = 0;
-    err_code           = nrf_sdh_ble_default_cfg_set(1, &ram_start);
+
+    err_code = nrf_sdh_ble_default_cfg_set(1, &ram_start);
     APP_ERROR_CHECK(err_code);
 }
+
+static TaskHandle_t m_lis3dh_thread;
 
 static void hal_evt_handler(const hal_event_type_t event)
 {
@@ -148,6 +177,7 @@ static void hal_evt_handler(const hal_event_type_t event)
         break;
 
     case HAL_EVENT_LIS3DH_INT1:
+        xTaskResumeFromISR(m_lis3dh_thread);
         NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
         break;
 
@@ -181,23 +211,21 @@ static void peripherals_init(void)
 
     NRF_LOG_FLUSH();
 
-    hal_interrupts_set(true, false);
-
-    NRF_LOG_FLUSH();
+    hal_interrupts_set(true, true);
 }
 
 void lis3dh_thread(void *pvParameters)
 {
     UNUSED_PARAMETER(pvParameters);
 
+    lis3dh_configure_fifo();
+
     while (1) {
         vTaskSuspend(NULL);
 
-        NRFX_LOG_INFO("%s", __func__);
+        lis3dh_int_handler();
     }
 }
-
-static TaskHandle_t m_lis3dh_thread;
 
 int main(void)
 {
@@ -233,16 +261,9 @@ int main(void)
     // Start FreeRTOS scheduler.
     vTaskStartScheduler();
 
-    lis3dh_configure(false);
-
     NRF_LOG_FLUSH();
 
     for (;;) {
         APP_ERROR_HANDLER(NRF_ERROR_FORBIDDEN);
     }
-}
-
-void SuspendAllTasks(void)
-{
-    // xTaskSuspend(monitor_thread);
 }
