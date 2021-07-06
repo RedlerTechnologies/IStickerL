@@ -364,7 +364,7 @@ bool lis3dh_configure_fifo(void)
         LISDH_CTRL_REG3,
         0x04,
 
-        // Stream-to-FIFO, INT1, FTH set to 15 (half as read to N+1)
+        // Stream-to-FIFO, INT1, FTH set to 31 (read to N+1)
         LISDH_FIFO_CTRL_REG,
         0x9F,
 

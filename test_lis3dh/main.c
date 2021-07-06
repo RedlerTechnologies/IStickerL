@@ -13,6 +13,7 @@
 #include "nrf_log_default_backends.h"
 #include "nrf_sdh.h"
 #include "nrf_sdh_ble.h"
+#include "nrf_sdh_freertos.h"
 #include "nrf_strerror.h"
 #include "nrfx_log.h"
 #include "semphr.h"
@@ -119,7 +120,7 @@ void log_pending_hook(void)
     if (__get_IPSR() != 0) {
         BaseType_t higherPriorityTaskWoken = pdFALSE;
 
-        //result = xTaskNotifyFromISR(m_logger_thread, 0, eSetValueWithoutOverwrite, &higherPriorityTaskWoken);
+        // result = xTaskNotifyFromISR(m_logger_thread, 0, eSetValueWithoutOverwrite, &higherPriorityTaskWoken);
         result = xTaskResumeFromISR(m_logger_thread);
 
         if (pdFAIL != result) {
@@ -151,6 +152,10 @@ static void clock_init(void)
     nrf_drv_clock_lfclk_request(NULL);
 }
 
+/**@brief Function for initializing the BLE stack.
+ *
+ * @details Initializes the SoftDevice and the BLE event interrupt.
+ */
 static void ble_stack_init(void)
 {
     ret_code_t err_code;
@@ -161,9 +166,15 @@ static void ble_stack_init(void)
     // Configure the BLE stack using the default settings.
     // Fetch the start address of the application RAM.
     uint32_t ram_start = 0;
-
-    err_code = nrf_sdh_ble_default_cfg_set(1, &ram_start);
+    err_code           = nrf_sdh_ble_default_cfg_set(1, &ram_start);
     APP_ERROR_CHECK(err_code);
+
+    // Enable BLE stack.
+    err_code = nrf_sdh_ble_enable(&ram_start);
+    APP_ERROR_CHECK(err_code);
+
+    // Register a handler for BLE events.
+    // NRF_SDH_BLE_OBSERVER(m_ble_observer, 3, ble_evt_handler, NULL);
 }
 
 static TaskHandle_t m_lis3dh_thread;
@@ -178,7 +189,7 @@ static void hal_evt_handler(const hal_event_type_t event)
 
     case HAL_EVENT_LIS3DH_INT1:
         xTaskResumeFromISR(m_lis3dh_thread);
-        NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
+        // NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
         break;
 
     case HAL_EVENT_LIS3DH_INT2:
@@ -200,7 +211,6 @@ static void hal_evt_handler(const hal_event_type_t event)
 
 static void flash_spi_event_handler(nrfx_spi_evt_t const *p_event, void *p_context)
 {
-    //
     NRFX_LOG_INFO("%s", __func__);
 }
 
@@ -225,6 +235,13 @@ void lis3dh_thread(void *pvParameters)
 
         lis3dh_int_handler();
     }
+}
+
+/**@brief Function for starting advertising. */
+static void advertising_start(void *context)
+{
+    // ret_code_t err_code = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
+    // APP_ERROR_CHECK(err_code);
 }
 
 int main(void)
@@ -257,6 +274,8 @@ int main(void)
     }
 
     NRFX_LOG_INFO("%s Free Heap: %u", __func__, xPortGetFreeHeapSize());
+
+    nrf_sdh_freertos_init(advertising_start, NULL);
 
     // Start FreeRTOS scheduler.
     vTaskStartScheduler();
