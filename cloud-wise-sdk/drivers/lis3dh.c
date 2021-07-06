@@ -1,13 +1,15 @@
 #include "lis3dh.h"
 
+#include "FreeRTOS.h"
 #include "hal/hal_drivers.h"
-// TODO This logic module should be optional
-//#include "logic/serial_comm.h"
+#include "task.h"
 
 #define NRF_LOG_MODULE_NAME cloud_wise_sdk_drivers_lis3dh
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
+
+static TickType_t m_start_time;
 
 #define LIS3DH_ADDR 0x19
 
@@ -20,8 +22,8 @@ NRF_LOG_MODULE_REGISTER();
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
-#define ACC_REG_20H 0x67
-//#define ACC_REG_20H 0x27
+//#define ACC_REG_20H 0x67
+#define ACC_REG_20H 0x27
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
@@ -174,6 +176,11 @@ void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
 
         if (m_read_buffers) {
             m_read_buffers = false;
+
+            TickType_t stop_time = xTaskGetTickCount();
+            TickType_t diff_time = stop_time - m_start_time;
+
+            NRFX_LOG_INFO("%s time: %u", __func__, diff_time);
 
             // NRFX_LOG_HEXDUMP_INFO(m_samples_buffer, p_event->xfer_desc.secondary_length);
         }
@@ -372,8 +379,9 @@ bool lis3dh_configure_fifo(void)
 
 inline bool lis3dh_int_handler(void)
 {
-     //uint8_t value = read_reg_blocking(LISDH_FIFO_SRC_REG);
-     //NRFX_LOG_INFO("%s %x %u", __func__, value, value & 0x1F);
+    // uint8_t value = read_reg_blocking(LISDH_FIFO_SRC_REG);
+    // NRFX_LOG_INFO("%s %x %u", __func__, value, value & 0x1F);
 
+    m_start_time = xTaskGetTickCount();
     lis3dh_read_buffer(m_samples_buffer, BUFFER_LENGTH, LISDH_OUT_XL | TWI_MULTI_READ);
 }
