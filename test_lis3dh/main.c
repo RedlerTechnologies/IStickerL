@@ -237,6 +237,15 @@ void lis3dh_thread(void *pvParameters)
     }
 }
 
+TimerHandle_t      sample_timer_handle;
+
+void sample_timer_toggle_timer_callback(TimerHandle_t xTimer)
+{
+  static int x = 0;
+
+  x++;
+}
+
 /**@brief Function for starting advertising. */
 static void advertising_start(void *context)
 {
@@ -276,6 +285,11 @@ int main(void)
     NRFX_LOG_INFO("%s Free Heap: %u", __func__, xPortGetFreeHeapSize());
 
     nrf_sdh_freertos_init(advertising_start, NULL);
+
+    // simulate an empty processing handler every 160msec (32 samples in 200hhz)
+    sample_timer_handle = xTimerCreate("SAMPLES", 160, pdTRUE, NULL, sample_timer_toggle_timer_callback);
+    UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
+
 
     // Start FreeRTOS scheduler.
     vTaskStartScheduler();

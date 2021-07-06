@@ -77,7 +77,7 @@ static uint8_t m_acc_init[] = {
 
     // low power mode disabled, sample rate 200hz, x,y,z axis enabled
     LISDH_CTRL_REG1,
-    ACC_REG_20H,
+    0x08, // ?????????? ACC_REG_20H,
 
     // normal mode, click filter bypassed, high pass filter disabled
     LISDH_CTRL_REG2,
@@ -162,10 +162,14 @@ bool lis3dh_init(void)
 {
     uint8_t value;
 
-    value = read_reg_blocking(LIS3DH_WHO_AM_I_ADDR);
-    NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
+    //value = read_reg_blocking(LIS3DH_WHO_AM_I_ADDR);
+    // ?????????????? NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
+/* ?????????
     return configure(m_acc_init, sizeof(m_acc_init) >> 1);
+    */
+    deinit_twim();
+    return true;
 }
 
 void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)

@@ -101,7 +101,6 @@ static void init_gpio(void)
     nrf_gpio_cfg_output(HAL_SPI_FLASH_RESETN);
     nrf_gpio_pin_set(HAL_SPI_FLASH_RESETN);
 
-
     nrfx_gpiote_in_config_t in_config;
 
     in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
@@ -148,6 +147,12 @@ static void init_twim(nrfx_twim_evt_handler_t handler)
     APP_ERROR_CHECK(err_code);
 
     nrfx_twim_enable(&m_twim0);
+}
+
+// ??????????????????????
+void deinit_twim(void)
+{
+    nrfx_twim_uninit(&m_twim0);
 }
 
 static void init_spi(nrfx_spi_evt_handler_t handler)
