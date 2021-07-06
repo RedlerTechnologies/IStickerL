@@ -359,7 +359,7 @@ bool lis3dh_configure_fifo(void)
 
         // Stream-to-FIFO, INT1, FTH set to 15 (half as read to N+1)
         LISDH_FIFO_CTRL_REG,
-        0xAF,
+        0x9F,
 
     };
 
@@ -372,8 +372,8 @@ bool lis3dh_configure_fifo(void)
 
 inline bool lis3dh_int_handler(void)
 {
-    // uint8_t int_src = read_reg_blocking(LISDH_FIFO_SRC_REG);
-    // NRFX_LOG_INFO("%s %x", __func__, int_src);
+     //uint8_t value = read_reg_blocking(LISDH_FIFO_SRC_REG);
+     //NRFX_LOG_INFO("%s %x %u", __func__, value, value & 0x1F);
 
     lis3dh_read_buffer(m_samples_buffer, BUFFER_LENGTH, LISDH_OUT_XL | TWI_MULTI_READ);
 }
