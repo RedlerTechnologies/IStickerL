@@ -28,3 +28,5 @@
 // </h>
 
 // <<< end of configuration section >>>
+
+//#define NRF_LOG_ENABLED 0
