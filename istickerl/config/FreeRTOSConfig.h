@@ -160,16 +160,16 @@ extern uint32_t SystemCoreClock;
 
 /* Fix for Errata #87 nrf52832 */
 
-//#if (__FPU_PRESENT)
-//#define configPRE_SLEEP_PROCESSING(xMIdleTime)                                                                                             \
-//    if (xMIdleTime > 0) {                                                                                                                  \
-//        __set_FPSCR(__get_FPSCR() & ~(0x0000009F));                                                                                        \
-//        (void)__get_FPSCR();                                                                                                               \
-//        NVIC_ClearPendingIRQ(FPU_IRQn);                                                                                                    \
-//    }
-//#else
-//#define configPRE_SLEEP_PROCESSING(xMIdleTime)
-//#endif // NRF_PWR_MGMT_CONFIG_FPU_SUPPORT_ENABLED
+#if (__FPU_PRESENT)
+#define configPRE_SLEEP_PROCESSING(xMIdleTime)                                                                                             \
+    if (xMIdleTime > 0) {                                                                                                                  \
+        __set_FPSCR(__get_FPSCR() & ~(0x0000009F));                                                                                        \
+        (void)__get_FPSCR();                                                                                                               \
+        NVIC_ClearPendingIRQ(FPU_IRQn);                                                                                                    \
+    }
+#else
+#define configPRE_SLEEP_PROCESSING(xMIdleTime)
+#endif // NRF_PWR_MGMT_CONFIG_FPU_SUPPORT_ENABLED
 
 /** Implementation note:  Use this with caution and set this to 1 ONLY for debugging
  * ----------------------------------------------------------
