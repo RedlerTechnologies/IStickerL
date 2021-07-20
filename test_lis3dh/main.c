@@ -188,8 +188,8 @@ static void hal_evt_handler(const hal_event_type_t event)
         break;
 
     case HAL_EVENT_LIS3DH_INT1:
-        xTaskResumeFromISR(m_lis3dh_thread);
-        // NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
+        NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
+        xTaskResumeFromISR(m_lis3dh_thread);        
         break;
 
     case HAL_EVENT_LIS3DH_INT2:
@@ -221,14 +221,14 @@ static void peripherals_init(void)
 
     NRF_LOG_FLUSH();
 
-    // hal_interrupts_set(true, true);
+    hal_interrupts_set(true, true); // ??????????
 }
 
 void lis3dh_thread(void *pvParameters)
 {
     UNUSED_PARAMETER(pvParameters);
 
-    // lis3dh_configure_fifo();
+    lis3dh_configure_fifo(); // ??????????
 
     while (1) {
         vTaskSuspend(NULL);
