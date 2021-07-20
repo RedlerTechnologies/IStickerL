@@ -17,13 +17,16 @@ static TickType_t m_start_time;
 
 #define LIS3DH_WHO_AM_I_ADDR 0x0F
 
+#ifdef ACC_SAMPLE_FREQ_10HZ
+#define ACC_REG_20H 0x27
+#endif
+
 #ifdef ACC_SAMPLE_FREQ_100HZ
 #define ACC_REG_20H 0x57
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
-//#define ACC_REG_20H 0x67
-#define ACC_REG_20H 0x27
+#define ACC_REG_20H 0x67
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
