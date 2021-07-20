@@ -1,6 +1,5 @@
 #include "hal.h"
 
-#include "app_timer.h"
 #include "drivers/flash.h"
 #include "hal_boards.h"
 #include "hal_drivers.h"
@@ -34,7 +33,7 @@ volatile struct {
 
 static void init_gpio(void);
 static void init_uart(void);
-static void init_twim(void);
+static void init_twim(nrfx_twim_evt_handler_t handler);
 static void init_spi(nrfx_spi_evt_handler_t handler);
 static void init_saadc(void);
 static void init_saadc_channels(void);
@@ -46,7 +45,7 @@ static void saadc_event_handler(nrfx_saadc_evt_t const *p_event);
 
 static hal_evt_handler_t p_evt_handler;
 
-void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler)
+void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler, nrfx_twim_evt_handler_t twim_handler)
 {
     ret_code_t ret;
 
@@ -63,15 +62,11 @@ void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler)
     nrf_gpio_pin_set(HAL_LED_GREEN);
     nrf_gpio_pin_set(HAL_LED_RED);
 
-    init_twim();
+    init_twim(twim_handler);
     init_spi(spi_handler);
     init_pwm();
     init_uart();
     init_saadc();
-
-    // init timers module
-    ret = app_timer_init();
-    APP_ERROR_CHECK(ret);
 }
 
 static void gpiote_event_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
@@ -106,19 +101,16 @@ static void init_gpio(void)
     nrf_gpio_cfg_output(HAL_SPI_FLASH_RESETN);
     nrf_gpio_pin_set(HAL_SPI_FLASH_RESETN);
 
-
     nrfx_gpiote_in_config_t in_config;
 
-    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(false);
-    // in_config.pull = NRF_GPIO_PIN_PULLUP;
+    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
     in_config.pull = NRF_GPIO_PIN_NOPULL;
     err_code       = nrfx_gpiote_in_init(HAL_LIS3DH_INT1, &in_config, gpiote_event_handler);
     if (NRFX_SUCCESS != err_code)
         NRFX_LOG_ERROR("%s nrfx_gpiote_in_init failed: %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
     APP_ERROR_CHECK(err_code);
 
-    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_HITOLO(false);
-    // in_config.pull = NRF_GPIO_PIN_PULLUP;
+    in_config      = (nrfx_gpiote_in_config_t)NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
     in_config.pull = NRF_GPIO_PIN_NOPULL;
     err_code       = nrfx_gpiote_in_init(HAL_LIS3DH_INT2, &in_config, gpiote_event_handler);
     if (NRFX_SUCCESS != err_code)
@@ -141,7 +133,7 @@ static void init_uart(void)
     APP_ERROR_CHECK(err_code);
 }
 
-static void init_twim(void)
+static void init_twim(nrfx_twim_evt_handler_t handler)
 {
     nrfx_err_t err_code;
 
@@ -151,10 +143,16 @@ static void init_twim(void)
                                            .interrupt_priority = NRFX_TWIM_DEFAULT_CONFIG_IRQ_PRIORITY,
                                            .hold_bus_uninit    = false};
 
-    err_code = nrfx_twim_init(&m_twim0, &twi_config, NULL, NULL);
+    err_code = nrfx_twim_init(&m_twim0, &twi_config, handler, NULL);
     APP_ERROR_CHECK(err_code);
 
     nrfx_twim_enable(&m_twim0);
+}
+
+// ??????????????????????
+void deinit_twim(void)
+{
+    nrfx_twim_uninit(&m_twim0);
 }
 
 static void init_spi(nrfx_spi_evt_handler_t handler)

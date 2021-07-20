@@ -70,11 +70,11 @@ void SendRecordAlert(uint32_t record_id);
 
 AccRecord acc_record;
 
-void sample_timer_toggle_timer_callback(void *pvParameter)
+void sample_timer_toggle_timer_callback(TimerHandle_t xTimer)
 {
     BaseType_t xHigherPriorityTaskWoken, xResult;
 
-    UNUSED_PARAMETER(pvParameter);
+    UNUSED_PARAMETER(xTimer);
 
     xHigherPriorityTaskWoken = pdFALSE;
 
@@ -195,7 +195,7 @@ void sampler_task(void *pvParameter)
 
     block_length = sizeof(AccConvertedSample) * SAMPLE_BUFFER_SIZE;
 
-    sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, (TimerCallbackFunction_t)sample_timer_toggle_timer_callback);
+    sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, sample_timer_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
 
     vTaskDelay(3000);

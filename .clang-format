@@ -25,6 +25,7 @@ BreakBeforeTernaryOperators: "false"
 ColumnLimit: "140"
 CommentPragmas: "^ IWYU pragma:"
 # EmptyLinesAtEndOfFile: 1
+AllowShortFunctionsOnASingleLine: false
 IncludeBlocks: Regroup
 IndentWidth: 4
 Language: Cpp

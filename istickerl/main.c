@@ -70,7 +70,7 @@ static TaskHandle_t m_logger_thread; // Logger thread
 
 TaskHandle_t driver_behaviour_task_handle;
 TaskHandle_t transfer_task_handle;
-TaskHandle_t sanpler_task_handle;
+TaskHandle_t sampler_task_handle;
 
 extern DriverBehaviourState driver_behaviour_state;
 
@@ -87,7 +87,10 @@ void init_tasks(void);
  * @param[in] line_num   Line number of the failing ASSERT call.
  * @param[in] file_name  File name of the failing ASSERT call.
  */
-void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name) { app_error_handler(DEAD_BEEF, line_num, p_file_name); }
+void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name)
+{
+    app_error_handler(DEAD_BEEF, line_num, p_file_name);
+}
 
 /**@brief Function for the various modules initialization.
  *
@@ -223,7 +226,7 @@ int main(void)
 
     UNUSED_VARIABLE(xTaskCreate(transfer_task, "Transfer", configMINIMAL_STACK_SIZE + 100, NULL, 2, &transfer_task_handle));
 
-    UNUSED_VARIABLE(xTaskCreate(sampler_task, "Sampler", configMINIMAL_STACK_SIZE + 100, NULL, 3, &sanpler_task_handle));
+    UNUSED_VARIABLE(xTaskCreate(sampler_task, "Sampler", configMINIMAL_STACK_SIZE + 100, NULL, 3, &sampler_task_handle));
 
     init_tasks();
 
@@ -273,7 +276,7 @@ void init_tasks(void)
     xSemaphoreGive(acc_recording_semaphore);
 
     event_acc_process_sample = xEventGroupCreate();
-    event_save_recording         = xEventGroupCreate();
+    event_save_recording     = xEventGroupCreate();
     event_sample_timer       = xEventGroupCreate();
     event_uart_rx            = xEventGroupCreate();
     ble_log_event            = xEventGroupCreate();
@@ -331,7 +334,7 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 #endif // DEBUG
 }
 
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) 
-{ 
-  ActivateSoftwareReset(RESET_STACK_OVERFLOW, 0, 0, 0); 
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+    ActivateSoftwareReset(RESET_STACK_OVERFLOW, 0, 0, 0);
 }

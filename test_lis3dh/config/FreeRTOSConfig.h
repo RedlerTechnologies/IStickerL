@@ -33,7 +33,7 @@
 #define configTICK_RATE_HZ 1024
 #define configMAX_PRIORITIES (3)
 #define configMINIMAL_STACK_SIZE (60)
-#define configTOTAL_HEAP_SIZE (2 * 8196)
+#define configTOTAL_HEAP_SIZE (8196)
 #define configMAX_TASK_NAME_LEN (8)
 #define configUSE_16_BIT_TICKS 0
 #define configIDLE_SHOULD_YIELD 1
@@ -50,7 +50,7 @@
 /* Hook function related definitions. */
 #define configUSE_IDLE_HOOK 1
 #define configUSE_TICK_HOOK 0
-#define configCHECK_FOR_STACK_OVERFLOW 2 // 0
+#define configCHECK_FOR_STACK_OVERFLOW 0
 #define configUSE_MALLOC_FAILED_HOOK 0
 
 /* Run time and task stats gathering related definitions. */
@@ -160,16 +160,16 @@ extern uint32_t SystemCoreClock;
 
 /* Fix for Errata #87 nrf52832 */
 
-//#if (__FPU_PRESENT)
-//#define configPRE_SLEEP_PROCESSING(xMIdleTime)                                                                                             \
-//    if (xMIdleTime > 0) {                                                                                                                  \
-//        __set_FPSCR(__get_FPSCR() & ~(0x0000009F));                                                                                        \
-//        (void)__get_FPSCR();                                                                                                               \
-//        NVIC_ClearPendingIRQ(FPU_IRQn);                                                                                                    \
-//    }
-//#else
-//#define configPRE_SLEEP_PROCESSING(xMIdleTime)
-//#endif // NRF_PWR_MGMT_CONFIG_FPU_SUPPORT_ENABLED
+#if (__FPU_PRESENT)
+#define configPRE_SLEEP_PROCESSING(xMIdleTime)                                                                                             \
+    if (xMIdleTime > 0) {                                                                                                                  \
+        __set_FPSCR(__get_FPSCR() & ~(0x0000009F));                                                                                        \
+        (void)__get_FPSCR();                                                                                                               \
+        NVIC_ClearPendingIRQ(FPU_IRQn);                                                                                                    \
+    }
+#else
+#define configPRE_SLEEP_PROCESSING(xMIdleTime)
+#endif // NRF_PWR_MGMT_CONFIG_FPU_SUPPORT_ENABLED
 
 /** Implementation note:  Use this with caution and set this to 1 ONLY for debugging
  * ----------------------------------------------------------

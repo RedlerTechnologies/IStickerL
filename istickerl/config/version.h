@@ -17,7 +17,9 @@ extern char version[];
 #define MODEL_NUM STRINGIFY(BOARD_CUSTOM)
 
 #if BOARD_CUSTOM == ISTICKERL_REV_1
-#define HARDWARE_REV "1"
+
+#define HARDWARE_TYPE 11
+#define HARDWARE_REV STRINGIFY(HARDWARE_TYPE)
 
 #else
 
@@ -30,5 +32,9 @@ extern char version[];
 #error "Unknown MODEL_NUM"
 #endif
 
+#define APP_MAJOR_VERSION 1
+#define APP_MINOR_VERSION 2
+#define APP_BUILD 101 // 15
+
 // Firmware Revision String (Device Information Service)
-#define FIRMWARE_REV "1.2.116"
+#define FIRMWARE_REV STRINGIFY(APP_MAJOR_VERSION) "." STRINGIFY(APP_MINOR_VERSION) "." STRINGIFY(APP_BUILD)

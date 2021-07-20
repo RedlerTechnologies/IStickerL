@@ -1,16 +1,25 @@
 #include "lis3dh.h"
 
+#include "FreeRTOS.h"
 #include "hal/hal_drivers.h"
-#include "logic/serial_comm.h"
+#include "task.h"
 
 #define NRF_LOG_MODULE_NAME cloud_wise_sdk_drivers_lis3dh
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
 #include "nrfx_log.h"
 NRF_LOG_MODULE_REGISTER();
 
+static TickType_t m_start_time;
+
 #define LIS3DH_ADDR 0x19
 
+#define TWI_MULTI_READ 0x80
+
 #define LIS3DH_WHO_AM_I_ADDR 0x0F
+
+#ifdef ACC_SAMPLE_FREQ_10HZ
+#define ACC_REG_20H 0x27
+#endif
 
 #ifdef ACC_SAMPLE_FREQ_100HZ
 #define ACC_REG_20H 0x57
@@ -67,7 +76,7 @@ typedef enum {
     LISDH_ACT_DUR = 0x3F,
 } eLis3dh;
 
-unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
+static uint8_t m_acc_init[] = {
 
     // low power mode disabled, sample rate 200hz, x,y,z axis enabled
     LISDH_CTRL_REG1,
@@ -77,8 +86,8 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     LISDH_CTRL_REG2,
     0x00,
 
-    // click int disabled, ZYD data ready int disabled, FIFO water maek disabled,
-    // FIFO overrun int disanled
+    // click int disabled, ZYD data ready int disabled, FIFO watermark disabled,
+    // FIFO overrun int disabled
     LISDH_CTRL_REG3,
     0x00,
 
@@ -87,10 +96,10 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     LISDH_CTRL_REG4,
     0xB0,
 
-    // FIFO disabled, BOOT disabled, 4D ditection int 1,2 disabled
+    // FIFO enabled, BOOT disabled, 4D ditection int 1,2 disabled
     // latch int 1,2 disabled,
     LISDH_CTRL_REG5,
-    0x00,
+    0x40,
 
     // int 2 click disabled,
     //  activity interrupt disable
@@ -121,6 +130,14 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     LISDH_INT2_CFG,
     0x00,
 
+    // int2 threhold
+    LISDH_INT2_THS,
+    0x00,
+
+    // int 2 duration value = 100
+    LISDH_INT2_DUR,
+    0x00,
+
     // click interrupt disbaled
     LISDH_CLICK_CFG,
     0x00,
@@ -134,61 +151,75 @@ unsigned char Acc_Table[ACC_TABLE_DRIVER_SIZE * 2] = {
     0x00,
 };
 
-unsigned char Acc_Sleep_Table[ACC_TABLE_SLEEP_SIZE * 2] = {
+static volatile bool m_xfer_done    = false;
+static volatile bool m_read_buffers = false;
 
-    // TODO Disable INT1 - INT1_CFG
+static bool    configure(uint8_t *table, uint8_t table_size);
+static void    write_reg_blocking(uint8_t reg, uint8_t value);
+static uint8_t read_reg_blocking(uint8_t reg);
 
-    // activity interrupt enabled
-    LISDH_ACT_THS, 0x02,
-
-    // activity interrupt enabled
-
-    LISDH_ACT_DUR, 0x10,
-
-    // TODO CTRL_REG1 - move to low power (LPen)
-    //LISDH_CTRL_REG1,
-    //0x3F,  //0x08 
-    // this definition cause problem to wakeup by movement.
-    // need to recheck again...
-
-    // int 2 click disabled,
-    // activity interrupt enables (wakeup from deep sleep)
-    LISDH_CTRL_REG6,
-   0x08,
-};
-
-uint8_t lis3dh_read_reg(uint8_t reg);
+#define BUFFER_LENGTH (32 * sizeof(uint16_t) * 3)
+static uint8_t m_samples_buffer[BUFFER_LENGTH];
 
 bool lis3dh_init(void)
 {
     uint8_t value;
 
-    value = lis3dh_read_reg(LIS3DH_WHO_AM_I_ADDR);
+    value = read_reg_blocking(LIS3DH_WHO_AM_I_ADDR);
     NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
-    return true;
+    return configure(m_acc_init, sizeof(m_acc_init) >> 1);
+    
+    //deinit_twim();
+    //return true;
 }
 
-uint8_t lis3dh_read_reg(uint8_t reg)
+void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
 {
-    ret_code_t err_code;
-    uint8_t    tx_temp_data = reg;
-    uint8_t    rx_temp_data;
+    switch (p_event->type) {
+    case NRFX_TWIM_EVT_DONE:
+        m_xfer_done = true;
 
-    const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data));
-    const nrfx_twim_xfer_desc_t xfer_rx = NRFX_TWIM_XFER_DESC_RX(LIS3DH_ADDR, &rx_temp_data, sizeof(rx_temp_data));
+        if (m_read_buffers) {
+            m_read_buffers = false;
 
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_tx, NRFX_TWIM_FLAG_TX_NO_STOP);
+            TickType_t stop_time = xTaskGetTickCount();
+            TickType_t diff_time = stop_time - m_start_time;
+
+            NRFX_LOG_INFO("%s time: %u", __func__, diff_time);
+
+            // NRFX_LOG_HEXDUMP_INFO(m_samples_buffer, p_event->xfer_desc.secondary_length);
+        }
+        break;
+
+    default:
+        NRFX_LOG_ERROR("%s %u", __func__, p_event->type);
+        break;
+    }
+}
+
+static uint8_t read_reg_blocking(uint8_t reg)
+{
+    ret_code_t     err_code;
+    static uint8_t tx_temp_data;
+    static uint8_t rx_temp_data;
+
+    tx_temp_data = reg;
+
+    const nrfx_twim_xfer_desc_t xfer_txrx =
+        NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), &rx_temp_data, sizeof(rx_temp_data));
+
+    m_xfer_done = false;
+
+    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
     if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
+        // TODO Fix
         return false;
     }
 
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_rx, 0);
-    if (err_code != NRFX_SUCCESS) {
-        NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-        return false;
-    }
+    while (m_xfer_done == false)
+        ;
 
     // NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, rx_temp_data);
 
@@ -197,65 +228,166 @@ uint8_t lis3dh_read_reg(uint8_t reg)
 
 void lis3dh_read_buffer(uint8_t *buffer, uint8_t size, uint8_t reg)
 {
-    ret_code_t err_code;
-    uint8_t    tx_temp_data = reg;
+    ret_code_t     err_code;
+    static uint8_t tx_temp_data;
 
-    const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data));
-    const nrfx_twim_xfer_desc_t xfer_rx = NRFX_TWIM_XFER_DESC_RX(LIS3DH_ADDR, buffer, size);
+    tx_temp_data = reg;
 
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_tx, NRFX_TWIM_FLAG_TX_NO_STOP);
-    if (err_code != NRFX_SUCCESS) {
-        NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-        return;
-    }
+    const nrfx_twim_xfer_desc_t xfer_txrx = NRFX_TWIM_XFER_DESC_TXRX(LIS3DH_ADDR, &tx_temp_data, sizeof(tx_temp_data), buffer, size);
 
-    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_rx, 0);
+    m_xfer_done    = false;
+    m_read_buffers = true;
+
+    err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_txrx, 0);
     if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
         return;
     }
 }
 
-void lis3dh_write_reg(uint8_t reg, uint8_t value)
+static void write_reg_blocking(uint8_t reg, uint8_t value)
 {
     ret_code_t err_code;
     uint8_t    tx_temp_data[2];
-    // uint8_t    rx_temp_data;
 
     tx_temp_data[0] = reg;
     tx_temp_data[1] = value;
 
     const nrfx_twim_xfer_desc_t xfer_tx = NRFX_TWIM_XFER_DESC_TX(LIS3DH_ADDR, tx_temp_data, sizeof(tx_temp_data));
 
+    m_xfer_done = false;
+
     err_code = nrfx_twim_xfer(hal_lis3dh_twi, &xfer_tx, 0);
     if (err_code != NRFX_SUCCESS) {
         NRFX_LOG_ERROR("%s %s", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
         return;
     }
+
+    while (m_xfer_done == false)
+        ;
 }
 
-bool configure_acc(unsigned char *table, unsigned char table_size)
+static bool configure(uint8_t *table, uint8_t table_size)
 {
     unsigned char i, j, reg;
     bool          success = true;
 
     for (i = 0, j = 0; i < table_size; i++, j += 2) {
-        lis3dh_write_reg(table[j], table[j + 1]);
+        write_reg_blocking(table[j], table[j + 1]);
     }
 
     for (i = 0, j = 0; i < table_size; i++, j += 2) {
-        reg = lis3dh_read_reg(table[j]);
+        reg = read_reg_blocking(table[j]);
 
         if (reg != table[j + 1]) {
             success = false;
-            break;
+            NRFX_LOG_ERROR("%s 0x%02x 0x%02x 0x%02x", __func__, table[j], reg, table[j + 1]);
         }
     }
 
-    if (success)
-        DisplayMessage("\r\nAcc configured - OK\r\n", 0, true);
-    else
-        DisplayMessage("\r\nError Acc Configuration\r\n", 0, true);
-
     return success;
+}
+
+bool lis3dh_configure_idle(void)
+{
+    uint8_t config[] = {
+        // no fifo
+        LISDH_FIFO_CTRL_REG,
+        0x00,
+
+        // activity interrupt disabled
+        LISDH_ACT_THS,
+        0x00,
+
+        // activity interrupt disabled
+        LISDH_ACT_DUR,
+        0x00,
+
+        // int 2 click disabled,
+        //  activity interrupt disable
+        LISDH_CTRL_REG6,
+        0x00,
+    };
+
+    if (configure(config, sizeof(config) >> 1)) {
+        NRFX_LOG_INFO("%s OK", __func__);
+    } else {
+        NRFX_LOG_ERROR("%s Failed", __func__);
+    }
+}
+
+bool lis3dh_configure_sleep(void)
+{
+    uint8_t config[] = {
+        // no fifo
+        LISDH_FIFO_CTRL_REG,
+        0x00,
+
+        // activity interrupt enabled
+        LISDH_ACT_THS,
+        0x02,
+
+        LISDH_ACT_DUR,
+        0x10,
+
+        // TODO CTRL_REG1 - move to low power (LPen)
+        // LISDH_CTRL_REG1,
+        // 0x3F,  //0x08
+        // this definition cause problem to wakeup by movement.
+        // need to recheck again...
+
+        // int 2 click disabled,
+        // activity interrupt enables (wakeup from deep sleep)
+        LISDH_CTRL_REG6,
+        0x08,
+    };
+
+    if (configure(config, sizeof(config) >> 1)) {
+        NRFX_LOG_INFO("%s OK", __func__);
+    } else {
+        NRFX_LOG_ERROR("%s Failed", __func__);
+    }
+}
+
+bool lis3dh_configure_fifo(void)
+{
+    uint8_t config[] = {
+        // activity interrupt disabled
+        LISDH_ACT_THS,
+        0x00,
+
+        // activity interrupt disabled
+        LISDH_ACT_DUR,
+        0x00,
+
+        // int 2 click disabled,
+        // activity interrupt disable
+        LISDH_CTRL_REG6,
+        0x00,
+
+        // click int disabled, ZYD data ready int disabled, FIFO watermark enabled,
+        // FIFO overrun int enabled
+        LISDH_CTRL_REG3,
+        0x04,
+
+        // Stream-to-FIFO, INT1, FTH set to 31 (read to N+1)
+        LISDH_FIFO_CTRL_REG,
+        0x9F,
+
+    };
+
+    if (configure(config, sizeof(config) >> 1)) {
+        NRFX_LOG_INFO("%s OK", __func__);
+    } else {
+        NRFX_LOG_ERROR("%s Failed", __func__);
+    }
+}
+
+inline bool lis3dh_int_handler(void)
+{
+    // uint8_t value = read_reg_blocking(LISDH_FIFO_SRC_REG);
+    // NRFX_LOG_INFO("%s %x %u", __func__, value, value & 0x1F);
+
+    m_start_time = xTaskGetTickCount();
+    lis3dh_read_buffer(m_samples_buffer, BUFFER_LENGTH, LISDH_OUT_XL | TWI_MULTI_READ);
 }

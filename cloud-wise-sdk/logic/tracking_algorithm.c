@@ -16,8 +16,6 @@
 #include "float.h"
 #include "gfilters_algorithm.h"
 #include "hal/hal.h"
-#include "hal/hal_boards.h"
-#include "hal/hal_drivers.h"
 #include "logic/clock.h"
 #include "logic/serial_comm.h"
 #include "monitor.h"
@@ -30,14 +28,13 @@
 #include "nrfx_log.h"
 #include "recording.h"
 #include "task.h"
+#include "version.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-extern uint8_t             Acc_Table[];
-extern uint8_t             Acc_Sleep_Table[];
 extern uint32_t            reset_count_x;
 extern ResetData           reset_data;
 extern DeviceConfiguration device_config;
@@ -101,7 +98,11 @@ void driver_behaviour_task(void *pvParameter)
     ble_services_advertising_start();
 #endif
 
-    configure_acc(Acc_Table, ACC_TABLE_DRIVER_SIZE);
+    if (lis3dh_configure(false)) {
+        DisplayMessage("\r\nAcc configured - OK\r\n", 0, true);
+    } else {
+        DisplayMessage("\r\nError Acc Configuration\r\n", 0, true);
+    }
 
     // init glabal state variables //
 
@@ -278,7 +279,12 @@ void driver_behaviour_task(void *pvParameter)
                     if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
                         buzzer_long(1200);
 
-                    configure_acc(Acc_Sleep_Table, ACC_TABLE_SLEEP_SIZE);
+                    if (lis3dh_configure(true)) {
+                        DisplayMessage("\r\nAcc configured (Sleep) - OK\r\n", 0, true);
+                    } else {
+                        DisplayMessage("\r\nError Acc Configuration (Sleep) \r\n", 0, true);
+                    }
+
                     vTaskDelay(2000);
 
                     reset_data.reason = RESET_AFTER_SLEEP;

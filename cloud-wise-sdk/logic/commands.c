@@ -10,8 +10,6 @@
 #include "event_groups.h"
 #include "events.h"
 #include "flash_data.h"
-#include "hal/hal_boards.h"
-#include "hal/hal_drivers.h"
 #include "logic/serial_comm.h"
 #include "monitor.h"
 #include "recording.h"
@@ -19,6 +17,7 @@
 #include "task.h"
 #include "tracking_algorithm.h"
 #include "transfer_task.h"
+#include "version.h"
 
 #include <stdlib.h>
 #include <string.h>

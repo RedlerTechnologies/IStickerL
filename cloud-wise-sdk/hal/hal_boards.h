@@ -2,12 +2,6 @@
 
 #include "boards.h"
 
-#define APP_MAJOR_VERSION 1
-#define APP_MINOR_VERSION 2
-#define APP_BUILD 116 // 15
-
-#define HARDWARE_TYPE 11
-
 #define SAMPLE_BUFFER_SIZE 32
 
 #define HAL_UICR_DEVICE_SERIAL_NUMBER 0

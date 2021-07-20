@@ -29,7 +29,11 @@ static QueueHandle_t ble_command_queue;
 static void          check_ble_events(void);
 static void          CheckBleAdvertising();
 
-void init_ble_task(void) { ble_command_queue = xQueueCreate(1, sizeof(BleMessage *)); }
+void init_ble_task(void)
+{
+    //
+    ble_command_queue = xQueueCreate(1, sizeof(BleMessage *));
+}
 
 bool PostBleCommand(uint8_t *command_str, uint8_t size)
 {
