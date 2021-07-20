@@ -189,6 +189,7 @@ void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
             NRFX_LOG_INFO("%s time: %u", __func__, diff_time);
 
             // NRFX_LOG_HEXDUMP_INFO(m_samples_buffer, p_event->xfer_desc.secondary_length);
+            // TODO Notify of data ******
         }
         break;
 

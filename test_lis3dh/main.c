@@ -221,14 +221,15 @@ static void peripherals_init(void)
 
     NRF_LOG_FLUSH();
 
-    hal_interrupts_set(true, true); // ??????????
+    hal_interrupts_set(true, true); // ?????
 }
 
 void lis3dh_thread(void *pvParameters)
 {
     UNUSED_PARAMETER(pvParameters);
 
-    lis3dh_configure_fifo(); // ??????????
+    // WARNING
+    lis3dh_configure_fifo(); // ?????
 
     while (1) {
         vTaskSuspend(NULL);

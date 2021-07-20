@@ -98,11 +98,14 @@ void driver_behaviour_task(void *pvParameter)
     ble_services_advertising_start();
 #endif
 
+    // TODO implement lis3dh_configure not found
+    /*
     if (lis3dh_configure(false)) {
         DisplayMessage("\r\nAcc configured - OK\r\n", 0, true);
     } else {
         DisplayMessage("\r\nError Acc Configuration\r\n", 0, true);
     }
+    */
 
     // init glabal state variables //
 
@@ -279,11 +282,14 @@ void driver_behaviour_task(void *pvParameter)
                     if (device_config.buzzer_mode == BUZZER_MODE_DEBUG)
                         buzzer_long(1200);
 
+                    // TODO implement lis3dh_configure not found
+                    /*
                     if (lis3dh_configure(true)) {
                         DisplayMessage("\r\nAcc configured (Sleep) - OK\r\n", 0, true);
                     } else {
                         DisplayMessage("\r\nError Acc Configuration (Sleep) \r\n", 0, true);
                     }
+                    */
 
                     vTaskDelay(2000);
 

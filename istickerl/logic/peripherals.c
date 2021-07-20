@@ -28,7 +28,7 @@ void peripherals_init(void)
     uint32_t serial = hal_read_device_serial_number(device_serial_number, SERIAL_NUMBER_WIDTH);
     NRFX_LOG_INFO("%s Device Serial %u [%s]\n", __func__, serial, device_serial_number);
 
-    hal_init(hal_evt_handler, flash_spi_event_handler, NULL);
+    hal_init(hal_evt_handler, flash_spi_event_handler, lis3dh_evt_handler);
 
     lis3dh_init();
 
@@ -36,7 +36,7 @@ void peripherals_init(void)
 
     serial_comm_init();
 
-    hal_interrupts_set(false, true);
+    hal_interrupts_set(true, true);
 
     NRF_LOG_FLUSH();
 }
