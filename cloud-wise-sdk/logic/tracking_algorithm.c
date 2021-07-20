@@ -295,10 +295,8 @@ void driver_behaviour_task(void *pvParameter)
             }
         }
 
-        /*
-              // ??????
-                need_sleep = false;
-        */
+        // ??????
+        // need_sleep = false;
 
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);

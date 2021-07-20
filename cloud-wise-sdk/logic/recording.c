@@ -66,7 +66,7 @@ static uint8_t     sample_buffer[7];
 #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_50HZ
 
 static void record_create_new(void);
-static void SendRecordAlert(uint32_t record_id);
+void SendRecordAlert(uint32_t record_id);
 
 AccRecord acc_record;
 
@@ -379,10 +379,10 @@ static void record_create_new(void)
     }
 }
 
-void print_record(uint32_t rec, uint16_t index)
+void print_record(uint32_t rec, uint16_t index, uint8_t pending_status)
 {
     terminal_buffer_lock();
-    sprintf(alert_str, "\r\nrec=%d, idx=%d\r\n", rec, index);
+    sprintf(alert_str, "\r\nrec=%d, idx=%d, pend=%d\r\n", rec, index, pending_status);
     DisplayMessage(alert_str, 0, false);
     terminal_buffer_release();
 }
@@ -398,6 +398,7 @@ uint8_t record_scan_for_new_records(bool forced)
     uint16_t       max_record_id = 0;
     uint8_t        i;
     uint8_t        pending_counter = 0;
+    uint8_t        pending_status;
     bool           flag;
 
     index = -1;
@@ -411,8 +412,13 @@ uint8_t record_scan_for_new_records(bool forced)
         if (flag) {
             buffer = read_buffer + 4;
             // if record is completed but not sent
-            if (buffer[0] == 0 && buffer[1] == 0xFF) {
-                pending_counter++;
+
+            pending_status = (buffer[0] == 0 && buffer[1] == 0xFF);
+            // if (buffer[0] == 0 && buffer[1] == 0xFF) {
+            if (pending_status | forced) {
+                if (pending_status)
+                    pending_counter++;
+
                 flash_address = FLASH_RECORDS_START_ADDRESS + i * RECORD_SIZE;
 
                 flag = flash_read_buffer(read_buffer, flash_address, 4);
@@ -421,7 +427,7 @@ uint8_t record_scan_for_new_records(bool forced)
                     memcpy((uint8_t *)&record_id, read_buffer + 4, 4);
 
                     if (forced) {
-                        print_record(record_id, i);
+                        print_record(record_id, i, pending_status);
 
                         /*
                             terminal_buffer_lock();
@@ -439,7 +445,7 @@ uint8_t record_scan_for_new_records(bool forced)
         }
     }
 
-    if (index >= 0) {
+    if (index >= 0 && !forced) {
 
         if (((ble_services_is_connected()) && (driver_behaviour_state.accident_state != ACCIDENT_STATE_IDENTIFIED) &&
              (!in_sending_file())) ||
@@ -448,17 +454,7 @@ uint8_t record_scan_for_new_records(bool forced)
         }
     }
 
-    if (!forced) {
-
-        /*
-            terminal_buffer_lock();
-            vTaskDelay(10);
-            sprintf(alert_str, "\r\pending count=%d, idx=%d\r\n", pending_counter, index);
-            DisplayMessage(alert_str, 0, false);
-            terminal_buffer_release();
-            */
-        print_record(pending_counter, index);
-    }
+    print_record(pending_counter, 0, -1);
 
     return pending_counter;
 }
@@ -499,6 +495,19 @@ void record_trigger(uint8_t reason)
     acc_record.accident_identified = true;
 
     xSemaphoreGive(acc_recording_semaphore);
+}
+
+void DeleteRecord(uint8_t record_num)
+{
+    uint32_t flash_address;
+
+    flash_address = FLASH_RECORDS_START_ADDRESS + (record_num)*RECORD_SIZE;
+    flash_erase_sectors_in_range(flash_address, (flash_address + RECORD_SIZE));
+
+    terminal_buffer_lock();
+    sprintf(alert_str, "\r\nRecord deleted: idx=%d\r\n", record_num);
+    DisplayMessageWithTime(alert_str, strlen(alert_str), false);
+    terminal_buffer_release();
 }
 
 static void get_header(uint8_t *header)
@@ -724,7 +733,7 @@ void record_print(unsigned char record_num)
     xSemaphoreGive(tx_uart_semaphore);
 }
 
-static void SendRecordAlert(uint32_t record_id)
+void SendRecordAlert(uint32_t record_id)
 {
     terminal_buffer_lock();
     sprintf(alert_str + 2, "@?REC,%d\r\n", record_id);
@@ -740,4 +749,20 @@ uint32_t GetRandomNumber(void)
     r = r & 0xFFFFFFF;
 
     return r;
+}
+
+unsigned char check_stuck_record(unsigned char record_num)
+{
+    if (acc_record.last_sent_record_num != record_num) {
+        acc_record.last_sent_record_num       = record_num;
+        acc_record.last_sent_record_num_count = 0;
+    } else {
+        if (acc_record.last_sent_record_num_count > 3) {
+            DeleteRecord(record_num);
+            acc_record.last_sent_record_num_count = 0;
+            return 0;
+        }
+    }
+
+    return 1;
 }

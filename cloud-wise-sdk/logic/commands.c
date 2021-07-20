@@ -74,6 +74,8 @@ ConfigParameter parameter_list[NUM_OF_PARAMETERS] = {
     {"TAMPER_ANGLE2", (uint32_t *)&device_config.tamper_angle2, PARAM_NUMERIC, 1},
     {"DR_BH", NULL, PARAM_NUMERIC, 0},
     {"TAMPER_DIS", (uint32_t *)&device_config.config_flags, PARAM_NUMERIC, 1},
+    {"P_RECORD", NULL, PARAM_COMMAND, 0},
+    {"D_RECORD", NULL, PARAM_COMMAND, 0},
 
 };
 
@@ -295,28 +297,84 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
         break;
 
     case COMMAND_RECORD:
+    case COMMAND_PRINT_RECORD:
+    case COMMAND_DELETE_RECORD:
+
+        result = param_num;
 
         if (is_set_command) {
             if (param_num > 0) {
                 param_num = record_search(param_num);
+
+                if (param_num == -1) {
+                    result = -1;
+                    break;
+                }
+
+                // check stuck file here
+                if (!check_stuck_record(param_num)) {
+                    result = -1;
+                    break;
+                }
+
                 param_num = -param_num;
             }
 
-            if (param_num <= 0) {
-                if (!is_remote)
-                    record_print(-param_num);
+            if (command_index == COMMAND_PRINT_RECORD && (!is_remote)) {
+                record_print(-param_num);
+                result = 1;
             }
 
-            if (is_remote) {
-                // send record file here
-                set_last_ble_command_time();
+            switch (command_index) {
+            case COMMAND_RECORD:
 
-                ble_reading_file_state.file_type = FILE_TYPE_RECORD;
-                BFT_start(-param_num, 1);
-                result = param_num;
+                if (is_remote) {
+                    // send record file here
+                    set_last_ble_command_time();
+
+                    ble_reading_file_state.file_type = FILE_TYPE_RECORD;
+                    BFT_start(-param_num, 1);
+                    // result = param_num;
+                    param_num = -param_num;
+                }
+                else
+                {
+                  SendRecordAlert(result);
+                }
+
+                break;
+
+            case COMMAND_DELETE_RECORD:
+                DeleteRecord(-param_num);
+                result = 1;
+                break;
             }
+
+            // check status
+            // ..
+
+            /*
+                        if (param_num != -1) {
+                            if (param_num <= 0) {
+                                if (!is_remote)
+                                    record_print(-param_num);
+                            }
+
+                            if (is_remote) {
+                                // send record file here
+                                set_last_ble_command_time();
+
+                                ble_reading_file_state.file_type = FILE_TYPE_RECORD;
+                                BFT_start(-param_num, 1);
+                                // result = param_num;
+                                param_num = -param_num;
+                            }
+                        }
+                        */
+
         } else {
             record_scan_for_new_records(true);
+            result = 1;
         }
         break;
 

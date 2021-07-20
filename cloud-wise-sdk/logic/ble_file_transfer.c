@@ -29,6 +29,7 @@ uint8_t *      ble_file_read_buffer;
 BleReadingFileState ble_reading_file_state;
 
 extern DriverBehaviourState driver_behaviour_state;
+extern AccRecord acc_record;
 
 static uint32_t GetAbsoluteReadAddress(unsigned packet_index)
 {
@@ -83,6 +84,8 @@ static void FileTransferSucceed(void)
 
     ble_reading_file_state.state      = 0xFF;
     ble_reading_file_state.record_num = -1;
+
+    acc_record.last_sent_record_num_count++;
 
     DisplayMessage("\r\nFile transfer succeed\r\n", 0, true);
     // CreateLogEvent(LOG_BLE_READ_FILE_COMPLETED, 2);

@@ -243,6 +243,7 @@ void monitor_thread(void *arg)
                 record_scan_for_new_records(false);
             }
 
+
 #ifdef BLE_ADVERTISING
             if (ble_services_is_connected())
 #endif

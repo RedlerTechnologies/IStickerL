@@ -84,15 +84,21 @@ typedef struct {
     bool accident_identified;
     bool accident_saving;
 
+    uint8_t last_sent_record_num;
+    uint8_t last_sent_record_num_count;
+
 } AccRecord;
 
-void    record_init(void);
-uint8_t record_scan_for_new_records(bool forced);
-void    record_trigger(uint8_t reason);
-void    record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t value);
+void     record_init(void);
+uint8_t  record_scan_for_new_records(bool forced);
+void     record_trigger(uint8_t reason);
+void     record_write_status(uint8_t record_num, uint8_t indication_idx, uint8_t value);
 void     record_print(unsigned char record_num);
 int16_t  record_search(uint32_t record_id);
 uint32_t GetRandomNumber(void);
 
 void recorder_task(void *pvParameter);
 void close_recording(void);
+void DeleteRecord(uint8_t record_num);
+unsigned char check_stuck_record(unsigned char record_num);
+void SendRecordAlert(uint32_t record_id);
