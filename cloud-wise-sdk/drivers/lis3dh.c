@@ -169,9 +169,6 @@ bool lis3dh_init(void)
     NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
     return configure(m_acc_init, sizeof(m_acc_init) >> 1);
-    
-    //deinit_twim();
-    //return true;
 }
 
 void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)

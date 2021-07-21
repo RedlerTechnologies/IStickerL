@@ -60,7 +60,7 @@ static uint8_t     sample_buffer[7];
 //#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_400HZ
 #endif
 
-// ??????????????
+// TODO: chamge this define for each allowed samping rates
 // bug in Back office. It read correctly only of the hz code is 50hz
 // unremark the aboce section when the bug is fixed
 #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_50HZ
@@ -70,6 +70,7 @@ void SendRecordAlert(uint32_t record_id);
 
 AccRecord acc_record;
 
+// TODO: remove this callback as it not needed in DMA reading for accelerometer
 void sample_timer_toggle_timer_callback(TimerHandle_t xTimer)
 {
     BaseType_t xHigherPriorityTaskWoken, xResult;
@@ -180,6 +181,21 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     acc_sample_out->turn_direction  = (signed short)(turn_direction * 100);
 }
 
+void sampler_task(void *pvParameters)
+{
+    UNUSED_PARAMETER(pvParameters);
+
+    vTaskDelay(3000);
+    lis3dh_configure_fifo(); // ??????????
+
+    while (1) {
+        vTaskSuspend(NULL);
+
+        lis3dh_int_handler();
+    }
+}
+
+/*
 void sampler_task(void *pvParameter)
 {
     static AccSample          acc_sample;
@@ -296,6 +312,7 @@ void sampler_task(void *pvParameter)
         }
     }
 }
+*/
 
 void record_init(void)
 {
