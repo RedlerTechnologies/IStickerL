@@ -169,9 +169,6 @@ bool lis3dh_init(void)
     NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
     return configure(m_acc_init, sizeof(m_acc_init) >> 1);
-    
-    //deinit_twim();
-    //return true;
 }
 
 void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
@@ -188,7 +185,7 @@ void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
 
             NRFX_LOG_INFO("%s time: %u", __func__, diff_time);
 
-            // NRFX_LOG_HEXDUMP_INFO(m_samples_buffer, p_event->xfer_desc.secondary_length);
+            //NRFX_LOG_HEXDUMP_INFO(m_samples_buffer, p_event->xfer_desc.secondary_length);
         }
         break;
 
@@ -385,8 +382,8 @@ bool lis3dh_configure_fifo(void)
 
 inline bool lis3dh_int_handler(void)
 {
-    // uint8_t value = read_reg_blocking(LISDH_FIFO_SRC_REG);
-    // NRFX_LOG_INFO("%s %x %u", __func__, value, value & 0x1F);
+    //uint8_t value = read_reg_blocking(LISDH_FIFO_SRC_REG);
+    //NRFX_LOG_INFO("%s %x %u", __func__, value, value & 0x1F);
 
     m_start_time = xTaskGetTickCount();
     lis3dh_read_buffer(m_samples_buffer, BUFFER_LENGTH, LISDH_OUT_XL | TWI_MULTI_READ);
