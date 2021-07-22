@@ -1,4 +1,4 @@
-#include "peripherals.h"
+  #include "peripherals.h"
 
 #include "FreeRTOS.h"
 #include "ble/ble_services_manager.h"
@@ -22,6 +22,7 @@ char device_serial_number[SERIAL_NUMBER_WIDTH];
 static void hal_evt_handler(const hal_event_type_t event);
 
 extern DriverBehaviourState driver_behaviour_state;
+extern TaskHandle_t sampler_task_handle;
 
 void peripherals_init(void)
 {
@@ -51,6 +52,8 @@ static void hal_evt_handler(const hal_event_type_t event)
 
     case HAL_EVENT_LIS3DH_INT1:
         // NRFX_LOG_INFO("%s HAL_EVENT_LIS3DH_INT1", __func__);
+            xTaskResumeFromISR(sampler_task_handle);
+
         break;
 
     case HAL_EVENT_LIS3DH_INT2:

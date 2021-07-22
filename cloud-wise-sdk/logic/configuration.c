@@ -80,7 +80,10 @@ void SetManufactureDefault(void)
     device_config.tamper_angle2         = 15;
 
     memset(&device_config.config_flags, 0x00, 4);
-    device_config.config_flags.offroad_disabled = 1; // 0 - ??????????
+
+    // TODO: set this configuration to zero after offroad algorithm is done
+    device_config.config_flags.offroad_disabled = 1; // 0
+
     //device_config.config_flags.bumper_dis       = 1;
     device_config.config_flags.tamper_disabled = 0;
 

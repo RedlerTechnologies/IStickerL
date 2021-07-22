@@ -70,7 +70,7 @@ static TaskHandle_t m_logger_thread; // Logger thread
 
 TaskHandle_t driver_behaviour_task_handle;
 TaskHandle_t transfer_task_handle;
-TaskHandle_t sanpler_task_handle;
+TaskHandle_t sampler_task_handle;
 
 extern DriverBehaviourState driver_behaviour_state;
 
@@ -219,11 +219,12 @@ int main(void)
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
+ 
     UNUSED_VARIABLE(xTaskCreate(driver_behaviour_task, "Route", configMINIMAL_STACK_SIZE + 200, NULL, 2, &driver_behaviour_task_handle));
 
     UNUSED_VARIABLE(xTaskCreate(transfer_task, "Transfer", configMINIMAL_STACK_SIZE + 100, NULL, 2, &transfer_task_handle));
 
-    UNUSED_VARIABLE(xTaskCreate(sampler_task, "Sampler", configMINIMAL_STACK_SIZE + 100, NULL, 3, &sanpler_task_handle));
+    UNUSED_VARIABLE(xTaskCreate(sampler_task, "Sampler", configMINIMAL_STACK_SIZE + 100, NULL, 3, &sampler_task_handle));
 
     init_tasks();
 

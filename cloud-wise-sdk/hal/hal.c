@@ -9,10 +9,6 @@
 #include "nrfx_gpiote.h"
 #include "nrfx_saadc.h"
 
-#include "FreeRTOS.h"
-#include "tasks.h"
-
-
 #include <string.h>
 
 #define NRF_LOG_MODULE_NAME cloud_wise_sdk_hal
@@ -48,7 +44,6 @@ static void uart0_event_handler(nrfx_uart_event_t const *p_event, void *p_contex
 static void saadc_event_handler(nrfx_saadc_evt_t const *p_event);
 
 static hal_evt_handler_t p_evt_handler;
-extern TaskHandle_t sanpler_task_handle;
 
 void hal_init(hal_evt_handler_t evt_handler, nrfx_spi_evt_handler_t spi_handler, nrfx_twim_evt_handler_t twim_handler)
 {
@@ -79,8 +74,7 @@ static void gpiote_event_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t ac
     switch (pin) {
     case HAL_LIS3DH_INT1:
         if (m_int_enable.lis3dh_int1)
-            p_evt_handler(HAL_EVENT_LIS3DH_INT1);
-            TaskResumeFromISR(sanpler_task_handle);  
+            p_evt_handler(HAL_EVENT_LIS3DH_INT1); 
         break;
 
     case HAL_LIS3DH_INT2:

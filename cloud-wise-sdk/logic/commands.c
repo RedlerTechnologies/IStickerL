@@ -201,7 +201,8 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
     uint8_t                 numeric_result = 1;
     bool                    is_remote      = (source == 1); // ble
 
-    static uint8_t xxx = 0; // ????????????
+    // TODO: Remove this variable. it is used to test DRIVER BEHAVIOUR COMMANDS
+    static uint8_t xxx = 0;
 
     param_num = atoi(param);
     p         = &parameter_list[command_index];
@@ -427,9 +428,10 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
                 break;
 
             case 10:
+                // TODO:
                 // keep connection active
                 // enable this line only after the app stops sending unnecessary BLE 10 commands
-                // ???????????? driver_behaviour_state.last_ble_command_time = xTaskGetTickCount();
+                // driver_behaviour_state.last_ble_command_time = xTaskGetTickCount();
                 break;
 
             case 9:

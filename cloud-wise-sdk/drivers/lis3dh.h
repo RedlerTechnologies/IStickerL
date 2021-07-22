@@ -12,3 +12,5 @@ bool lis3dh_configure_fifo(void);
 bool lis3dh_int_handler(void);
 
 void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context);
+
+uint8_t read_reg_blocking(uint8_t reg);

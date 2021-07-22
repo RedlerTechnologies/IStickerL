@@ -221,7 +221,7 @@ static void peripherals_init(void)
 
     NRF_LOG_FLUSH();
 
-    hal_interrupts_set(true, true); // ?????
+    hal_interrupts_set(true, true);
 }
 
 void lis3dh_thread(void *pvParameters)

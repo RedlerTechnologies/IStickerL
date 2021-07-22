@@ -26,11 +26,14 @@
 
 static uint8_t flash_buffer[260];
 
+
 extern xSemaphoreHandle     tx_uart_semaphore;
 extern DriverBehaviourState driver_behaviour_state;
 extern AccidentState        accident_state;
 extern ScanResult           scan_result;
 extern DeviceConfiguration  device_config;
+
+extern uint8_t m_samples_buffer[];
 
 xSemaphoreHandle acc_recording_semaphore;
 
@@ -86,13 +89,36 @@ void sample_timer_toggle_timer_callback(TimerHandle_t xTimer)
     }
 }
 
+typedef struct {
+
+    int16_t ax; // acceleration on x axis
+    int16_t ay; // acceleration on y axis
+    int16_t az; // acceleration on z axis
+
+} lis3dh_raw_data_t;
+
+static lis3dh_raw_data_t t;
+
 void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
 {
-    signed short   x, y, z;
-    signed short   x1, y1, z1;
-    unsigned short mask = 0x8000;
-    ret_code_t     err_code;
+    //signed short   x, y, z;
+    //signed short   x1, y1, z1;
+    //unsigned short mask = 0x8000;
+    //ret_code_t     err_code;
 
+     #ifdef USING_ACC_DMA
+     memcpy( &t, buffer, 6 );
+     t.ax = (t.ax >> 6) * 48;
+     t.ay = (t.ay >> 6) * 48;
+     t.az = (t.az >> 6) * 48;
+     #else
+     memcpy( &t, buffer+1, 6 );
+     t.ax = (t.ax >> 4) * 12;
+     t.ay = (t.ay >> 4) * 12;
+     t.az = (t.az >> 4) * 12;
+     #endif
+
+    /*
     x = 0;
     y = 0;
     z = 0;
@@ -123,10 +149,11 @@ void calculate_sample(AccSample *acc_sample, uint8_t *buffer)
         z1 |= 0xF000;
     else
         z1 &= 0x0FFF;
+   */
 
-    acc_sample->X = -x1 * 12;
-    acc_sample->Y = -y1 * 12;
-    acc_sample->Z = z1 * 12;
+    acc_sample->X = -t.ax;
+    acc_sample->Y = -t.ay;
+    acc_sample->Z = t.az;
 }
 
 void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sample_out)
@@ -181,12 +208,13 @@ void ACC_CalibrateSample(AccSample *acc_sample_in, AccConvertedSample *acc_sampl
     acc_sample_out->turn_direction  = (signed short)(turn_direction * 100);
 }
 
+/*
 void sampler_task(void *pvParameters)
 {
     UNUSED_PARAMETER(pvParameters);
 
     vTaskDelay(3000);
-    lis3dh_configure_fifo(); // ??????????
+    lis3dh_configure_fifo();
 
     while (1) {
         vTaskSuspend(NULL);
@@ -194,8 +222,9 @@ void sampler_task(void *pvParameters)
         lis3dh_int_handler();
     }
 }
+*/
 
-/*
+
 void sampler_task(void *pvParameter)
 {
     static AccSample          acc_sample;
@@ -211,18 +240,58 @@ void sampler_task(void *pvParameter)
 
     block_length = sizeof(AccConvertedSample) * SAMPLE_BUFFER_SIZE;
 
+    #ifndef USING_ACC_DMA
     sample_timer_handle = xTimerCreate("SAMPLES", TIMER_PERIOD, pdTRUE, NULL, sample_timer_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(sample_timer_handle, 0));
+    #endif
 
     vTaskDelay(3000);
+
+    #ifdef USING_ACC_DMA
+   lis3dh_configure_fifo();
+   #endif
 
     while (1) {
 
         monitor_task_set(TASK_MONITOR_BIT_TRACKING);
 
+        #ifdef USING_ACC_DMA
+
+        vTaskSuspend(NULL);
+       // interrupt occurred (accelerometer FIFO is full with 32 data samples)
+ 
+        // activate reading via DMA
+        lis3dh_int_handler();
+        #endif
+
         uxBits = xEventGroupWaitBits(event_sample_timer, 0x01, pdTRUE, pdFALSE, 100);
 
         if (uxBits) {
+
+        // DMA was read to buffer m_samples_buffer
+   
+        #ifdef USING_ACC_DMA
+          // received the data from DMA
+
+          count = 0;
+
+          while (count < 32)
+          {
+            calculate_sample(&acc_sample, m_samples_buffer + sizeof(uint8_t)*6*count);
+       
+            if (driver_behaviour_state.calibrated && driver_behaviour_state.track_state != TRACKING_STATE_SLEEP) {
+                ACC_CalibrateSample(&acc_sample, &acc_sample1);
+            } else {
+                memcpy(&acc_sample1, &acc_sample, sizeof(AccSample));
+            }
+
+            acc_samples[count] = acc_sample1;
+            count++;
+            acc_record.sample_count++;
+          }
+
+          //continue;
+        #else
             lis3dh_read_buffer(sample_buffer, 7, (0x27 | 0x80));
 
             status = sample_buffer[0];
@@ -248,7 +317,9 @@ void sampler_task(void *pvParameter)
 
             acc_samples[count] = acc_sample1;
 
+            acc_record.sample_count++;
             count++;
+        #endif
 
             if (count >= SAMPLE_BUFFER_SIZE) {
                 count = 0;
@@ -312,7 +383,6 @@ void sampler_task(void *pvParameter)
         }
     }
 }
-*/
 
 void record_init(void)
 {

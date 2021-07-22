@@ -290,6 +290,7 @@ void driver_behaviour_task(void *pvParameter)
                         DisplayMessage("\r\nError Acc Configuration (Sleep) \r\n", 0, true);
                     }
                     */
+                    lis3dh_configure_sleep();
 
                     vTaskDelay(2000);
 

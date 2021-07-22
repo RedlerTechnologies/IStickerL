@@ -3,6 +3,7 @@
 #include "FreeRTOS.h"
 #include "hal/hal_drivers.h"
 #include "task.h"
+#include "event_groups.h"
 
 #define NRF_LOG_MODULE_NAME cloud_wise_sdk_drivers_lis3dh
 #define NRF_LOG_LEVEL CLOUD_WISE_DEFAULT_LOG_LEVEL
@@ -10,6 +11,7 @@
 NRF_LOG_MODULE_REGISTER();
 
 static TickType_t m_start_time;
+extern EventGroupHandle_t event_sample_timer;
 
 #define LIS3DH_ADDR 0x19
 
@@ -28,6 +30,7 @@ static TickType_t m_start_time;
 #ifdef ACC_SAMPLE_FREQ_200HZ
 #define ACC_REG_20H 0x67
 #endif
+
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
 #define ACC_REG_20H 0x77
@@ -156,10 +159,10 @@ static volatile bool m_read_buffers = false;
 
 static bool    configure(uint8_t *table, uint8_t table_size);
 static void    write_reg_blocking(uint8_t reg, uint8_t value);
-static uint8_t read_reg_blocking(uint8_t reg);
+//static uint8_t read_reg_blocking(uint8_t reg);
 
 #define BUFFER_LENGTH (32 * sizeof(uint16_t) * 3)
-static uint8_t m_samples_buffer[BUFFER_LENGTH];
+uint8_t m_samples_buffer[BUFFER_LENGTH];
 
 bool lis3dh_init(void)
 {
@@ -169,6 +172,21 @@ bool lis3dh_init(void)
     NRFX_LOG_INFO("%s LIS3DH ID 0x%x", __func__, value);
 
     return configure(m_acc_init, sizeof(m_acc_init) >> 1);
+}
+
+void notify_task(void)
+{
+    BaseType_t xHigherPriorityTaskWoken, xResult;
+
+    //UNUSED_PARAMETER(xTimer);
+
+    xHigherPriorityTaskWoken = pdFALSE;
+
+    xResult = xEventGroupSetBitsFromISR(event_sample_timer, 0x01, &xHigherPriorityTaskWoken);
+
+    if (xResult != pdFAIL) {
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
 }
 
 void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
@@ -187,6 +205,7 @@ void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
 
             // NRFX_LOG_HEXDUMP_INFO(m_samples_buffer, p_event->xfer_desc.secondary_length);
             // TODO Notify of data ******
+            notify_task();
         }
         break;
 
@@ -196,7 +215,7 @@ void lis3dh_evt_handler(nrfx_twim_evt_t const *p_event, void *p_context)
     }
 }
 
-static uint8_t read_reg_blocking(uint8_t reg)
+uint8_t read_reg_blocking(uint8_t reg)
 {
     ret_code_t     err_code;
     static uint8_t tx_temp_data;

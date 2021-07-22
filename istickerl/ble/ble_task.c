@@ -187,9 +187,6 @@ static void check_ble_events(void)
         if (uxBits & (BLE_EVENTS_SERVER_TIMEOUT | BLE_EVENTS_CLIENT_TIMEOUT)) {
             DisplayMessage("\r\nBLE timeout\r\n", 0, true);
         }
-
-
-        // ??????????? CreateDebugEvent(EVENT_DEBUG_BLE_STATUS_CHANGE , get_bit(uxBits), false);
     }
 }
 
