@@ -31,7 +31,7 @@ void LoadConfiguration(void)
     terminal_buffer_release();
 
     if (crc != device_config.crc) {
-        SetManufactureDefault();
+        SetManufactureDefault(0);
         SaveConfiguration(true);
     }
 
@@ -64,11 +64,19 @@ void SaveConfiguration(bool force)
     }
 }
 
-void SetManufactureDefault(void)
+
+// profile:
+//  0 - production
+//  1 - pilot
+//  2 - experiment
+//  3 - lab test
+void SetManufactureDefault(uint8_t profile_num)
 {
     uint8_t i;
 
     memset(&device_config, 0x00, 254);
+
+    device_config.profile_code = profile_num;
 
     device_config.AccidentG             = MIN_G_FOR_ACCIDENT_EVENT;
     device_config.buzzer_mode           = BUZZER_MODE_ON;
@@ -85,7 +93,7 @@ void SetManufactureDefault(void)
     device_config.config_flags.offroad_disabled = 1; // 0
 
     //device_config.config_flags.bumper_dis       = 1;
-    device_config.config_flags.tamper_disabled = 0;
+    //device_config.config_flags.tamper_disabled = 0;
 
     memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
 
@@ -130,6 +138,26 @@ void SetManufactureDefault(void)
     device_config.dr_bh_durations[DRIVER_BEHAVIOR_SLALUM][0] = DR_SLALUM_MAX_DUR_BETWEEN_TURNS;
     device_config.dr_bh_durations[DRIVER_BEHAVIOR_SLALUM][1] = DR_SLALUM_MIN_TURNS;
 */
+
+    switch (profile_num)
+    {
+      case 0: // production
+        break;
+
+      case 1: // pilot
+        break;  
+
+      case 2: // experiment
+        device_config.AccidentG             = 14;
+        device_config.config_flags.tamper_disabled = 1;
+        break;
+
+      case 3: // lab test
+        device_config.AccidentG             = 7;
+        device_config.config_flags.tamper_disabled = 1;
+        break;        
+    }
+
 
     device_config.crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
 }

@@ -56,9 +56,21 @@ static uint32_t GetAbsoluteReadAddress(unsigned packet_index)
 
 void FileTransferFailed(bool abort)
 {
+    static int16_t last_record_num = -1;
+
     if (ble_services_is_connected() & !abort) {
         if (ble_reading_file_state.record_num >= 0)
-            record_write_status(ble_reading_file_state.record_num, RECORD_SENT_IND, 1 /* error status>0 */);
+        {
+            if (ble_reading_file_state.record_num == last_record_num)
+            {
+              record_write_status(ble_reading_file_state.record_num, RECORD_SENT_IND, 1 /* error status>0 */);
+              last_record_num = -1;
+            }
+            else
+            {
+              last_record_num = ble_reading_file_state.record_num;
+            }
+        }
     }
 
     ble_reading_file_state.next_read_address = 0x0FFFFFFF;

@@ -48,7 +48,7 @@ typedef struct {
 
     unsigned char AccidentG;
     unsigned char buzzer_mode;
-    unsigned char reservered3;
+    unsigned char profile_code;
 
     // 0x0030
     unsigned short offroad_g;
@@ -111,5 +111,5 @@ typedef struct {
 } DeviceConfiguration;
 
 void LoadConfiguration(void);
-void SetManufactureDefault(void);
+void SetManufactureDefault(uint8_t profile_num);
 void SaveConfiguration(bool force);

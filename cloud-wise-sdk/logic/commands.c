@@ -594,11 +594,13 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
 
         if (is_set_command) {
 
-            SetManufactureDefault();
+            SetManufactureDefault(param_num);
             SaveConfiguration(true);
 
             ActivateSoftwareReset(RESET_SET_MANUFACTURE_DEFAULT, 0, 0, 0);
         }
+
+        result = device_config.profile_code;
 
         break;
 

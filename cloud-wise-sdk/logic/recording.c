@@ -52,21 +52,21 @@ EventGroupHandle_t event_sample_timer;
 static uint8_t     sample_buffer[7];
 
 #ifdef ACC_SAMPLE_FREQ_100HZ
-// #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_100HZ
+#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_100HZ
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_200HZ
-//#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_200HZ
+#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_200HZ
 #endif
 
 #ifdef ACC_SAMPLE_FREQ_400HZ
-//#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_400HZ
+#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_400HZ
 #endif
 
-// TODO: chamge this define for each allowed samping rates
+// TODO: change this define for each allowed samping rates
 // bug in Back office. It read correctly only of the hz code is 50hz
 // unremark the aboce section when the bug is fixed
-#define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_50HZ
+// #define RECORD_SAMPLE_FREQ_CODE RECORD_SAMPLE_FREQ_50HZ
 
 static void record_create_new(void);
 void SendRecordAlert(uint32_t record_id);

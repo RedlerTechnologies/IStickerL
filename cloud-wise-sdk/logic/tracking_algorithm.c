@@ -308,8 +308,11 @@ void driver_behaviour_task(void *pvParameter)
             }
         }
 
-        // ??????
-        // need_sleep = false;
+        // no sleep on experiment
+        if (device_config.profile_code == 2)
+        {
+          driver_behaviour_state.last_activity_time = xTaskGetTickCount();
+        }
 
         if (need_sleep) {
             DisplayMessage("\r\nSleeping...\r\n", 0, true);
