@@ -317,6 +317,7 @@ void run_command(int8_t command_index, uint8_t *param, uint8_t *param_result, ui
                     break;
                 }
 
+                ble_reading_file_state.record_id = result;
                 param_num = -param_num;
             }
 

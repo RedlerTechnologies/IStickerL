@@ -17,147 +17,141 @@ DeviceConfiguration device_config;
 
 extern DriverBehaviourState driver_behaviour_state;
 
-void LoadConfiguration(void)
-{
-    uint16_t crc;
+void LoadConfiguration(void) {
+  uint16_t crc;
+
+  terminal_buffer_lock();
+
+  flash_read_buffer(alert_str, CONFIGURATION_ADDRESS, 256);
+  memcpy(&device_config, alert_str + 4, 256);
+
+  crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
+
+  terminal_buffer_release();
+
+  if (crc != device_config.crc) {
+    SetManufactureDefault(0);
+    SaveConfiguration(true);
+  }
+
+  // strcpy ( device_config.DeviceName , "S-KKKK0000001" );
+
+  // device_config.AccidentG = MIN_G_FOR_ACCIDENT_EVENT;
+}
+
+void SaveConfiguration(bool force) {
+  uint16_t crc;
+
+  crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
+
+  if (force || crc != device_config.crc) {
+
+    device_config.crc = crc;
+
+    flash_erase_sector(CONFIGURATION_ADDRESS);
 
     terminal_buffer_lock();
 
-    flash_read_buffer(alert_str, CONFIGURATION_ADDRESS, 256);
-    memcpy(&device_config, alert_str + 4, 256);
+    memcpy(alert_str + 4, &device_config, 256);
 
-    crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
+    flash_write_buffer(alert_str, CONFIGURATION_ADDRESS, 256);
 
     terminal_buffer_release();
 
-    if (crc != device_config.crc) {
-        SetManufactureDefault(0);
-        SaveConfiguration(true);
-    }
-
-    // strcpy ( device_config.DeviceName , "S-KKKK0000001" );
-
-    // device_config.AccidentG = MIN_G_FOR_ACCIDENT_EVENT;
+    DisplayMessage("\r\nConfiguration saved\r\n", 0, true);
+  }
 }
-
-void SaveConfiguration(bool force)
-{
-    uint16_t crc;
-
-    crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
-
-    if (force || crc != device_config.crc) {
-
-        device_config.crc = crc;
-
-        flash_erase_sector(CONFIGURATION_ADDRESS);
-
-        terminal_buffer_lock();
-
-        memcpy(alert_str + 4, &device_config, 256);
-
-        flash_write_buffer(alert_str, CONFIGURATION_ADDRESS, 256);
-
-        terminal_buffer_release();
-
-        DisplayMessage("\r\nConfiguration saved\r\n", 0, true);
-    }
-}
-
 
 // profile:
 //  0 - production
 //  1 - pilot
 //  2 - experiment
 //  3 - lab test
-void SetManufactureDefault(uint8_t profile_num)
-{
-    uint8_t i;
+void SetManufactureDefault(uint8_t profile_num) {
+  uint8_t i;
 
-    memset(&device_config, 0x00, 254);
+  memset(&device_config, 0x00, 254);
 
-    device_config.profile_code = profile_num;
+  device_config.profile_code = profile_num;
 
-    device_config.AccidentG             = MIN_G_FOR_ACCIDENT_EVENT;
-    device_config.buzzer_mode           = BUZZER_MODE_ON;
-    device_config.filter_z              = 75;
-    device_config.offroad_g             = 25;
-    device_config.offroad_per           = 50;
-    device_config.min_events_for_tamper = 15;
-    device_config.tamper_angle1         = 35;
-    device_config.tamper_angle2         = 15;
+  device_config.AccidentG = MIN_G_FOR_ACCIDENT_EVENT;
+  device_config.buzzer_mode = BUZZER_MODE_ON;
+  device_config.filter_z = 75;
+  device_config.offroad_g = 25;
+  device_config.offroad_per = 50;
+  device_config.min_events_for_tamper = 15;
+  device_config.tamper_angle1 = 35;
+  device_config.tamper_angle2 = 15;
 
-    memset(&device_config.config_flags, 0x00, 4);
+  memset(&device_config.config_flags, 0x00, 4);
 
-    // TODO: set this configuration to zero after offroad algorithm is done
-    device_config.config_flags.offroad_disabled = 1; // 0
+  // TODO: set this configuration to zero after offroad algorithm is done
+  device_config.config_flags.offroad_disabled = 1; // 0
 
-    //device_config.config_flags.bumper_dis       = 1;
-    //device_config.config_flags.tamper_disabled = 0;
+  //device_config.config_flags.bumper_dis       = 1;
+  //device_config.config_flags.tamper_disabled = 0;
 
-    memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
+  memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
 
-    // driver behaviour table
+  // driver behaviour table
 
-    for (i = 0; i < NUM_DRIVER_EVENT_TYPES; i++) {
-        device_config.dr_bh_durations[i][0] = 3;
-        device_config.dr_bh_durations[i][1] = 3;
-        device_config.dr_bh_durations[i][2] = 3;
+  for (i = 0; i < NUM_DRIVER_EVENT_TYPES; i++) {
+    device_config.dr_bh_durations[i][0] = 3;
+    device_config.dr_bh_durations[i][1] = 3;
+    device_config.dr_bh_durations[i][2] = 3;
 
-        device_config.dr_bh_gvalues[i][0] = 15;
-        device_config.dr_bh_gvalues[i][1] = 15;
-        device_config.dr_bh_gvalues[i][2] = 15;
-    }
+    device_config.dr_bh_gvalues[i][0] = 15;
+    device_config.dr_bh_gvalues[i][1] = 15;
+    device_config.dr_bh_gvalues[i][2] = 15;
+  }
 
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][2] = DR_BRAKES_G_TH_3;
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][1] = DR_BRAKES_G_TH_2;
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][0] = DR_BRAKES_G_TH_1;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][2] = DR_BRAKES_G_TH_3;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][1] = DR_BRAKES_G_TH_2;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_BRAKES][0] = DR_BRAKES_G_TH_1;
 
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][2] = DR_BRAKES_DURATION_TH_3;
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][1] = DR_BRAKES_DURATION_TH_2;
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][0] = DR_BRAKES_DURATION_TH_1;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][2] = DR_BRAKES_DURATION_TH_3;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][1] = DR_BRAKES_DURATION_TH_2;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_BRAKES][0] = DR_BRAKES_DURATION_TH_1;
 
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][2] = DR_ACCEL_G_TH_3;
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][1] = DR_ACCEL_G_TH_2;
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][0] = DR_ACCEL_G_TH_1;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][2] = DR_ACCEL_G_TH_3;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][1] = DR_ACCEL_G_TH_2;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_EVENT_ACCEL][0] = DR_ACCEL_G_TH_1;
 
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][2] = DR_ACCEL_DURATION_TH_3;
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][1] = DR_ACCEL_DURATION_TH_2;
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][0] = DR_ACCEL_DURATION_TH_1;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][2] = DR_ACCEL_DURATION_TH_3;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][1] = DR_ACCEL_DURATION_TH_2;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_EVENT_ACCEL][0] = DR_ACCEL_DURATION_TH_1;
 
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][2] = DR_SHARP_TURN_G_TH_3;
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][1] = DR_SHARP_TURN_G_TH_2;
-    device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][0] = DR_SHARP_TURN_G_TH_1;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][2] = DR_SHARP_TURN_G_TH_3;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][1] = DR_SHARP_TURN_G_TH_2;
+  device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SHARP_TURN][0] = DR_SHARP_TURN_G_TH_1;
 
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][2] = DR_SHARP_TURN_DURATION_TH_3;
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][1] = DR_SHARP_TURN_DURATION_TH_2;
-    device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][0] = DR_SHARP_TURN_DURATION_TH_1;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][2] = DR_SHARP_TURN_DURATION_TH_3;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][1] = DR_SHARP_TURN_DURATION_TH_2;
+  device_config.dr_bh_durations[DRIVER_BEHAVIOR_SHARP_TURN][0] = DR_SHARP_TURN_DURATION_TH_1;
 
-/*
+  /*
     device_config.dr_bh_gvalues[DRIVER_BEHAVIOR_SLALUM][0]   = DR_SLALUM_GFORCE_TH;
     device_config.dr_bh_durations[DRIVER_BEHAVIOR_SLALUM][0] = DR_SLALUM_MAX_DUR_BETWEEN_TURNS;
     device_config.dr_bh_durations[DRIVER_BEHAVIOR_SLALUM][1] = DR_SLALUM_MIN_TURNS;
 */
 
-    switch (profile_num)
-    {
-      case 0: // production
-        break;
+  switch (profile_num) {
+  case PROFILE_PRODUCTION:
+    break;
 
-      case 1: // pilot
-        break;  
+  case PROFILE_PILOT:
+    break;
 
-      case 2: // experiment
-        device_config.AccidentG             = 14;
-        device_config.config_flags.tamper_disabled = 1;
-        break;
+  case PROFILE_EXPERIMENT:
+    device_config.AccidentG = 14;
+    device_config.config_flags.tamper_disabled = 1;
+    break;
 
-      case 3: // lab test
-        device_config.AccidentG             = 7;
-        device_config.config_flags.tamper_disabled = 1;
-        break;        
-    }
+  case PROFILE_LAB:
+    device_config.AccidentG = 7;
+    device_config.config_flags.tamper_disabled = 1;
+    break;
+  }
 
-
-    device_config.crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
+  device_config.crc = CRC16_Calc((uint8_t *)&device_config, 254, 0);
 }

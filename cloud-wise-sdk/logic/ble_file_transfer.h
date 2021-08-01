@@ -28,6 +28,7 @@ typedef struct {
     uint32_t last_ack_time;
     int32_t  next_read_address;
     int32_t  prev_packet_address;
+    uint32_t record_id;
 
     int16_t record_num;
     uint8_t offset;

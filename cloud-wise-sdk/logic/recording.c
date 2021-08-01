@@ -675,7 +675,7 @@ void close_recording(void)
         flash_address += len;
     }
 
-    // CreateDebugEvent(EVENT_DEBUG_ACC_RECORD_COMPLETE, acc_record.record_id, 3, 0);
+    CreateDebugEvent(EVENT_DEBUG_ACC_RECORD_COMPLETE, acc_record.record_id, false);
 
     SendRecordAlert(acc_record.record_id);
 
