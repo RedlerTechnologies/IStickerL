@@ -228,8 +228,7 @@ void lis3dh_thread(void *pvParameters)
 {
     UNUSED_PARAMETER(pvParameters);
 
-    // WARNING
-    lis3dh_configure_fifo(); // ?????
+    lis3dh_configure_fifo();
 
     while (1) {
         vTaskSuspend(NULL);

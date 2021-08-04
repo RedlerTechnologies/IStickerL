@@ -88,7 +88,6 @@ void SetManufactureDefault(uint8_t profile_num) {
   // TODO: set this configuration to zero after offroad algorithm is done
   device_config.config_flags.offroad_disabled = 1; // 0
 
-  //device_config.config_flags.bumper_dis       = 1;
   //device_config.config_flags.tamper_disabled = 0;
 
   memset(&device_config.calibrate_value, 0x00, sizeof(CalibratedValue));
@@ -145,11 +144,13 @@ void SetManufactureDefault(uint8_t profile_num) {
   case PROFILE_EXPERIMENT:
     device_config.AccidentG = 14;
     device_config.config_flags.tamper_disabled = 1;
+    device_config.config_flags.bumper_dis = 1;
     break;
 
   case PROFILE_LAB:
     device_config.AccidentG = 7;
     device_config.config_flags.tamper_disabled = 1;
+    device_config.config_flags.bumper_dis = 1;
     break;
   }
 

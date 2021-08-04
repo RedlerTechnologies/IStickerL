@@ -30,17 +30,29 @@ bool buzzer_init(void)
     return true;
 }
 
-bool buzzer_train(uint8_t repeats)
+bool buzzer_train_test(uint8_t repeats)
 {
+    #ifdef BUZZER_DISABLE
     nrfx_pwm_simple_playback(hal_buzzer, &m_tuneSequence, repeats, NRFX_PWM_FLAG_STOP);
     return true;
+    #endif
+}
+
+bool buzzer_train(uint8_t repeats)
+{
+    #ifndef BUZZER_DISABLE
+    nrfx_pwm_simple_playback(hal_buzzer, &m_tuneSequence, repeats, NRFX_PWM_FLAG_STOP);
+    return true;
+    #endif
 }
 
 bool buzzer_long(uint16_t time_ms)
 {
+    #ifndef BUZZER_DISABLE
     m_tuneSequence1.repeats = time_ms;
     nrfx_pwm_simple_playback(hal_buzzer, &m_tuneSequence1, 1, NRFX_PWM_FLAG_STOP);
     return true;
+    #endif
 }
 
 bool buzzer_end(void)

@@ -9,6 +9,8 @@
 #define ACC_SAMPLE_FREQ_200HZ
 //#define ACC_SAMPLE_FREQ_400HZ
 
+//#define  BUZZER_DISABLE
+
 #define USING_ACC_DMA
 
 #define NRFX_LOG_LEVEL_OFF 0

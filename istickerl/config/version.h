@@ -34,7 +34,7 @@ extern char version[];
 
 #define APP_MAJOR_VERSION 1
 #define APP_MINOR_VERSION 3
-#define APP_BUILD 1
+#define APP_BUILD 2
 
 // Firmware Revision String (Device Information Service)
 #define FIRMWARE_REV STRINGIFY(APP_MAJOR_VERSION) "." STRINGIFY(APP_MINOR_VERSION) "." STRINGIFY(APP_BUILD)
