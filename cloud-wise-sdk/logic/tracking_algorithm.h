@@ -15,7 +15,7 @@
 #define TIMER_PERIOD 2 // 2.5ms sample rate
 #endif
 
-#define ACC_MIN_ACCIDENT_VALUE 25
+#define ACC_MIN_ACCIDENT_VALUE 30 // 25     // 0.25g
 #define MIN_G_FOR_ACCIDENT_EVENT 25   // 2.5g
 
 #ifdef ACC_SAMPLE_FREQ_100HZ
@@ -142,14 +142,14 @@ typedef struct {
     ////////////////////////
 
     signed short   max_g;
-    signed short   sample_in_drive_direction;
-    signed short   sample_in_turn_direction;
     unsigned short accident_sample_count;
     signed short   hit_angle;
     unsigned short time_to_sleep_left_in_sec;
     unsigned       sum_g_accident;
     AccidentState  accident_state;
 
+    AccConvertedSample sample_on_gmax;
+    
     // on_driving
     unsigned       last_activity_time;
     unsigned       enter_sleeping_time;

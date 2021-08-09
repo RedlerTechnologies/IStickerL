@@ -1,6 +1,7 @@
 #pragma once
 
 #define BLE_ADVERTISING
+#define RELEASE_COMPILATION
 #define FLASH_TEST_ENABLE 0
 //#define SLEEP_DISABLE
 //#define DISABLE_WATCHDOG

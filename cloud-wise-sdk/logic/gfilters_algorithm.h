@@ -9,7 +9,7 @@
 #define TIME_EVENT_IN_QUEUE 5
 #define DELAY_BETWEEN_GFILTER_EVENT_MSEC 5000
 
-#define BUMPER_BLOCK_DRIVER_EVENTS_TIME (3*1000)
+#define BUMPER_BLOCK_DRIVER_EVENTS_TIME (3 * 1000)
 
 /*
 // table of driver behaviour thresholds
@@ -68,7 +68,7 @@
 
 #define DR_ACCEL_MIN_GFORCE 0.05
 
-#define DR_ACCEL_DURATION_TH_3 5// 30
+#define DR_ACCEL_DURATION_TH_3 5 // 30
 #define DR_ACCEL_DURATION_TH_2 4 // 8
 #define DR_ACCEL_DURATION_TH_1 3 //4
 
@@ -105,30 +105,31 @@
 #define DR_SHARP_TURN_G_TH_1 30 // 0.26
 
 typedef struct {
-    uint8_t code;
-    uint8_t axis;
-    uint8_t positive;
+  uint8_t code;
+  uint8_t axis;
+  uint8_t positive;
 
-    int16_t  min_g;         // units: 1/100 g
-    uint16_t min_duration;  // units in msec
-    int16_t  min_g2;        // units: 1/100 g
-    uint16_t min_duration2; // units in msec
-    int16_t  min_g3;        // units: 1/100 g
-    uint16_t min_duration3; // units in msec
+  int16_t min_g;          // units: 1/100 g
+  uint16_t min_duration;  // units in msec
+  int16_t min_g2;         // units: 1/100 g
+  uint16_t min_duration2; // units in msec
+  int16_t min_g3;         // units: 1/100 g
+  uint16_t min_duration3; // units in msec
 
-    uint8_t name[8];
+  uint8_t name[8];
 } GFilterConfig;
 
 typedef struct {
-    uint32_t energy;
-    uint32_t timestamp;
-    uint32_t event_time;
-    uint32_t duration_count;
-    uint32_t max_g;
-    uint8_t  state;
-    uint8_t  severity;
-    uint8_t  index;
-    uint8_t  g_is_over;
+  uint32_t energy;
+  uint32_t timestamp;
+  uint32_t event_time;
+  uint32_t duration_count;
+  uint32_t max_g;
+
+  uint8_t state;
+  uint8_t severity;
+  uint8_t index;
+  uint8_t g_is_over;
 } GFilterState;
 
 void Process_GFilters(AccConvertedSample *samples);

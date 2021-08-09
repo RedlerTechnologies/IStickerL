@@ -119,8 +119,8 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample) {
       state->accident_state = ACCIDENT_STATE_STARTED;
 
     if (state->accident_state == ACCIDENT_STATE_STARTED) {
-      // buzzer_train_test(1);
       state->accident_sample_count = 1;
+      state->sample_on_gmax = *sample;
       state->max_g = GetGValue(sample);
       state->sum_g_accident = state->max_g;
       state->hit_angle = calculate_accident_hit_angle(sample);
@@ -136,9 +136,7 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample) {
 
     if (value > state->max_g) {
       state->max_g = value;
-      state->sample_in_drive_direction = sample->drive_direction;
-      state->sample_in_turn_direction = sample->turn_direction;
-      state->hit_angle = calculate_accident_hit_angle(sample);
+      state->sample_on_gmax = *sample;
     }
 
     // bumper block accident
@@ -146,6 +144,28 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample) {
       state->accident_state = ACCIDENT_STATE_NONE;
 
     if (state->accident_sample_count >= MIN_SAMPLES_FOR_ACCIDENT) {
+
+      if (device_config.profile_code == PROFILE_LAB) {
+        duration = timeDiff(xTaskGetTickCount(), last_print_time);
+
+        if (duration > 2500) {
+          state->hit_angle = calculate_accident_hit_angle(&state->sample_on_gmax);
+
+          terminal_buffer_lock();
+          sprintf(alert_str, "\r\nGmax=%d x=%d, y=%d, z=%d ang=%d\r\n", state->max_g, state->sample_on_gmax.drive_direction,
+              state->sample_on_gmax.turn_direction, state->sample_on_gmax.earth_direction, state->hit_angle);
+          DisplayMessage(alert_str, 0, false);
+          terminal_buffer_release();
+          last_print_time = xTaskGetTickCount();
+          buzzer_train(5);
+        }
+      }
+
+      if (device_config.profile_code == PROFILE_LAB) {
+        state->accident_state = ACCIDENT_STATE_NONE;
+        break;
+      }
+
       if (state->max_g >= (device_config.AccidentG * 10) || driver_behaviour_state.record_triggered) {
         /////////////////////////
         // accident identified //
@@ -160,16 +180,6 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample) {
         record_trigger(0);
       } else {
         state->accident_state = ACCIDENT_STATE_NONE;
-
-        duration = timeDiff(xTaskGetTickCount(), last_print_time);
-
-        if (duration > 3000) {
-          terminal_buffer_lock();
-          sprintf(alert_str, "\r\nNo Accident Gmax=: %d\r\n", state->max_g);
-          DisplayMessage(alert_str, 0, false);
-          terminal_buffer_release();
-          last_print_time = xTaskGetTickCount();
-        }
       }
     }
 
@@ -182,8 +192,9 @@ void Process_Accident(DriverBehaviourState *state, AccConvertedSample *sample) {
     if (state->accident_sample_count == MIN_SAMPLES_FOR_ACCIDENT) {
       // sending calibrate alert
 
+      state->hit_angle = calculate_accident_hit_angle(&state->sample_on_gmax);
+
       terminal_buffer_lock();
-      // sprintf(alert_str + 2, "@?X,%d,%d,%d\r\n", state->max_g, state->hit_angle, state->sum_g_accident);
       sprintf(alert_str + 2, "@?X,%d,%d\r\n", state->max_g, state->hit_angle);
       PostBleAlert(alert_str);
       terminal_buffer_release();

@@ -466,7 +466,7 @@ uint8_t record_scan_for_new_records(bool forced) {
   uint32_t record_id;
   int16_t index = -9;
   uint32_t duration;
-  uint16_t max_record_id = 0;
+  uint32_t max_record_id = 0;
   uint8_t i;
   uint8_t pending_counter = 0;
   uint8_t pending_status;
@@ -484,7 +484,7 @@ uint8_t record_scan_for_new_records(bool forced) {
       if (pending_status)
         pending_counter++;
 
-      if (record_id > max_record_id) {
+      if (record_id > max_record_id && pending_status) {
         index = i;
         max_record_id = record_id;
       }
@@ -496,7 +496,7 @@ uint8_t record_scan_for_new_records(bool forced) {
     if (((ble_services_is_connected()) && (driver_behaviour_state.accident_state != ACCIDENT_STATE_IDENTIFIED) &&
             (!in_sending_file())) ||
         forced) {
-      SendRecordAlert(record_id);
+      SendRecordAlert(max_record_id);
     }
   }
 
