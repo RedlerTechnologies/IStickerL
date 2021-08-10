@@ -7,8 +7,8 @@
 //#define DISABLE_WATCHDOG
 
 //#define ACC_SAMPLE_FREQ_100HZ
-#define ACC_SAMPLE_FREQ_200HZ
-//#define ACC_SAMPLE_FREQ_400HZ
+//#define ACC_SAMPLE_FREQ_200HZ
+#define ACC_SAMPLE_FREQ_400HZ  // ???????????????
 
 //#define  BUZZER_DISABLE
 

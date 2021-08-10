@@ -759,6 +759,7 @@ void record_print(uint8_t record_num) {
 
   i = 0;
   buffer = flash_buffer + 4;
+  flash_address = FLASH_RECORDS_START_ADDRESS + record_num * RECORD_SIZE + RECORD_HEADER_SIZE;
 
   while (i < RECORD_SIZE) {
     memset(flash_buffer, 0x00, 260);

@@ -510,6 +510,7 @@ bool monitor_task_check(void) {
       i++;
     }
 
+  #ifdef RELEASE_COMPILATION
     if (!status) {
       // force reset on stucked task
       DisplayMessage("\r\nTask is stucked\r\n", 0, true);
@@ -517,6 +518,7 @@ bool monitor_task_check(void) {
 
       ActivateSoftwareReset(RESET_WATCHDOG, task_id, 0, 0);
     }
+    #endif
   }
 
   state_machine_feed_watchdog();
